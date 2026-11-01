@@ -3,23 +3,23 @@
 import { motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
-import { useLang } from "@/lib/i18n"; // আপনার i18n হুক
+import { useLang } from "@/lib/i18n";
 
 const experiences = [
   {
     title: {
-      bn: "আর্কিটেকচার এক্সপেরিয়েন্স",
+      bn: "আর্কিটেকচার এক্সপেরিয়েন্স",
       en: "ARCHITECTURE EXPERIENCE",
     },
     years: "20+ Year",
     desc: {
-      bn: "ইউনিক ও এসথেটিক বিবেচনায় রেখে বিভিন্ন আর্কিটেকচারাল সমাধান তৈরি করা",
+      bn: "ইউনিক ও এসথেটিক বিবেচনায় রেখে বিভিন্ন আর্কিটেকচারাল সমাধান তৈরি করা",
       en: "Menyusun berbagai solusi arsitektur dengan mempertimbangkan keunikan dan estetika",
     },
   },
   {
     title: {
-      bn: "প্রজেক্ট ম্যানেজিং এক্সপেরিয়েন্স",
+      bn: "প্রজেক্ট ম্যানেজিং এক্সপেরিয়েন্স",
       en: "PROJECT MANAGING EXPERIENCE",
     },
     years: "25+ Year",
@@ -30,7 +30,7 @@ const experiences = [
   },
   {
     title: {
-      bn: "কনস্ট্রাকশন এক্সপেরিয়েন্স",
+      bn: "কনস্ট্রাকশন এক্সপেরিয়েন্স",
       en: "CONSTRUCTION EXPERIENCE",
     },
     years: "15+ Year",
@@ -66,7 +66,7 @@ const services = [
   {
     id: "04",
     title: {
-      bn: "রেসিডেনশিয়াল ও কমার্শিয়াল ইন্টেরিয়র ডিজাইন",
+      bn: "রেসিডেনশিয়াল ও কমার্শিয়াল ইন্টেরিয়র ডিজাইন",
       en: "Interior design for residential and commercial spaces",
     },
   },
@@ -103,7 +103,7 @@ export default function ArchitectureServices() {
   const { t } = useLang();
 
   return (
-    <section className="bg-white dark:bg-neutral-950 py-16 md:py-24 transition-colors duration-300">
+    <section className="bg-white py-16 text-ink-950 md:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Experience Stats */}
         <motion.div
@@ -119,13 +119,13 @@ export default function ArchitectureServices() {
               variants={item}
               className="text-center md:text-left"
             >
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-500 dark:text-neutral-400">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-950/50">
                 {t(exp.title)}
               </p>
-              <h3 className="mb-3 text-4xl font-light tracking-tight text-neutral-900 dark:text-white md:text-5xl">
+              <h3 className="mb-3 text-4xl font-light tracking-tight text-ink-950 md:text-5xl">
                 {exp.years}
               </h3>
-              <p className="mx-auto max-w-xs text-sm leading-relaxed text-neutral-500 dark:text-neutral-400 md:mx-0">
+              <p className="mx-auto max-w-xs text-sm leading-relaxed text-ink-950/60 md:mx-0">
                 {t(exp.desc)}
               </p>
             </motion.div>
@@ -140,7 +140,7 @@ export default function ArchitectureServices() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, ease: "easeOut" }}
-            className="relative overflow-hidden rounded-2xl lg:col-span-5"
+            className="relative overflow-hidden rounded-2xl lg:col-span-5 shadow-lg shadow-black/5"
           >
             <div className="relative aspect-[4/5] w-full">
               <Image
@@ -152,7 +152,7 @@ export default function ArchitectureServices() {
                 priority
               />
               {/* Overlay card */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-6 pt-20">
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-6 pt-20">
                 <h4 className="mb-1 text-lg font-medium text-white">
                   {t({
                     bn: "বিল্ডিং প্ল্যানিং ও ডিজাইন",
@@ -180,21 +180,21 @@ export default function ArchitectureServices() {
                 key={service.id}
                 variants={item}
                 href="#"
-                className="group flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 py-5 transition-colors hover:border-neutral-400 dark:hover:border-neutral-600"
+                className="group flex items-center justify-between border-b border-black/10 py-5 transition-colors hover:border-black/30"
               >
                 <div className="flex items-start gap-5">
-                  <span className="mt-0.5 text-sm font-medium text-neutral-400 dark:text-neutral-500 transition-colors group-hover:text-neutral-900 dark:group-hover:text-white">
+                  <span className="mt-0.5 text-sm font-medium text-ink-950/40 transition-colors group-hover:text-ink-950">
                     {service.id}
                   </span>
-                  <span className="text-base font-medium text-neutral-800 dark:text-neutral-200 transition-colors group-hover:text-neutral-900 dark:group-hover:text-white md:text-lg">
+                  <span className="text-base font-medium text-ink-950/80 transition-colors group-hover:text-ink-950 md:text-lg">
                     {t(service.title)}
                   </span>
                 </div>
 
-                <div className="ml-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 dark:border-neutral-700 transition-all duration-300 group-hover:border-neutral-900 dark:group-hover:border-white group-hover:bg-neutral-900 dark:group-hover:bg-white">
+                <div className="ml-4 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 transition-all duration-300 group-hover:border-ink-950 group-hover:bg-ink-950">
                   <ArrowUpRight
                     size={16}
-                    className="text-neutral-500 dark:text-neutral-400 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white dark:group-hover:text-neutral-900"
+                    className="text-ink-950/50 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white"
                   />
                 </div>
               </motion.a>

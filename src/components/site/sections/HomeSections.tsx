@@ -119,7 +119,7 @@ const PROJECTS = [
 export function FeaturedProjects() {
   const { t, taka, num } = useLang();
   return (
-    <section className="bg-slate-50 py-24 sm:py-32">
+    <section className="bg-slate-50 py-10">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <SectionHeading

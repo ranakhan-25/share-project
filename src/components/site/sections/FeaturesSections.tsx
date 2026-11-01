@@ -57,7 +57,7 @@ function SpotlightCard({ children }: { children: React.ReactNode }) {
 export function FeatureGrid() {
   const { t } = useLang();
   return (
-    <section className="bg-white py-24 sm:py-32">
+    <section className="bg-white py-10 sm:py-32">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
         <SectionHeading
           eyebrow={{ bn: "মূল ফিচার", en: "Core features" }}

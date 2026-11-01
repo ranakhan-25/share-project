@@ -10,7 +10,7 @@ export function BusinessFeature() {
 
   const features = [
     {
-      bn: "স্বয়ংক্রিয়ভাবে প্রতিটি এজেন্টের কাজ এবং লিড অ্যাসাইন করুন",
+      bn: "স্বয়ংক্রিয়ভাবে প্রতিটি এজেন্টের কাজ এবং লিড অ্যাসাইন করুন",
       en: "Assign and track leads across every agent automatically",
     },
     {
@@ -18,7 +18,7 @@ export function BusinessFeature() {
       en: "Manage files, land, and bookings in one inventory",
     },
     {
-      bn: "স্প্রেডশিট ছাড়াই ইনভয়েস এবং পেমেন্ট ট্র্যাক করুন",
+      bn: "স্প্রেডশিট ছাড়াই ইনভয়েস এবং পেমেন্ট ট্র্যাক করুন",
       en: "Generate invoices and track payments without spreadsheets",
     },
     {
@@ -28,7 +28,8 @@ export function BusinessFeature() {
   ];
 
   return (
-    <section className="bg-[#F4F5F4] py-20 lg:py-28">
+    <section className="bg-[#F4F5F4] py-20 px-5">
+      {/* 🎯 max-w-7xl এবং px-5 sm:px-8 আপনার অন্যান্য সেকশনের সাথে মিল রাখা হয়েছে */}
       <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 sm:px-8 lg:grid-cols-2">
         {/* Left Content */}
         <motion.div
@@ -37,7 +38,7 @@ export function BusinessFeature() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <p className="mb-4 text-xs font-bold uppercase tracking-widest text-emerald-500">
+          <p className="mb-4 text-xs font-bold uppercase tracking-widest text-emerald-600">
             {t({ bn: "এজেন্সিগুলোর জন্য", en: "FOR AGENCIES" })}
           </p>
 
@@ -47,7 +48,7 @@ export function BusinessFeature() {
 
           <p className="mt-6 max-w-lg text-base leading-relaxed text-slate-600">
             {t({
-              bn: "প্রথম ধাপ থেকে শেষ হ্যান্ডওভার পর্যন্ত, আপনার পুরো দলকে একটি শেয়ার্ড সিস্টেম দিন—বিক্রয়, বিলিং এবং রিপোর্টিংয়ের জন্য। আর পাঁচটি ভিন্ন টুল ব্যবহার করে জটিলতা বাড়ানোর দরকার নেই।",
+              bn: "প্রথম ধাপ থেকে শেষ হ্যান্ডওভার পর্যন্ত, আপনার পুরো দলকে একটি শেয়ার্ড সিস্টেম দিন—বিক্রয়, বিলিং এবং রিপোর্টিংয়ের জন্য। আর পাঁচটি ভিন্ন টুল ব্যবহার করে জটিলতা বাড়ানোর দরকার নেই।",
               en: "From the first lead to the final handover, give your entire team one shared system for sales, billing, and reporting — no more juggling five different tools.",
             })}
           </p>
@@ -56,7 +57,7 @@ export function BusinessFeature() {
             {features.map((item, i) => (
               <li key={i} className="flex items-start gap-3 text-slate-700">
                 <Check
-                  className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
                   strokeWidth={3}
                 />
                 <span className="text-sm">{t(item)}</span>
@@ -64,7 +65,8 @@ export function BusinessFeature() {
             ))}
           </ul>
 
-          <button className="mt-10 flex items-center gap-2 rounded-md bg-emerald-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
+          {/* 🎯 বাটনটি rounded-full করা হয়েছে এবং শ্যাডো যোগ করা হয়েছে */}
+          <button className="mt-10 flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:scale-[1.02] hover:bg-emerald-700 active:scale-95">
             {t({ bn: "ফ্রি ট্রায়াল শুরু করুন", en: "Start Free Trial" })}
             <ArrowRight className="h-4 w-4" />
           </button>
@@ -79,7 +81,7 @@ export function BusinessFeature() {
           className="relative"
         >
           {/* মেইন ড্যাশবোর্ড ইমেজ */}
-          <div className="relative overflow-hidden rounded-xl bg-white shadow-xl">
+          <div className="relative overflow-hidden rounded-2xl bg-white shadow-xl shadow-black/5 ring-1 ring-black/5">
             <Image
               src="/image/images8.jpg" // আপনার ইমেজের পাথ দিন
               alt="Dashboard"
@@ -90,7 +92,7 @@ export function BusinessFeature() {
           </div>
 
           {/* ছোট ওভারল্যাপিং ইমেজ (ঐচ্ছিক) */}
-          <div className="absolute -bottom-6 -left-6 h-32 w-48 overflow-hidden rounded-lg border-4 border-white shadow-lg sm:h-40 sm:w-64">
+          <div className="absolute -bottom-6 -left-6 h-32 w-48 overflow-hidden rounded-xl border-4 border-white shadow-lg shadow-black/10 sm:h-40 sm:w-64">
             <Image
               src="/image/images7.jpg" // আপনার ইমেজের পাথ দিন
               alt="Team member"

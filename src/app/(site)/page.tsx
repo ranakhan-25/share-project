@@ -17,11 +17,11 @@ export default function HomePage() {
   return (
     <>
       <Hero />
+      <FeaturedProjects />
       <ShareProjectFeatures />
       <ArchitectureServices />
       <StatsStrip />
       <BestProperties />
-      <FeaturedProjects />
       <BusinessFeature />
       <BenefitsBento />
       <ReturnsCalculator />

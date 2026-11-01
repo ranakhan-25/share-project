@@ -36,7 +36,7 @@ export function Logo({
       </span>
       <span
         className={`text-[19px] font-bold tracking-tight ${
-          tone === "light" ? "text-white" : "text-slate-900"
+          tone === "light" ? " text-slate-900" : "text-white"
         }`}
       >
         Share<span className="text-emerald-400"> Project</span>

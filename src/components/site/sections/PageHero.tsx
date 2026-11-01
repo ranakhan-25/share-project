@@ -14,18 +14,23 @@ function Decoration({ variant }: { variant: Variant }) {
         {[0, 1, 2, 3].map((i) => (
           <motion.span
             key={i}
-            className="absolute inset-0 m-auto rounded-full border border-emerald-300/20"
+            // 🎯 বর্ডার কালার হালকা করা হয়েছে
+            className="absolute inset-0 m-auto rounded-full border border-emerald-400/30"
             style={{ width: 140 + i * 110, height: 140 + i * 110 }}
             animate={{ rotate: i % 2 ? 360 : -360 }}
-            transition={{ duration: 40 + i * 12, repeat: Infinity, ease: "linear" }}
+            transition={{
+              duration: 40 + i * 12,
+              repeat: Infinity,
+              ease: "linear",
+            }}
           >
             <span
-              className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-emerald-300"
-              style={{ boxShadow: "0 0 18px #6ee7b7" }}
+              className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-emerald-400"
+              style={{ boxShadow: "0 0 18px #34d399" }}
             />
           </motion.span>
         ))}
-        <div className="absolute inset-0 m-auto h-24 w-24 rounded-full bg-gradient-to-br from-emerald-400 to-sky-500 blur-xl" />
+        <div className="absolute inset-0 m-auto h-24 w-24 rounded-full bg-gradient-to-br from-emerald-400 to-sky-500 blur-xl opacity-50" />
       </div>
     );
   }
@@ -39,8 +44,13 @@ function Decoration({ variant }: { variant: Variant }) {
             className="absolute bottom-0 w-[200%]"
             preserveAspectRatio="none"
             animate={{ x: ["0%", "-50%"] }}
-            transition={{ duration: 22 + i * 8, repeat: Infinity, ease: "linear" }}
-            style={{ opacity: 0.18 - i * 0.05 }}
+            transition={{
+              duration: 22 + i * 8,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+            // 🎯 ওয়েভের অপাসিটি লাইট মোডের জন্য কাস্টমাইজ করা হয়েছে
+            style={{ opacity: 0.15 - i * 0.04 }}
           >
             <path
               d="M0,80 C120,20 240,140 360,80 C480,20 600,140 720,80 C840,20 960,140 1080,80 C1200,20 1320,140 1440,80 L1440,160 L0,160 Z"
@@ -57,7 +67,8 @@ function Decoration({ variant }: { variant: Variant }) {
       {Array.from({ length: 14 }).map((_, i) => (
         <motion.span
           key={i}
-          className="absolute rounded-2xl border border-white/10 bg-white/[0.04]"
+          // 🎯 ভাসমান বক্সগুলোর বর্ডার ও ব্যাকগ্রাউন্ড হালকা করা হয়েছে
+          className="absolute rounded-2xl border border-black/5 bg-black/[0.02]"
           style={{
             width: 36 + (i % 4) * 14,
             height: 36 + (i % 4) * 14,
@@ -65,7 +76,12 @@ function Decoration({ variant }: { variant: Variant }) {
             top: `${12 + ((i * 53) % 70)}%`,
           }}
           animate={{ y: [0, -22, 0], rotate: [0, 12, 0] }}
-          transition={{ duration: 6 + (i % 5), repeat: Infinity, delay: i * 0.3, ease: "easeInOut" }}
+          transition={{
+            duration: 6 + (i % 5),
+            repeat: Infinity,
+            delay: i * 0.3,
+            ease: "easeInOut",
+          }}
         />
       ))}
     </div>
@@ -87,15 +103,16 @@ export function PageHero({
 }) {
   const { t } = useLang();
   return (
-    <section className="relative isolate overflow-hidden bg-ink-950 pb-24 pt-36 text-white sm:pb-28 sm:pt-44">
-      <div className="bg-grid absolute inset-0 -z-10" />
+    // 🎯 সেকশন ব্যাকগ্রাউন্ড ও টেক্সট কালার আপডেট করা হয়েছে
+    <section className="relative isolate overflow-hidden bg-white pb-24 pt-36 text-ink-950 sm:pb-28 sm:pt-44">
+      <div className="bg-grid absolute inset-0 -z-10 opacity-[0.15]" />
       <div
         className={`absolute -z-10 h-[30rem] w-[30rem] rounded-full blur-[120px] ${
           variant === "about"
-            ? "-left-20 top-0 bg-sky-500/20"
+            ? "-left-20 top-0 bg-sky-400/15"
             : variant === "contact"
-              ? "right-0 top-0 bg-emerald-500/20"
-              : "left-1/3 -top-20 bg-emerald-500/20"
+              ? "right-0 top-0 bg-emerald-400/15"
+              : "left-1/3 -top-20 bg-emerald-400/15"
         }`}
       />
       <Decoration variant={variant} />
@@ -103,13 +120,13 @@ export function PageHero({
         <motion.nav
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-1.5 text-sm text-white/50"
+          className="flex items-center gap-1.5 text-sm text-ink-950/50"
         >
-          <Link href="/" className="transition hover:text-white">
+          <Link href="/" className="transition hover:text-ink-950">
             {t({ bn: "হোম", en: "Home" })}
           </Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-emerald-300">{t(eyebrow)}</span>
+          <span className="font-medium text-emerald-600">{t(eyebrow)}</span>
         </motion.nav>
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
@@ -123,7 +140,7 @@ export function PageHero({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-6 max-w-2xl text-lg leading-relaxed text-white/60"
+          className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-950/60"
         >
           {t(subtitle)}
         </motion.p>
