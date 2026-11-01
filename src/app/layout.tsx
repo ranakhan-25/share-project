@@ -60,8 +60,9 @@ export default function RootLayout({
     <html
       lang="bn"
       className={`${jakarta.variable} ${hind.variable} ${playfair.variable} ${pinyon.variable}`}
+      suppressHydrationWarning
     >
-      <body className="min-h-screen antialiased">
+      <body suppressHydrationWarning className="min-h-screen antialiased">
         <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>

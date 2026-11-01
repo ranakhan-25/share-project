@@ -10,7 +10,7 @@ import {
   ReturnsCalculator,
   TestimonialsCta,
 } from "@/components/site/sections/HomeSections";
-import { RealEstateFeature } from "@/components/site/sections/RealEstateFeature";
+
 import ArchitectureServices from "@/components/ui/ArchitectureServices";
 
 export default function HomePage() {
