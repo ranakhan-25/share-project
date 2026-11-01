@@ -42,7 +42,7 @@ export function Navbar() {
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${
         scrolled
-          ? "border-b border-white/10 bg-ink-950/75 py-2.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)] backdrop-blur-xl"
+          ? "border-b border-black/8 bg-white/80 py-2.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl"
           : "border-b border-transparent bg-transparent py-4"
       }`}
     >
@@ -50,22 +50,27 @@ export function Navbar() {
         <Logo />
 
         {/* desktop menu */}
-        <ul className="relative hidden items-center gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10 md:flex">
+        <ul className="relative hidden items-center gap-1 rounded-full bg-black/[0.04] p-1 ring-1 ring-black/8 md:flex">
           {NAV_LINKS.map((l) => {
-            const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+            const active =
+              l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
             return (
               <li key={l.href}>
                 <Link
                   href={l.href}
                   className={`relative block rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    active ? "text-ink-950" : "text-white/75 hover:text-white"
+                    active ? "text-white" : "text-ink-950/60 hover:text-ink-950"
                   }`}
                 >
                   {active && (
                     <motion.span
                       layoutId="nav-pill"
-                      className="absolute inset-0 -z-0 rounded-full bg-white"
-                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                      className="absolute inset-0 -z-0 rounded-full bg-ink-950"
+                      transition={{
+                        type: "spring",
+                        stiffness: 380,
+                        damping: 32,
+                      }}
                     />
                   )}
                   <span className="relative z-10">{t(l.label)}</span>
@@ -91,7 +96,7 @@ export function Navbar() {
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-label="Menu"
-            className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white ring-1 ring-white/15 md:hidden"
+            className="grid h-10 w-10 place-items-center rounded-full bg-black/5 text-ink-950 ring-1 ring-black/10 md:hidden"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -106,11 +111,14 @@ export function Navbar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-x-3 top-[68px] z-50 rounded-3xl border border-white/10 bg-ink-900/95 p-4 shadow-2xl backdrop-blur-2xl md:hidden"
+            className="fixed inset-x-3 top-[68px] z-50 rounded-3xl border border-black/10 bg-white/95 p-4 shadow-2xl backdrop-blur-2xl md:hidden"
           >
             <ul className="space-y-1">
               {NAV_LINKS.map((l, i) => {
-                const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+                const active =
+                  l.href === "/"
+                    ? pathname === "/"
+                    : pathname.startsWith(l.href);
                 return (
                   <motion.li
                     key={l.href}
@@ -121,7 +129,9 @@ export function Navbar() {
                     <Link
                       href={l.href}
                       className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-base font-medium ${
-                        active ? "bg-white text-ink-950" : "text-white/85 hover:bg-white/5"
+                        active
+                          ? "bg-ink-950 text-white"
+                          : "text-ink-950/70 hover:bg-black/5"
                       }`}
                     >
                       {t(l.label)}
@@ -131,7 +141,7 @@ export function Navbar() {
                 );
               })}
             </ul>
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/10 pt-4">
               <LangSwitch id="nav-lang-m" />
               <Link
                 href="/login"

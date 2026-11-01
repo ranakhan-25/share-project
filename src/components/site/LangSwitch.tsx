@@ -10,7 +10,7 @@ const OPTIONS: { value: Lang; label: string }[] = [
 
 export function LangSwitch({
   id = "lang",
-  tone = "dark",
+  tone = "light",
 }: {
   /** unique id per instance so the sliding thumb animates independently */
   id?: string;
@@ -23,7 +23,9 @@ export function LangSwitch({
       role="group"
       aria-label="Language"
       className={`relative inline-flex rounded-full p-0.5 text-xs font-semibold ${
-        dark ? "bg-white/10 ring-1 ring-white/15" : "bg-slate-100 ring-1 ring-slate-200"
+        dark
+          ? "bg-white/10 ring-1 ring-white/15"
+          : "bg-black/[0.05] ring-1 ring-black/10"
       }`}
     >
       {OPTIONS.map((o) => {
@@ -41,14 +43,14 @@ export function LangSwitch({
                   : "text-white"
                 : dark
                   ? "text-white/70 hover:text-white"
-                  : "text-slate-500 hover:text-slate-900"
+                  : "text-ink-950/55 hover:text-ink-950"
             }`}
           >
             {active && (
               <motion.span
                 layoutId={`${id}-thumb`}
                 className={`absolute inset-0 -z-10 rounded-full ${
-                  dark ? "bg-white" : "bg-slate-900"
+                  dark ? "bg-white" : "bg-ink-950"
                 }`}
                 transition={{ type: "spring", stiffness: 420, damping: 32 }}
               />
