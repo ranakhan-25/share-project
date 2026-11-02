@@ -2,22 +2,93 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
-import { ArrowRight, MapPin, Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Search, SlidersHorizontal } from "lucide-react";
 import { useLang } from "@/lib/i18n";
-import { investorProjects } from "@/data/investorProjects";
 import { PageHero } from "@/components/site/sections/PageHero";
+import type { OwnerProject } from "@/lib/owner-projects";
+import type { InvestorProject } from "@/data/investorProjects";
 
 export default function ProjectsPage() {
   const { t, taka, num } = useLang();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState("featured");
+  const [ownerPublished, setOwnerPublished] = useState<OwnerProject[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const pageSize = 6;
 
-  const categories = useMemo(() => ["all", ...Array.from(new Set(investorProjects.map((p) => p.category.en)))], []);
+  useEffect(() => {
+    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
+    setLoading(true);
+    fetch(`${API_BASE}/realbizpro/api/v1/share-project/public/projects?page=${currentPage}&limit=${pageSize}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((payload: unknown) => {
+        const root = payload && typeof payload === "object" ? payload as { data?: unknown } : {};
+        const inner = root.data && typeof root.data === "object" ? root.data as { data?: unknown; meta?: { total?: number; page?: number; totalPages?: number } } : {};
+        const data = Array.isArray(root.data) ? root.data : Array.isArray(inner.data) ? inner.data : [];
+        const meta = inner.meta;
+        const rows = (data as Record<string, unknown>[]).map((project) => ({
+          id: String(project.uuid || project.id || ""),
+          name: String(project.name || ""),
+          location: String(project.location || ""),
+          category: String((project.category as { name?: string } | undefined)?.name || ""),
+          thumbnail: String(project.thumbnailUrl || ""),
+          pricePerShare: Number(project.pricePerShare || 0),
+          totalShares: Number(project.totalShares || 0),
+          expectedAnnualReturn: Number(project.expectedAnnualReturn || 0),
+          startDate: String(project.startDate || ""),
+          endDate: String(project.endDate || ""),
+          description: String(project.description || ""),
+          documents: Array.isArray(project.documents) ? project.documents.map((document) => String((document as { title?: string }).title || "")) : [],
+          status: "published",
+        })) as OwnerProject[];
+        setOwnerPublished(rows);
+        setTotalProjects(Number(meta?.total || rows.length));
+        setTotalPages(Math.max(1, Number(meta?.totalPages || Math.ceil(Number(meta?.total || rows.length) / pageSize))));
+      })
+      .catch(() => {
+        setOwnerPublished([]);
+        setTotalProjects(0);
+        setTotalPages(1);
+      })
+      .finally(() => setLoading(false));
+  }, [currentPage]);
+
+  const publishedProjects: InvestorProject[] = useMemo(
+    () => ownerPublished.map((project) => ({
+      id: project.id,
+      name: { bn: project.name, en: project.name },
+      location: { bn: project.location, en: project.location },
+      category: { bn: project.category, en: project.category },
+      status: "funding",
+      image: project.thumbnail || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85",
+      pricePerShare: project.pricePerShare,
+      totalShares: project.totalShares,
+      soldShares: 0,
+      returnRate: project.expectedAnnualReturn,
+      duration: {
+        bn: project.startDate && project.endDate ? `${project.startDate} - ${project.endDate}` : "উল্লেখ নেই",
+        en: project.startDate && project.endDate ? `${project.startDate} - ${project.endDate}` : "Not specified",
+      },
+      description: { bn: project.description, en: project.description },
+      documents: project.documents,
+    })),
+    [ownerPublished],
+  );
+
+  const visibleProjects = useMemo(
+    () => publishedProjects,
+    [publishedProjects],
+  );
+
+  const categories = useMemo(() => ["all", ...Array.from(new Set(visibleProjects.map((p) => p.category.en)))], [visibleProjects]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const rows = investorProjects.filter((p) => {
+    const rows = visibleProjects.filter((p) => {
       const search = `${t(p.name)} ${t(p.location)} ${t(p.category)}`.toLowerCase();
       return (!q || search.includes(q)) && (category === "all" || p.category.en === category);
     });
@@ -25,7 +96,7 @@ export default function ProjectsPage() {
     if (sort === "return-high") rows.sort((a, b) => b.returnRate - a.returnRate);
     if (sort === "availability") rows.sort((a, b) => (b.totalShares - b.soldShares) - (a.totalShares - a.soldShares));
     return rows;
-  }, [category, query, sort, t]);
+  }, [category, query, sort, t, visibleProjects]);
 
   return (
     <>
@@ -39,7 +110,12 @@ export default function ProjectsPage() {
           </div>
 
           <div className="mt-8 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((project) => {
+            {loading && (
+              <div className="col-span-full rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-center">
+                <p className="font-bold text-slate-700">{t({ bn: "প্রজেক্ট লোড হচ্ছে...", en: "Loading projects..." })}</p>
+              </div>
+            )}
+            {!loading && filtered.map((project) => {
               const percent = Math.round((project.soldShares / project.totalShares) * 100);
               return (
                 <article key={project.id} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
@@ -55,7 +131,50 @@ export default function ProjectsPage() {
               );
             })}
           </div>
-          {filtered.length === 0 && <div className="mt-8 rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-center"><p className="font-bold text-slate-700">{t({ bn: "কোনো প্রজেক্ট পাওয়া যায়নি", en: "No projects found" })}</p><button onClick={() => { setQuery(""); setCategory("all"); }} className="mt-4 text-sm font-semibold text-emerald-600">{t({ bn: "ফিল্টার সরান", en: "Clear filters" })}</button></div>}
+          {!loading && totalPages > 1 && (
+            <div className="mt-10 flex flex-col items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row">
+              <p className="text-sm text-slate-500">
+                {t({ bn: `মোট ${totalProjects}টি প্রজেক্ট • পৃষ্ঠা ${currentPage}/${totalPages}`, en: `${totalProjects} projects • Page ${currentPage} of ${totalPages}` })}
+              </p>
+              <nav className="flex items-center gap-2" aria-label={t({ bn: "প্রজেক্ট পেজিনেশন", en: "Project pagination" })}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage === 1 || loading}
+                  className="inline-flex h-10 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {t({ bn: "আগে", en: "Previous" })}
+                </button>
+                {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    disabled={loading}
+                    aria-current={page === currentPage ? "page" : undefined}
+                    className={`h-10 min-w-10 rounded-xl px-3 text-sm font-semibold transition ${
+                      page === currentPage
+                        ? "bg-ink-950 text-white"
+                        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage === totalPages || loading}
+                  className="inline-flex h-10 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {t({ bn: "পরবর্তী", en: "Next" })}
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </nav>
+            </div>
+          )}
+          {!loading && filtered.length === 0 && <div className="mt-8 rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-center"><p className="font-bold text-slate-700">{t({ bn: "কোনো প্রজেক্ট পাওয়া যায়নি", en: "No projects found" })}</p><button onClick={() => { setQuery(""); setCategory("all"); }} className="mt-4 text-sm font-semibold text-emerald-600">{t({ bn: "ফিল্টার সরান", en: "Clear filters" })}</button></div>}
         </div>
       </section>
     </>

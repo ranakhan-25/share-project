@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import { LangSwitch } from "@/components/site/LangSwitch";
 import { clearStoredTokens, getStoredUser, type StoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import { logoutShareUser } from "@/lib/share-project-api";
 import { findTitle } from "./sidebar-data";
 
 function useClickAway<T extends HTMLElement>(onAway: () => void) {
@@ -36,7 +37,12 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const name = user?.name || user?.username || "Admin";
   const initials = name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await logoutShareUser();
+    } catch {
+      // Local session cleanup must still succeed when the API is unavailable.
+    }
     clearStoredTokens();
     router.replace("/login");
   };

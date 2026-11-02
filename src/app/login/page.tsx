@@ -67,11 +67,11 @@ export default function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = identifier.trim();
-    if (!clean || password.length < 4) {
+    if (!clean || password.length < 8) {
       setError(
         t({
-          bn: "আপনার ইমেইল/ইউজারনেম এবং কমপক্ষে ৪ অক্ষরের পাসওয়ার্ড দিন।",
-          en: "Please enter your email or username, and a password of at least 4 characters.",
+          bn: "আপনার ইমেইল এবং কমপক্ষে ৮ অক্ষরের পাসওয়ার্ড দিন।",
+          en: "Please enter your email and a password of at least 8 characters.",
         }),
       );
       return;
@@ -216,11 +216,11 @@ export default function LoginPage() {
             <form onSubmit={submit} className="mt-8 space-y-5">
               <div className="space-y-1.5">
                 <label htmlFor="identifier" className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  {t({ bn: "ইমেইল বা ইউজারনেম", en: "Email or username" })}
+                  {t({ bn: "ইমেইল", en: "Email" })}
                 </label>
                 <div className="relative">
                   <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input id="identifier" type="text" autoComplete="username" required disabled={isSubmitting} value={identifier} onChange={(e) => setIdentifier(e.target.value)} className={inputCls} placeholder="name@company.com" />
+                  <input id="identifier" type="email" autoComplete="email" required disabled={isSubmitting} value={identifier} onChange={(e) => setIdentifier(e.target.value)} className={inputCls} placeholder="name@company.com" />
                 </div>
               </div>
 
@@ -284,14 +284,6 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && (
-              <p className="mt-5 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
-                {t({
-                  bn: "ডেমো মোড চালু: যেকোনো ইউজারনেম ও ৪+ অক্ষরের পাসওয়ার্ড দিয়ে প্রবেশ করুন।",
-                  en: "Demo mode is on: sign in with any username and a 4+ character password.",
-                })}
-              </p>
-            )}
             <p className="mt-5 text-center text-sm text-slate-500">
               {t({ bn: "নতুন অ্যাকাউন্ট?", en: "New to Share Project?" })}{" "}
               <Link href="/register" className="font-semibold text-emerald-600 hover:text-emerald-700">

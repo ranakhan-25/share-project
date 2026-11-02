@@ -6,6 +6,13 @@ import { monotonePath } from "./utils";
 
 export function Sparkline({ values, color, width = 120, height = 44 }: { values: number[]; color: string; width?: number; height?: number }) {
   const id = useId().replace(/:/g, "");
+  if (values.length === 0) {
+    return (
+      <svg width={width} height={height} aria-hidden>
+        <path d={`M0 ${height - 4} L${width} ${height - 4}`} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" opacity={0.35} />
+      </svg>
+    );
+  }
   const min = Math.min(...values), max = Math.max(...values);
   const pts = values.map((v, i) => [(i / (values.length - 1)) * width, 4 + (1 - (v - min) / (max - min || 1)) * (height - 8)] as [number, number]);
   const d = monotonePath(pts);

@@ -2,24 +2,45 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { notFound, useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Download, FileText, MapPin, Minus, Plus } from "lucide-react";
 import { useLang } from "@/lib/i18n";
-import { investorProjects } from "@/data/investorProjects";
+import { getPublicProject, prepareShareProjectInvestment } from "@/lib/share-project-api";
+import type { InvestorProject } from "@/data/investorProjects";
 
 export default function ProjectDetailsPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { t, taka, num } = useLang();
-  const project = investorProjects.find((item) => item.id === params.id);
+  const [project, setProject] = useState<InvestorProject | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [confirmed, setConfirmed] = useState(false);
+  const [investmentError, setInvestmentError] = useState("");
   const available = project ? project.totalShares - project.soldShares : 0;
   const total = project ? project.pricePerShare * quantity : 0;
   const fee = Math.round(total * 0.01);
-  if (!project) notFound();
-  const percent = useMemo(() => Math.round((project.soldShares / project.totalShares) * 100), [project]);
+  useEffect(() => {
+    void getPublicProject(params.id).then((row) => {
+      setProject({
+        id: row.uuid,
+        name: { bn: row.name, en: row.name },
+        location: { bn: row.location || "", en: row.location || "" },
+        category: { bn: row.category?.name || "", en: row.category?.name || "" },
+        status: "funding",
+        image: row.thumbnailUrl || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85",
+        pricePerShare: Number(row.pricePerShare),
+        totalShares: Number(row.totalShares),
+        soldShares: 0,
+        returnRate: Number(row.expectedAnnualReturn || 0),
+        duration: { bn: row.startDate && row.endDate ? `${row.startDate} - ${row.endDate}` : "", en: row.startDate && row.endDate ? `${row.startDate} - ${row.endDate}` : "" },
+        description: { bn: row.description, en: row.description },
+        documents: (row.documents || []).map((document) => document.title || document.url),
+      });
+    }).catch(() => setProject(null));
+  }, [params.id]);
+  const percent = useMemo(() => project && project.totalShares ? Math.round((project.soldShares / project.totalShares) * 100) : 0, [project]);
+  if (!project) return <main className="min-h-[60vh] pt-28 text-center text-sm text-slate-500">Loading project...</main>;
 
   return (
     <main className="bg-slate-50 pb-20 pt-28">
@@ -39,7 +60,8 @@ export default function ProjectDetailsPage() {
               <label className="mt-6 block text-sm font-semibold text-slate-700">{t({ bn: "শেয়ার পরিমাণ", en: "Share quantity" })}</label>
               <div className="mt-2 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-2"><button type="button" onClick={() => setQuantity((v) => Math.max(1, v - 1))} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100"><Minus className="h-4 w-4" /></button><strong className="text-lg">{num(quantity)}</strong><button type="button" onClick={() => setQuantity((v) => Math.min(available, v + 1))} className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100"><Plus className="h-4 w-4" /></button></div>
               <div className="mt-5 space-y-3 border-t border-slate-200 pt-4 text-sm"><div className="flex justify-between text-slate-500"><span>{t({ bn: "শেয়ার মূল্য", en: "Share value" })}</span><span>{taka(total)}</span></div><div className="flex justify-between text-slate-500"><span>{t({ bn: "সেবা ফি", en: "Service fee" })}</span><span>{taka(fee)}</span></div><div className="flex justify-between border-t border-slate-200 pt-3 font-bold text-slate-900"><span>{t({ bn: "সর্বমোট", en: "Total" })}</span><span>{taka(total + fee)}</span></div></div>
-              {confirmed ? <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-center text-sm font-semibold text-emerald-700"><CheckCircle2 className="mx-auto mb-2 h-6 w-6" />{t({ bn: "বিনিয়োগ নির্বাচিত হয়েছে", en: "Investment prepared" })}</div> : <button onClick={() => setConfirmed(true)} className="mt-5 w-full rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-semibold text-white hover:bg-ink-800">{t({ bn: "বিনিয়োগ নিশ্চিত করুন", en: "Confirm investment" })}</button>}
+              {investmentError && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{investmentError}</div>}
+              {confirmed ? <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-center text-sm font-semibold text-emerald-700"><CheckCircle2 className="mx-auto mb-2 h-6 w-6" />{t({ bn: "বিনিয়োগ সফলভাবে নিশ্চিত হয়েছে", en: "Investment confirmed successfully" })}</div> : <button onClick={async () => { setInvestmentError(""); try { await prepareShareProjectInvestment(params.id, quantity); setConfirmed(true); } catch (cause) { setInvestmentError(cause instanceof Error ? cause.message : "Could not prepare investment."); } }} className="mt-5 w-full rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-semibold text-white hover:bg-ink-800">{t({ bn: "বিনিয়োগ নিশ্চিত করুন", en: "Confirm investment" })}</button>}
               <Link href="/dashboard/payments" className="mt-3 block text-center text-xs font-semibold text-emerald-600">{t({ bn: "পেমেন্ট পদ্ধতি দেখুন", en: "View payment methods" })}</Link>
             </aside>
           </div>

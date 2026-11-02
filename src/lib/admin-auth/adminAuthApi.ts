@@ -1,8 +1,7 @@
 import type { StoredUser } from "./adminAuthStorage";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002").replace(/\/+$/, "");
-const LOGIN_PATH = process.env.NEXT_PUBLIC_LOGIN_PATH || "/realbizpro/api/v1/auth/login";
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const LOGIN_PATH = process.env.NEXT_PUBLIC_LOGIN_PATH || "/realbizpro/api/v1/share-user/login";
 
 export type LoginSession = {
   accessToken: string;
@@ -38,23 +37,13 @@ function findSession(payload: unknown): LoginSession | null {
  * Adjust LOGIN_PATH / body fields here if your backend differs.
  */
 export async function loginUniversalSession(identifier: string, password: string): Promise<LoginSession> {
-  if (DEMO_MODE) {
-    // Offline demo: no backend required.
-    await new Promise((r) => setTimeout(r, 900));
-    return {
-      accessToken: "demo-access-token",
-      refreshToken: "demo-refresh-token",
-      user: { name: "Demo User", email: identifier.includes("@") ? identifier : `${identifier}@shareproject.com`, username: identifier, role: "Admin" },
-    };
-  }
-
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${LOGIN_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        username: identifier,
+        email: identifier,
         password,
       }),
     });

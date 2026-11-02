@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { ArrowDownRight, ArrowUpRight, CalendarDays, Download, Plus, Trophy, Users, Wallet, AlertTriangle, PieChart } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowDownRight, ArrowUpRight, CalendarDays, Download, Plus, Trophy, Users, Wallet, AlertTriangle, PieChart, FolderKanban } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useLang, type Bi } from "@/lib/i18n";
 import { CountUp } from "@/components/ui/CountUp";
 import { AreaChart } from "@/components/dashboard/charts/AreaChart";
@@ -12,6 +12,7 @@ import { DonutChart } from "@/components/dashboard/charts/DonutChart";
 import { Gauge } from "@/components/dashboard/charts/Gauge";
 import { Sparkline } from "@/components/dashboard/charts/Sparkline";
 import { PALETTE } from "@/components/dashboard/charts/utils";
+import { getShareProjectUserDashboard } from "@/lib/share-project-api";
 
 /* ───────── demo data (replace with API data) ───────── */
 const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -78,6 +79,13 @@ function Legend({ items }: { items: { color: string; label: string }[] }) {
 export default function DashboardPage() {
   const { t, num, taka, lang } = useLang();
   const [range, setRange] = useState<6 | 12>(12);
+  const [dashboard, setDashboard] = useState<{ counts?: Record<string, number>; totalProjects?: number; totalShareValue?: number; recentProjects?: Array<Record<string, unknown>> }>({});
+
+  useEffect(() => {
+    void getShareProjectUserDashboard()
+      .then((data) => setDashboard(data as typeof dashboard))
+      .catch(() => setDashboard({ counts: {}, totalProjects: 0, totalShareValue: 0, recentProjects: [] }));
+  }, []);
 
   const months = lang === "bn" ? MONTHS_BN : MONTHS_EN;
   const sl = <T,>(a: T[]) => a.slice(12 - range);
@@ -85,12 +93,12 @@ export default function DashboardPage() {
 
   const kpis = useMemo(
     () => [
-      { icon: Wallet, label: { bn: "মোট শেয়ার মূল্য", en: "Total share value" } as Bi, node: <CountUp to={24.6e6} compact prefix="৳" decimals={1} />, delta: 8.4, spark: VALUE, color: PALETTE[0], good: true },
-      { icon: Users, label: { bn: "সক্রিয় শেয়ারহোল্ডার", en: "Active shareholders" } as Bi, node: <CountUp to={12480} />, delta: 3.2, spark: [9.8, 10.2, 10.9, 11.3, 11.6, 12.0, 12.48].map((v) => v * 1e3), color: PALETTE[1], good: true },
-      { icon: PieChart, label: { bn: "এই মাসের কালেকশন", en: "Collected this month" } as Bi, node: <CountUp to={4.2e6} compact prefix="৳" decimals={1} />, delta: 13.5, spark: MONTH_COLLECT, color: PALETTE[2], good: true },
-      { icon: AlertTriangle, label: { bn: "বকেয়া ও পেনাল্টি", en: "Dues & penalties" } as Bi, node: <CountUp to={1.38e6} compact prefix="৳" decimals={2} />, delta: -4.1, spark: [2.1, 1.9, 2.0, 1.8, 1.6, 1.5, 1.38].map((v) => v * 1e6), color: PALETTE[3], good: true },
+      { icon: Wallet, label: { bn: "মোট শেয়ার মূল্য", en: "Total share value" } as Bi, node: <CountUp to={Number(dashboard.totalShareValue || 0)} compact prefix="৳" decimals={1} />, delta: 0, spark: [], color: PALETTE[0], good: true },
+      { icon: FolderKanban, label: { bn: "মোট প্রজেক্ট", en: "Total projects" } as Bi, node: <CountUp to={Number(dashboard.totalProjects || 0)} />, delta: 0, spark: [], color: PALETTE[1], good: true },
+      { icon: PieChart, label: { bn: "পেন্ডিং প্রজেক্ট", en: "Pending projects" } as Bi, node: <CountUp to={Number(dashboard.counts?.pending || 0)} />, delta: 0, spark: [], color: PALETTE[2], good: true },
+      { icon: AlertTriangle, label: { bn: "রিজেক্টেড প্রজেক্ট", en: "Rejected projects" } as Bi, node: <CountUp to={Number(dashboard.counts?.rejected || 0)} />, delta: 0, spark: [], color: PALETTE[3], good: true },
     ],
-    [],
+    [dashboard],
   );
 
   const statusStyle = {

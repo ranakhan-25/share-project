@@ -11,6 +11,7 @@ import {
   ScrollText,
   WalletCards,
   UserRound,
+  FolderKanban,
   type LucideIcon,
 } from "lucide-react";
 import type { Bi } from "@/lib/i18n";
@@ -66,6 +67,27 @@ export const sidebarMenu: MenuGroup[] = [
           { label: { bn: "পেমেন্ট ইতিহাস", en: "Payment History" }, href: "/dashboard/payments" },
           { label: { bn: "স্টেটমেন্ট ও রিপোর্ট", en: "Statements & Reports" }, href: "/dashboard/reports" },
           { label: { bn: "নোটিফিকেশন", en: "Notifications" }, href: "/dashboard/notifications" },
+        ],
+      },
+    ],
+  },
+  {
+    title: { bn: "প্রজেক্ট মালিক", en: "Project Owner" },
+    items: [
+      {
+        label: { bn: "প্রজেক্ট মালিক পোর্টাল", en: "Owner Portal" },
+        icon: FolderKanban,
+        children: [
+          { label: { bn: "ওনার ড্যাশবোর্ড", en: "Owner Dashboard" }, href: "/dashboard/owner" },
+          { label: { bn: "আমার প্রজেক্ট", en: "My Projects" }, href: "/dashboard/owner/projects" },
+          { label: { bn: "নতুন প্রজেক্ট", en: "Create Project" }, href: "/dashboard/owner/projects/create" },
+          { label: { bn: "ড্রাফট প্রজেক্ট", en: "Draft Projects" }, href: "/dashboard/owner/status/draft" },
+          { label: { bn: "পেন্ডিং প্রজেক্ট", en: "Pending Projects" }, href: "/dashboard/owner/status/pending" },
+          { label: { bn: "অ্যাপ্রুভড প্রজেক্ট", en: "Approved Projects" }, href: "/dashboard/owner/status/approved" },
+          { label: { bn: "বর্জিত প্রজেক্ট", en: "Rejected Projects" }, href: "/dashboard/owner/status/rejected" },
+          { label: { bn: "পাবলিশড প্রজেক্ট", en: "Published Projects" }, href: "/dashboard/owner/status/published" },
+          { label: { bn: "সাবমিশন ইতিহাস", en: "Submission History" }, href: "/dashboard/owner/submission-history" },
+          { label: { bn: "প্রোফাইল সেটিংস", en: "Profile Settings" }, href: "/dashboard/owner/profile" },
         ],
       },
     ],
