@@ -154,7 +154,7 @@ export function FeaturedProjects() {
           />
           <Reveal>
             <Link
-              href="/login"
+              href="/projects"
               className="group inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
             >
               {t({ bn: "সব প্রজেক্ট দেখুন", en: "View all projects" })}

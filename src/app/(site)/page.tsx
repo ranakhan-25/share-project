@@ -1,7 +1,6 @@
 import { BestProperties } from "@/components/site/sections/BestProperties";
 import { BusinessFeature } from "@/components/site/sections/BusinessFeature";
 import { ShareProjectFeatures } from "@/components/site/sections/FeaturesSection";
-import FloatingContact from "@/components/site/sections/floating-contact";
 import { Hero, StatsStrip } from "@/components/site/sections/Hero";
 import {
   BenefitsBento,

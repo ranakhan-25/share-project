@@ -9,6 +9,8 @@ import {
   PieChart,
   ReceiptText,
   ScrollText,
+  WalletCards,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import type { Bi } from "@/lib/i18n";
@@ -36,6 +38,37 @@ export const sidebarMenu: MenuGroup[] = [
   {
     title: { bn: "ওভারভিউ", en: "Overview" },
     items: [{ label: { bn: "ড্যাশবোর্ড", en: "Dashboard" }, href: "/dashboard", icon: LayoutDashboard }],
+  },
+  {
+    title: { bn: "ইনভেস্টর", en: "Investor" },
+    items: [
+      {
+        label: { bn: "আমার অ্যাকাউন্ট", en: "My Account" },
+        icon: UserRound,
+        children: [
+          { label: { bn: "প্রোফাইল", en: "Profile" }, href: "/dashboard/profile" },
+          { label: { bn: "KYC যাচাই", en: "KYC Verification" }, href: "/dashboard/kyc" },
+        ],
+      },
+      {
+        label: { bn: "বিনিয়োগ", en: "Investments" },
+        icon: Landmark,
+        children: [
+          { label: { bn: "আমার বিনিয়োগ", en: "My Investments" }, href: "/dashboard/investments" },
+          { label: { bn: "শেয়ারসমূহ", en: "My Shares" }, href: "/dashboard/shares" },
+          { label: { bn: "লাভ ও ডিভিডেন্ড", en: "Profit & Dividend" }, href: "/dashboard/profits" },
+        ],
+      },
+      {
+        label: { bn: "পেমেন্ট ও রিপোর্ট", en: "Payments & Reports" },
+        icon: WalletCards,
+        children: [
+          { label: { bn: "পেমেন্ট ইতিহাস", en: "Payment History" }, href: "/dashboard/payments" },
+          { label: { bn: "স্টেটমেন্ট ও রিপোর্ট", en: "Statements & Reports" }, href: "/dashboard/reports" },
+          { label: { bn: "নোটিফিকেশন", en: "Notifications" }, href: "/dashboard/notifications" },
+        ],
+      },
+    ],
   },
   {
     title: { bn: "শেয়ার", en: "Share" },
@@ -126,7 +159,7 @@ export const sidebarMenu: MenuGroup[] = [
     title: { bn: "অন্যান্য", en: "Other" },
     items: [
       { label: { bn: "ডকুমেন্ট", en: "Documents" }, href: `${P}/document`, icon: FileText },
-      { label: { bn: "পেমেন্ট", en: "Payments" }, href: "/dashboard", icon: Banknote },
+      { label: { bn: "পেমেন্ট", en: "Payments" }, href: "/dashboard/payments", icon: Banknote },
     ],
   },
 ];
