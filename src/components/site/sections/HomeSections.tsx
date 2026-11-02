@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "motion/react";
 import {
   ArrowRight,
@@ -18,11 +19,10 @@ import {
   Star,
   UserPlus,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLang, type Bi } from "@/lib/i18n";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { SkylineArt } from "@/components/ui/SkylineArt";
 import { CountUp } from "@/components/ui/CountUp";
 
 /* ─────────────── 1. How it works ─────────────── */
@@ -108,141 +108,310 @@ export function HowItWorks() {
 }
 
 /* ─────────────── 2. Featured projects ─────────────── */
-const PROJECTS = [
-  {
-    name: { bn: "সী ভিউ হোটেল ও রিসোর্ট", en: "Sea View Hotel & Resort" },
-    place: { bn: "কক্সবাজার, চট্টগ্রাম", en: "Cox's Bazar, Chattogram" },
-    type: { bn: "হোটেল ও রিসোর্ট", en: "Hotel & resort" },
-    price: 35000,
-    sold: 74,
-    ret: 15,
-    hue: 190,
-  },
-  {
-    name: { bn: "প্রিমিয়াম কার শেয়ার", en: "Premium Car Share" },
-    place: { bn: "বনানী, ঢাকা", en: "Banani, Dhaka" },
-    type: { bn: "গাড়ি শেয়ারিং", en: "Car sharing" },
-    price: 12000,
-    sold: 58,
-    ret: 11,
-    hue: 210,
-  },
-  {
-    name: { bn: "সোলার পাওয়ার প্লান্ট", en: "Solar Power Plant" },
-    place: { bn: "সাভার, ঢাকা", en: "Savar, Dhaka" },
-    type: { bn: "নবায়নযোগ্য জ্বালানি", en: "Renewable energy" },
-    price: 22000,
-    sold: 69,
-    ret: 18,
-    hue: 160,
-  },
-];
+/* ─────────────── 2. Featured projects ─────────────── */
+
+type FeaturedProject = {
+  id: string;
+  name: string;
+  location: string;
+  category: string;
+  thumbnail: string;
+  pricePerShare: number;
+  expectedAnnualReturn: number;
+  totalShares: number;
+};
 
 export function FeaturedProjects() {
   const { t, taka, num } = useLang();
+
+  const [projects, setProjects] = useState<FeaturedProject[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const API_BASE =
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      "http://localhost:5002";
+
+    let cancelled = false;
+
+    const getImageUrl = (p: Record<string, any>): string => {
+      const image =
+        p.thumbnail ||
+        p.thumbnailUrl ||
+        p.imageUrl ||
+        p.image ||
+        p.coverImage ||
+        p.featuredImage ||
+        p.projectImage ||
+        p.bannerImage ||
+        p.media?.url ||
+        p.images?.[0]?.url ||
+        p.images?.[0] ||
+        "";
+
+      if (typeof image === "string") {
+        return image.trim();
+      }
+
+      if (image && typeof image === "object") {
+        return (
+          image.url ||
+          image.secure_url ||
+          image.location ||
+          ""
+        );
+      }
+
+      return "";
+    };
+
+    const fetchProjects = async () => {
+      try {
+        setLoading(true);
+
+        const response = await fetch(
+          `${API_BASE}/realbizpro/api/v1/share-project/public/projects?page=1&limit=6`,
+        );
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+
+        const payload = await response.json();
+
+        if (cancelled) return;
+
+        const root =
+          payload && typeof payload === "object"
+            ? payload
+            : {};
+
+        const data = Array.isArray(root.data)
+          ? root.data
+          : Array.isArray(root.data?.data)
+            ? root.data.data
+            : Array.isArray(root.projects)
+              ? root.projects
+              : [];
+
+        const rows: FeaturedProject[] = data
+          .map((p: Record<string, any>) => ({
+            id: String(p.uuid || p.id || ""),
+            name: String(p.name || p.title || ""),
+            location: String(p.location || p.address || ""),
+            category: String(
+              typeof p.category === "object"
+                ? p.category?.name || ""
+                : p.category || "",
+            ),
+            thumbnail: getImageUrl(p),
+            pricePerShare: Number(p.pricePerShare || 0),
+            expectedAnnualReturn: Number(
+              p.expectedAnnualReturn || 0,
+            ),
+            totalShares: Number(p.totalShares || 0),
+          }))
+          .filter((p: FeaturedProject) => p.id && p.name)
+          .slice(0, 6);
+
+        // console.log("Featured Projects:", rows);
+
+        setProjects(rows);
+      } catch (error) {
+        console.error("Featured Projects Error:", error);
+
+        if (!cancelled) {
+          setProjects([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <section className="bg-slate-50 py-10">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
+
+        {/* Section Heading */}
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <SectionHeading
             align="left"
-            eyebrow={{ bn: "ফিচার্ড প্রজেক্ট", en: "Featured projects" }}
+            eyebrow={{
+              bn: "ফিচার্ড প্রজেক্ট",
+              en: "Featured projects",
+            }}
             title={{
               bn: "যেসব প্রজেক্টে এখন শেয়ার পাওয়া যাচ্ছে",
               en: "Projects with shares available now",
             }}
           />
+
           <Reveal>
             <Link
               href="/projects"
               className="group inline-flex items-center gap-2 rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
             >
-              {t({ bn: "সব প্রজেক্ট দেখুন", en: "View all projects" })}
+              {t({
+                bn: "সব প্রজেক্ট দেখুন",
+                en: "View all projects",
+              })}
+
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </Reveal>
         </div>
 
+        {/* Projects Grid */}
         <div className="mt-14 grid gap-7 lg:grid-cols-3">
-          {PROJECTS.map((p, i) => (
-            <Reveal key={i} delay={i * 0.12}>
-              <article className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-slate-900/10">
-                <div className="relative h-52 overflow-hidden">
-                  <SkylineArt
-                    hue={p.hue}
-                    variant={i}
-                    className="h-full w-full transition-transform duration-700 group-hover:scale-110"
-                  />
-                  <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur">
-                    {t(p.type)}
-                  </span>
-                  <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
-                    <Sparkles className="h-3 w-3" />
-                    {num(p.ret)}% {t({ bn: "রিটার্ন", en: "return" })}
-                  </span>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold text-slate-900">
-                    {t(p.name)}
-                  </h3>
-                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
-                    <MapPin className="h-4 w-4" />
-                    {t(p.place)}
-                  </p>
 
-                  <div className="mt-6 flex items-end justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500">
-                        {t({ bn: "প্রতি শেয়ার", en: "Per share" })}
+          {/* Loading Skeleton */}
+          {loading &&
+            Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-[430px] animate-pulse rounded-[28px] border border-slate-200 bg-slate-200/60"
+              />
+            ))}
+
+          {/* Project Cards */}
+          {!loading &&
+            projects.map((p, i) => (
+              <Reveal key={p.id} delay={i * 0.12}>
+                <article className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-slate-900/10">
+
+                  {/* Project Thumbnail */}
+                  <div className="relative h-52 overflow-hidden bg-slate-200">
+
+                    {p.thumbnail ? (
+                      <img
+                        src={p.thumbnail || "/image.png"}
+                        alt={p.name}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        onError={(e) => {
+                          console.error(
+                            "Project image failed:",
+                            p.thumbnail,
+                          );
+
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                        No Image Available
+                      </div>
+                    )}
+
+                    {/* Category */}
+                    {p.category && (
+                      <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur">
+                        {p.category}
+                      </span>
+                    )}
+
+                    {/* Annual Return */}
+                    {p.expectedAnnualReturn > 0 && (
+                      <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
+                        <Sparkles className="h-3 w-3" />
+
+                        {num(p.expectedAnnualReturn)}%{" "}
+                        {t({
+                          bn: "রিটার্ন",
+                          en: "return",
+                        })}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Project Information */}
+                  <div className="p-6">
+
+                    <h3 className="text-xl font-bold text-slate-900">
+                      {p.name}
+                    </h3>
+
+                    {p.location && (
+                      <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
+                        <MapPin className="h-4 w-4" />
+                        {p.location}
                       </p>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {taka(p.price)}
-                      </p>
+                    )}
+
+                    {/* Price & Shares */}
+                    <div className="mt-6 flex items-end justify-between">
+                      <div>
+                        <p className="text-xs text-slate-500">
+                          {t({
+                            bn: "প্রতি শেয়ার",
+                            en: "Per share",
+                          })}
+                        </p>
+
+                        <p className="text-2xl font-bold text-slate-900">
+                          {taka(p.pricePerShare)}
+                        </p>
+                      </div>
+
+                      {p.totalShares > 0 && (
+                        <p className="text-sm font-semibold text-emerald-600">
+                          {num(p.totalShares)}{" "}
+                          {t({
+                            bn: "শেয়ার",
+                            en: "shares",
+                          })}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-sm font-semibold text-emerald-600">
-                      {num(p.sold)}% {t({ bn: "বিক্রিত", en: "sold" })}
-                    </p>
-                  </div>
-                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      whileInView={{ width: `${p.sold}%` }}
-                      viewport={{ once: true }}
-                      transition={{
-                        duration: 1.4,
-                        delay: 0.3 + i * 0.1,
-                        ease: [0.16, 1, 0.3, 1],
-                      }}
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-sky-500"
-                    />
-                  </div>
 
-                  <div className="mt-6 flex gap-3">
-                    {/* <Link
-                      href="/login"
-                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-800 transition group-hover:border-emerald-500 group-hover:bg-emerald-500 group-hover:text-white"
-                    >
-                      {t({ bn: "শেয়ার নিন", en: "Get shares" })}
-                      <ArrowRight className="h-4 w-4" />
-                    </Link> */}
-                    <Link
-                      href={`/features/${i + 1}`}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-800 transition hover:border-sky-500 hover:bg-sky-500 hover:text-white"
-                    >
-                      {t({ bn: "বিস্তারিত দেখুন", en: "View details" })}
-                    </Link>
+                    {/* Details Button */}
+                    <div className="mt-6 flex gap-3">
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-800 transition hover:border-sky-500 hover:bg-sky-500 hover:text-white"
+                      >
+                        {t({
+                          bn: "বিস্তারিত দেখুন",
+                          en: "View details",
+                        })}
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </article>
-            </Reveal>
-          ))}
+                </article>
+              </Reveal>
+            ))}
+
+          {/* Empty State */}
+          {!loading && projects.length === 0 && (
+            <div className="col-span-full rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-center">
+              <p className="font-bold text-slate-700">
+                {t({
+                  bn: "এখনো কোনো প্রজেক্ট প্রকাশিত হয়নি।",
+                  en: "No projects published yet.",
+                })}
+              </p>
+
+              <Link
+                href="/projects"
+                className="mt-4 inline-block text-sm font-semibold text-emerald-600"
+              >
+                {t({
+                  bn: "সব প্রজেক্ট দেখুন",
+                  en: "Browse all projects",
+                })}
+              </Link>
+            </div>
+          )}
         </div>
-        <p className="mt-8 text-center text-xs text-slate-400">
-          {t({
-            bn: "* প্রদর্শিত তথ্য নমুনা মাত্র।",
-            en: "* Figures shown are illustrative samples.",
-          })}
-        </p>
       </div>
     </section>
   );
