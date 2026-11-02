@@ -242,9 +242,9 @@ export default function LoginPage() {
                   <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-slate-300 accent-emerald-500" />
                   {t({ bn: "মনে রাখুন", en: "Remember me" })}
                 </label>
-                <a href="#" className="font-medium text-emerald-600 hover:text-emerald-700">
+                <Link href="/forgot-password" className="font-medium text-emerald-600 hover:text-emerald-700">
                   {t({ bn: "পাসওয়ার্ড ভুলে গেছেন?", en: "Forgot password?" })}
-                </a>
+                </Link>
               </div>
 
               <AnimatePresence>
@@ -292,6 +292,12 @@ export default function LoginPage() {
                 })}
               </p>
             )}
+            <p className="mt-5 text-center text-sm text-slate-500">
+              {t({ bn: "নতুন অ্যাকাউন্ট?", en: "New to Share Project?" })}{" "}
+              <Link href="/register" className="font-semibold text-emerald-600 hover:text-emerald-700">
+                {t({ bn: "নিবন্ধন করুন", en: "Create account" })}
+              </Link>
+            </p>
 
             <div className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-400 lg:hidden">
               <Link href="/" className="font-medium text-slate-600 hover:text-slate-900">

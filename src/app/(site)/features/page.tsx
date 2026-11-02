@@ -15,7 +15,6 @@ export default function FeaturesPage() {
         highlight={{ bn: "স্মার্ট শেয়ার ব্যবস্থাপনা", en: "smarter share management" }}
         subtitle={{ bn: "শেয়ার বরাদ্দ, কালেকশন, রিপোর্ট ও পয়েন্ট — সবকিছুর জন্য প্রয়োজনীয় সব টুল এক জায়গায়।", en: "Share allocation, collection, reports and points — all the tools you need in one place." }}
       />
-      <FeaturedProjects />
       <FeatureGrid />
       <LifecycleTabs />
       <SecurityCta />
