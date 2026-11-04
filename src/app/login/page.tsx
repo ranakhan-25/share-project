@@ -284,12 +284,12 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="mt-5 text-center text-sm text-slate-500">
+            {/* <p className="mt-5 text-center text-sm text-slate-500">
               {t({ bn: "নতুন অ্যাকাউন্ট?", en: "New to Share Project?" })}{" "}
               <Link href="/register" className="font-semibold text-emerald-600 hover:text-emerald-700">
                 {t({ bn: "নিবন্ধন করুন", en: "Create account" })}
               </Link>
-            </p>
+            </p> */}
 
             <div className="mt-8 border-t border-slate-100 pt-5 text-center text-xs text-slate-400 lg:hidden">
               <Link href="/" className="font-medium text-slate-600 hover:text-slate-900">

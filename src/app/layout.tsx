@@ -6,6 +6,7 @@ import {
   Pinyon_Script, // 🎯 নতুন Script ফন্ট
 } from "next/font/google";
 import { LanguageProvider } from "@/lib/i18n";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -63,7 +64,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning className="min-h-screen antialiased">
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          {children}
+          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+        </LanguageProvider>
       </body>
     </html>
   );

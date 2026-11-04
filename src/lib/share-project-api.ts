@@ -4,6 +4,7 @@ const ROOT = "/realbizpro/api/v1/share-project";
 
 export type ShareApiProject = {
   uuid: string;
+  code?: string;
   name: string;
   description: string;
   location?: string;
@@ -114,5 +115,22 @@ export async function getShareProjectNotifications() {
 
 export async function prepareShareProjectInvestment(projectUuid: string, quantity: number) {
   const response = await api.post(`${ROOT}/user/investments/prepare`, { projectUuid, quantity });
+  return unwrap<Record<string, unknown>>(response.data);
+}
+
+export async function createPublicShareProject(dto: Record<string, unknown>) {
+  const response = await api.post(`${ROOT}/public/projects`, dto);
+  return unwrap<ShareApiProject>(response.data);
+}
+
+export async function requestPublicInvestment(dto: {
+  projectUuid: string;
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  quantity: number;
+}) {
+  const response = await api.post(`${ROOT}/public/investments/request`, dto);
   return unwrap<Record<string, unknown>>(response.data);
 }
