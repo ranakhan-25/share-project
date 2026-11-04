@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import Link from "next/link";
 import {
   Bell,
@@ -82,8 +83,11 @@ export function InvestorFeaturePage({ feature }: { feature: InvestorFeature }) {
         stored ? { ...stored, name: profile.name.trim(), phone: profile.phone.trim() } : null,
       );
       setSaved(true);
+      toast.success("Profile saved successfully.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save profile.");
+      const message = cause instanceof Error ? cause.message : "Could not save profile.";
+      setError(message);
+      toast.error(message);
     }
   };
 

@@ -12,6 +12,7 @@ import { LangSwitch } from "./LangSwitch";
 export const NAV_LINKS: { href: string; label: Bi }[] = [
   { href: "/", label: { bn: "হোম", en: "Home" } },
   { href: "/projects", label: { bn: "প্রজেক্ট", en: "Projects" } },
+  { href: "/investments", label: { bn: "ইনভেস্টমেন্ট", en: "Investment" } },
   { href: "/features", label: { bn: "ফিচার", en: "Features" } },
   { href: "/about", label: { bn: "আমাদের সম্পর্কে", en: "About" } },
   { href: "/contact", label: { bn: "যোগাযোগ", en: "Contact" } },

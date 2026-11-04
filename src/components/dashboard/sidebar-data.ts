@@ -41,6 +41,21 @@ export const sidebarMenu: MenuGroup[] = [
     items: [{ label: { bn: "ড্যাশবোর্ড", en: "Dashboard" }, href: "/dashboard", icon: LayoutDashboard }],
   },
   {
+    title: { bn: "ইনভেস্টমেন্ট", en: "Investment" },
+    items: [{
+      label: { bn: "ইনভেস্টমেন্ট সেন্টার", en: "Investment center" },
+      icon: Landmark,
+      children: [
+        { label: { bn: "প্রজেক্টে বিনিয়োগ", en: "Invest in projects" }, href: "/projects" },
+        { label: { bn: "আমার বিনিয়োগ", en: "My investments" }, href: "/dashboard/investments" },
+        { label: { bn: "আমার শেয়ার", en: "My shares" }, href: "/dashboard/shares" },
+        { label: { bn: "লাভ ও ডিভিডেন্ড", en: "Profit & dividend" }, href: "/dashboard/profits" },
+        { label: { bn: "পেমেন্ট ইতিহাস", en: "Payment history" }, href: "/dashboard/payments" },
+        { label: { bn: "স্টেটমেন্ট ও রিপোর্ট", en: "Statements & reports" }, href: "/dashboard/reports" },
+      ],
+    }],
+  },
+  {
     title: { bn: "ইনভেস্টর", en: "Investor" },
     items: [
       {

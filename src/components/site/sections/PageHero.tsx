@@ -128,14 +128,25 @@ export function PageHero({
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="font-medium text-emerald-600">{t(eyebrow)}</span>
         </motion.nav>
-        <motion.h1
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-6 max-w-3xl text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-6xl"
-        >
-          {t(title)} <span className="text-gradient">{t(highlight)}</span>
-        </motion.h1>
+        <div className="flex justify-between items-center">
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-6 max-w-3xl text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-6xl"
+          >
+            {t(title)} <span className="text-gradient">{t(highlight)}</span>
+          </motion.h1>
+          <div className="mt-5 mr-10">
+            <Link
+              href="/projects/create"
+              className="inline-flex rounded-2xl bg-ink-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
+            >
+              {t({ bn: "ক্রিয়েট প্রজেক্ট", en: "Create project" })}
+            </Link>
+          </div>
+        </div>
+
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

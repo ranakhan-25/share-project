@@ -17,14 +17,18 @@ const AVATARS = [
 function HeroVisual() {
   return (
     <div className="relative mx-auto flex h-[400px] w-full max-w-[600px] items-center justify-center lg:h-[500px]">
-      {/* soft glow */}
+      {/* Soft glow */}
       <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400/15 blur-[110px]" />
 
-      {/* Full Image - Bigger Height */}
+      {/* Full Image */}
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        transition={{
+          duration: 0.9,
+          delay: 0.2,
+          ease: [0.16, 1, 0.3, 1],
+        }}
         className="relative w-full overflow-hidden rounded-3xl shadow-2xl shadow-black/10"
       >
         <div className="relative aspect-[4/3] w-full min-h-[300px] lg:min-h-[480px]">
@@ -47,18 +51,29 @@ export function Hero() {
 
   return (
     <section className="relative isolate overflow-hidden bg-white pb-14 pt-32 text-ink-950">
-      {/* backgrounds */}
+      {/* Backgrounds */}
       <div className="bg-grid absolute inset-0 -z-10 opacity-[0.15]" />
+
       <motion.div
         animate={{ x: [0, 60, 0], y: [0, 30, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+        transition={{
+          duration: 18,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
         className="absolute -left-40 top-0 -z-10 h-[34rem] w-[34rem] rounded-full bg-emerald-400/15 blur-[120px]"
       />
+
       <motion.div
         animate={{ x: [0, -50, 0], y: [0, 40, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+        transition={{
+          duration: 22,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
         className="absolute -right-32 top-24 -z-10 h-[30rem] w-[30rem] rounded-full bg-sky-400/15 blur-[120px]"
       />
+
       <div className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-white to-transparent" />
 
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-8">
@@ -72,6 +87,7 @@ export function Hero() {
             <span className="rounded-full bg-emerald-400 px-2.5 py-0.5 text-[11px] font-bold uppercase text-ink-950">
               {t({ bn: "নতুন", en: "New" })}
             </span>
+
             {t({
               bn: "নতুন প্রজেক্টে শেয়ার এখন উন্মুক্ত",
               en: "Shares open in new projects",
@@ -81,30 +97,41 @@ export function Hero() {
           <motion.h1
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            transition={{
+              duration: 0.8,
+              delay: 0.1,
+              ease: [0.16, 1, 0.3, 1],
+            }}
             className="mt-6 flex flex-col"
           >
-            {/* Serif Font */}
+            {/* First Title - Marko One */}
             <span
-              className="text-[44px] font-semibold leading-[1.1] tracking-tight text-ink-950 sm:text-6xl lg:text-[68px]"
-              style={{ fontFamily: "var(--font-playfair)" }}
+              className="text-[44px] font-normal leading-[1.2] tracking-tight text-ink-950 sm:text-6xl lg:text-[68px]"
+              style={{ fontFamily: '"Marko One", serif' }}
             >
               {t({ bn: "বিশ্বস্ত শেয়ারে", en: "Own a share of" })}
             </span>
 
-            {/* Script Font */}
+            {/* Second Title - Marko One */}
             <span
-              className="-mt-2 block text-[54px] font-normal leading-[1.2] text-emerald-600 sm:text-7xl lg:text-[96px]"
-              style={{ fontFamily: "var(--font-pinyon)" }}
+              className=" block text-[54px] font-normal leading-[1.3] text-emerald-600 sm:text-7xl lg:text-[96px]"
+              style={{ fontFamily: '"Marko One", serif' }}
             >
-              {t({ bn: "গড়ুন আপনার ভবিষ্যৎ", en: "tomorrow’s best projects" })}
+              {t({
+                bn: "গড়ুন আপনার ভবিষ্যৎ",
+                en: "tomorrow’s best projects",
+              })}
             </span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            transition={{
+              duration: 0.8,
+              delay: 0.25,
+              ease: [0.16, 1, 0.3, 1],
+            }}
             className="mt-6 max-w-lg text-base leading-relaxed text-ink-950/70 sm:text-lg"
           >
             {t({
@@ -116,7 +143,11 @@ export function Hero() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            transition={{
+              duration: 0.8,
+              delay: 0.4,
+              ease: [0.16, 1, 0.3, 1],
+            }}
             className="mt-9 flex flex-wrap items-center gap-4"
           >
             <Link
@@ -126,6 +157,7 @@ export function Hero() {
               {t({ bn: "শুরু করুন", en: "Get started" })}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
+
             <Link
               href="/features"
               className="inline-flex items-center gap-2 rounded-full px-5 py-4 text-[15px] font-semibold text-ink-950 ring-1 ring-black/15 transition hover:bg-black/5"
@@ -149,6 +181,7 @@ export function Hero() {
                 />
               ))}
             </div>
+
             <p className="text-sm leading-snug text-ink-950/60">
               <b className="text-ink-950">
                 <CountUp to={12000} suffix="+" />
@@ -170,6 +203,7 @@ export function Hero() {
 
 export function StatsStrip() {
   const { t, taka } = useLang();
+
   const items = [
     {
       node: <CountUp to={12000} suffix="+" />,
@@ -205,6 +239,7 @@ export function StatsStrip() {
               <p className="text-3xl font-bold tracking-tight text-ink-950 sm:text-4xl">
                 {it.node}
               </p>
+
               <p className="mt-1.5 text-sm text-ink-950/50">{t(it.label)}</p>
             </motion.div>
           ))}
