@@ -113,22 +113,19 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-[1500px] space-y-6">
       {/* header */}
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-ink-950 p-7 text-white sm:p-9">
-        <div className="bg-grid absolute inset-0 opacity-50" />
-        <div className="absolute -right-10 -top-16 h-64 w-64 rounded-full bg-emerald-500/30 blur-[90px]" />
-        <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-sky-500/25 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-5">
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-7 sm:p-9">
+        <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
-            <p className="flex items-center gap-2 text-sm text-white/55"><CalendarDays className="h-4 w-4" />{today}</p>
-            <h2 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-4xl">
+            <p className="flex items-center gap-2 text-sm text-slate-400"><CalendarDays className="h-4 w-4" />{today}</p>
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               {t({ bn: "স্বাগতম, আপনার শেয়ার পোর্টফোলিও", en: "Welcome — your share portfolio" })}{" "}
-              <span className="text-gradient">{t({ bn: "বাড়ছে", en: "is growing" })}</span>
+              <span className="text-emerald-600">{t({ bn: "বাড়ছে", en: "is growing" })}</span>
             </h2>
-            <p className="mt-2 max-w-xl text-sm text-white/60">{t({ bn: "গত মাসের তুলনায় মোট শেয়ার মূল্য ৮.৪% বেড়েছে। নিচে বিস্তারিত দেখুন।", en: "Total share value is up 8.4% versus last month. Details below." })}</p>
+            <p className="mt-2 max-w-xl text-sm text-slate-500">{t({ bn: "গত মাসের তুলনায় মোট শেয়ার মূল্য ৮.৪% বেড়েছে। নিচে বিস্তারিত দেখুন।", en: "Total share value is up 8.4% versus last month. Details below." })}</p>
           </div>
           <div className="flex gap-3">
-            <button className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold ring-1 ring-white/15 transition hover:bg-white/20"><Download className="h-4 w-4" />{t({ bn: "এক্সপোর্ট", en: "Export" })}</button>
-            <Link href="/dashboard/project/share-project/assign-share" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-sky-400 px-4 py-2.5 text-sm font-semibold text-ink-950 shadow-lg shadow-emerald-500/25 transition hover:scale-[1.03]"><Plus className="h-4 w-4" />{t({ bn: "শেয়ার অ্যাসাইন", en: "Assign share" })}</Link>
+            <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><Download className="h-4 w-4" />{t({ bn: "এক্সপোর্ট", en: "Export" })}</button>
+            <Link href="/dashboard/project/share-project/assign-share" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 transition hover:scale-[1.03]"><Plus className="h-4 w-4" />{t({ bn: "শেয়ার অ্যাসাইন", en: "Assign share" })}</Link>
           </div>
         </div>
       </motion.div>

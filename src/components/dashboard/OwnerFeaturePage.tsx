@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import {
   ArrowLeft,
   Building2,
@@ -256,8 +257,11 @@ export function OwnerFeaturePage({ feature, status, projectId }: Props) {
       }));
       setProjects(updated);
       setMessage(submit ? "Project submitted for approval." : "Project draft saved successfully.");
+      toast.success(submit ? "Project submitted for approval." : "Project draft saved successfully.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save the project.");
+      const message = cause instanceof Error ? cause.message : "Could not save the project.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -279,7 +283,12 @@ export function OwnerFeaturePage({ feature, status, projectId }: Props) {
       }));
       setProjects(updated);
       setMessage(`Project moved to ${statusLabel(nextStatus)}.`);
-    }).catch((cause) => setError(cause instanceof Error ? cause.message : "Status change failed."));
+      toast.success(`Project moved to ${statusLabel(nextStatus)}.`);
+    }).catch((cause) => {
+      const message = cause instanceof Error ? cause.message : "Status change failed.";
+      setError(message);
+      toast.error(message);
+    });
   }
 
   if (feature === "dashboard") {

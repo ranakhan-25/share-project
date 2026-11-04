@@ -39,8 +39,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!ready) {
     return (
-      <div className="grid min-h-screen place-items-center bg-ink-950">
-        <div className="animate-float"><LogoMark size={56} /></div>
+      <div className="grid min-h-screen place-items-center bg-slate-50">
+        <div className="animate-float rounded-3xl bg-white p-4 ring-1 ring-slate-200"><LogoMark size={56} /></div>
       </div>
     );
   }
