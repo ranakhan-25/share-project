@@ -73,6 +73,14 @@ export default function ProjectDetailsPage() {
                   }
                   try {
                     await requestPublicInvestment({ projectUuid: params.id, quantity, ...investor });
+                    try {
+                      localStorage.setItem(
+                        "share-project:guest-investor",
+                        JSON.stringify({ email: investor.email.trim(), phone: investor.phone.trim(), name: investor.name.trim() }),
+                      );
+                    } catch {
+                      /* ignore */
+                    }
                     setConfirmed(true);
                     toast.success(t({ bn: "ইনভেস্টমেন্ট অনুরোধ পাঠানো হয়েছে", en: "Investment request submitted" }));
                   } catch (cause) {
@@ -88,7 +96,7 @@ export default function ProjectDetailsPage() {
                   <button type="submit" className="w-full rounded-2xl bg-ink-950 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-600">{t({ bn: "ইনভেস্টমেন্ট অনুরোধ পাঠান", en: "Submit investment request" })}</button>
                 </form>
               )}
-              <Link href="/dashboard/payments" className="mt-3 block text-center text-xs font-semibold text-emerald-600">{t({ bn: "পেমেন্ট পদ্ধতি দেখুন", en: "View payment methods" })}</Link>
+              <Link href="/dashboard/my-investments" className="mt-3 block text-center text-xs font-semibold text-emerald-600 hover:underline">{t({ bn: "আমার বিনিয়োগ দেখুন", en: "View my investments" })}</Link>
             </aside>
           </div>
         </div>
