@@ -108,6 +108,16 @@ export async function getShareProjectPortfolio() {
   return unwrap<Record<string, unknown[]>>(response.data);
 }
 
+export async function getPublicPortfolio(params?: { email?: string; phone?: string; code?: string }) {
+  const query = new URLSearchParams();
+  if (params?.email) query.set("email", params.email);
+  if (params?.phone) query.set("phone", params.phone);
+  if (params?.code) query.set("code", params.code);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  const response = await api.get(`${ROOT}/public/portfolio${qs}`);
+  return unwrap<Record<string, unknown[]>>(response.data);
+}
+
 export async function getShareProjectNotifications() {
   const response = await api.get(`${ROOT}/user/notifications`);
   return unwrap<Array<Record<string, unknown>>>(response.data);
@@ -133,4 +143,64 @@ export async function requestPublicInvestment(dto: {
 }) {
   const response = await api.post(`${ROOT}/public/investments/request`, dto);
   return unwrap<Record<string, unknown>>(response.data);
+}
+
+export type LocationDistrict = {
+  id: number;
+  divisionId: number;
+  divisionName: string;
+  divisionBnName: string;
+  name: string;
+  bnName: string;
+};
+
+export type LocationDivision = {
+  id: number;
+  name: string;
+  bnName: string;
+  code: string;
+  districts: LocationDistrict[];
+};
+
+export type LocationsResponse = {
+  totalDivisions: number;
+  totalDistricts: number;
+  divisions: LocationDivision[];
+  districts?: LocationDistrict[];
+  locations?: Array<{
+    id: number;
+    district: string;
+    districtBn: string;
+    division: string;
+    divisionBn: string;
+    label: string;
+    labelBn: string;
+  }>;
+};
+
+export async function getPublicLocations(search?: string): Promise<LocationsResponse> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  try {
+    const response = await api.get(`/realbizpro/api/v1/locations${query}`);
+    return unwrap<LocationsResponse>(response.data);
+  } catch {
+    const fallbackResponse = await api.get(`${ROOT}/public/locations${query}`);
+    return unwrap<LocationsResponse>(fallbackResponse.data);
+  }
+}
+
+export async function getPublicDistricts(division?: string, search?: string): Promise<LocationDistrict[]> {
+  const params = new URLSearchParams();
+  if (division) params.set("division", division);
+  if (search) params.set("search", search);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  try {
+    const response = await api.get(`/realbizpro/api/v1/locations/districts${q}`);
+    const data = unwrap<any>(response.data);
+    return Array.isArray(data) ? data : data?.districts || [];
+  } catch {
+    const fallback = await api.get(`${ROOT}/public/locations${q}`);
+    const data = unwrap<any>(fallback.data);
+    return data?.districts || [];
+  }
 }
