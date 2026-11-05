@@ -13,7 +13,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Auth guard: no token → login page.
+  // Auth guard: no token → login page. Dashboard cannot be accessed without login.
   useEffect(() => {
     if (!getStoredAccessToken()) {
       router.replace("/login");
@@ -40,14 +40,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!ready) {
     return (
       <div className="grid min-h-screen place-items-center bg-slate-50">
-        <div className="animate-float rounded-3xl bg-white p-4 ring-1 ring-slate-200"><LogoMark size={56} /></div>
+        <div className="animate-float rounded-3xl bg-white p-4 ring-1 ring-slate-200">
+          <LogoMark size={56} />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Sidebar collapsed={collapsed} onToggle={toggle} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={toggle}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
+      />
       <div className={`transition-[padding] duration-300 ${collapsed ? "lg:pl-[84px]" : "lg:pl-[272px]"}`}>
         <Topbar onMenu={() => setMobileOpen(true)} />
         <main className="p-4 sm:p-6 lg:p-8">{children}</main>
