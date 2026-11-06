@@ -137,7 +137,15 @@ export async function requestPublicInvestment(dto: {
   projectUuid: string;
   name: string;
   email: string;
-  password: string;
+  password?: string;
+  investorType?: string;
+  organizationName?: string;
+  organizationLocation?: string;
+  organizationPhone?: string;
+  representativePhone?: string;
+  tradeLicenseNumber?: string;
+  organizationRepresentativeName?: string;
+  organizationDesignation?: string;
   phone: string;
   quantity: number;
 }) {

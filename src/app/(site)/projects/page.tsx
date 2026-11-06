@@ -7,9 +7,16 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  Building2,
+  Coins,
+  FileCheck2,
   MapPin,
+  PlusCircle,
   Search,
+  ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { PageHero } from "@/components/site/sections/PageHero";
@@ -158,18 +165,191 @@ export default function ProjectsPage() {
 
   return (
     <>
-      <PageHero
-        variant="features"
-        eyebrow={{ bn: "শেয়ার প্রজেক্ট", en: "Share projects" }}
-        title={{ bn: "প্রজেক্ট খুঁজুন ও", en: "Find and" }}
-        highlight={{ bn: "বিনিয়োগ করুন", en: "invest in projects" }}
-        subtitle={{
-          bn: "স্বচ্ছ তথ্য, স্পষ্ট ঝুঁকি এবং প্রজেক্টভিত্তিক রিটার্ন বিশ্লেষণ।",
-          en: "Clear information, transparent risks and project-based return analysis.",
-        }}
-      />
-      <section className="bg-slate-50 py-14 sm:py-20">
+            {/* ───────────────── ENHANCED RICH HERO BANNER ───────────────── */}
+      <section className="relative isolate overflow-hidden bg-white pb-10 pt-32 text-slate-900 border-b border-slate-200/80">
+        {/* Soft background grid & ambient light accents */}
+        <div className="bg-grid absolute inset-0 -z-10 opacity-[0.12]" />
+        <div className="absolute left-1/4 -top-20 -z-10 h-[32rem] w-[32rem] rounded-full bg-emerald-400/10 blur-[130px] pointer-events-none" />
+        <div className="absolute right-10 top-20 -z-10 h-[26rem] w-[26rem] rounded-full bg-sky-400/10 blur-[120px] pointer-events-none" />
+
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
+          {/* Breadcrumb Navigation */}
+          <nav className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 mb-6">
+            <Link href="/" className="transition hover:text-slate-900 font-medium">
+              {t({ bn: "হোম", en: "Home" })}
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              {t({ bn: "বাণিজ্যিক প্রজেক্ট মার্কেটপ্লেস", en: "Commercial Projects Directory" })}
+            </span>
+          </nav>
+
+          {/* Badge & Creator CTA Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/80 px-4 py-1.5 text-xs font-bold text-emerald-800 shadow-sm backdrop-blur-md w-fit">
+              <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+              {t({
+                bn: "১০০% যাচাইকৃত প্রজেক্ট • ফ্র্যাকশনাল কো-ওনারশিপ পোর্টাল",
+                en: "100% Vetted Projects • Fractional Co-Ownership Portal",
+              })}
+            </div>
+
+            <Link
+              href="/projects/create"
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md transition hover:bg-emerald-600 hover:scale-[1.02] active:scale-95 w-fit"
+            >
+              <PlusCircle className="h-4 w-4" />
+              {t({ bn: "নতুন প্রজেক্ট যুক্ত করুন", en: "Submit a Project" })}
+            </Link>
+          </div>
+
+          {/* Main Headline */}
+          <h1 className="max-w-4xl text-3xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl text-slate-900 leading-[1.15]">
+            {t({
+              bn: "বাছাইকৃত সেরা বাণিজ্যিক প্রজেক্ট খুঁজুন ও ",
+              en: "Discover High-Yield Commercial Assets & ",
+            })}
+            <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 bg-clip-text text-transparent">
+              {t({
+                bn: "নিরাপদে বিনিয়োগ করুন",
+                en: "Invest with Confidence",
+              })}
+            </span>
+          </h1>
+
+          {/* Rich Content Paragraphs */}
+          <div className="mt-6 max-w-3xl space-y-3 text-sm sm:text-base leading-relaxed text-slate-600">
+            <p>
+              {t({
+                bn: "স্বচ্ছ আর্থিক তথ্য, সুস্পষ্ট ঝুঁকি ব্যবস্থাপনা এবং নিয়মিত প্রজেক্টভিত্তিক রিটার্ন নিশ্চিত করতে আমাদের প্রতিটি প্রজেক্ট কঠোর পেশাদার অডিট ও আইনি পর্যালোচনার পরই লাইভ করা হয়।",
+                en: "To guarantee transparent financial insights, clear risk mitigation, and steady cash flows, every project undergoes comprehensive legal audits and feasibility reviews before going live.",
+              })}
+            </p>
+            {/* <p className="text-slate-500">
+              {t({
+                bn: "বাণিজ্যিক রিয়েল এস্টেট, রিসোর্ট, শপিং মল, কৃষি খামার ও আধুনিক সম্পদে যৌথ মালিকানা গ্রহণ করুন। আপনার সঞ্চয় অনুযায়ী যেকোনো পরিমাণের শেয়ার কিনে নিয়মিত ভাড়াভিত্তিক লভ্যাংশ এবং দীর্ঘমেয়াদী মূলধন বৃদ্ধি উপভোগ করুন।",
+                en: "Co-own premium commercial real estate, resorts, retail spaces, and agro-ventures. Purchase fractional shares tailored to your budget and enjoy predictable rental distributions coupled with long-term capital appreciation.",
+              })}
+            </p> */}
+          </div>
+
+          {/* Feature Highlights Pills */}
+          <div className="mt-8 flex flex-wrap gap-2.5 sm:gap-3">
+            {[
+              {
+                icon: ShieldCheck,
+                text: { bn: "আইনগতভাবে অনুমোদিত চুক্তি", en: "Legally Backed Deeds" },
+              },
+              {
+                icon: TrendingUp,
+                text: { bn: "নিয়মিত ভাড়া ও ডিভিডেন্ড", en: "Predictable Rental Yields" },
+              },
+              {
+                icon: Coins,
+                text: { bn: "স্বল্প পুঁজিতে ফ্র্যাকশনাল ওনারশিপ", en: "Fractional Ownership from Low Entry" },
+              },
+              {
+                icon: FileCheck2,
+                text: { bn: "সুপার এডমিন মনিটরিং ও অডিট", en: "Super Admin Audited Reports" },
+              },
+            ].map((pill, idx) => {
+              const Icon = pill.icon;
+              return (
+                <div
+                  key={idx}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+                >
+                  <Icon className="h-4 w-4 text-emerald-600" />
+                  <span>{t(pill.text)}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Quick Metrics / Stats Bar */}
+          {/* <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-slate-100 pt-8">
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {t({ bn: "সক্রিয় প্রজেক্ট", en: "Live Projects" })}
+              </p>
+              <p className="mt-1 text-2xl font-black text-slate-900">
+                {loading ? "..." : totalProjects > 0 ? `${totalProjects}+` : "10+"}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {t({ bn: "সুপার এডমিন যাচাইকৃত", en: "Vetted & Published" })}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {t({ bn: "প্রত্যাশিত বার্ষিক রিটার্ন", en: "Expected Annual ROI" })}
+              </p>
+              <p className="mt-1 text-2xl font-black text-emerald-600">
+                ১৫% - ২৫%
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {t({ bn: "ভাড়া ও লাভ্যাংশ ভিত্তিক", en: "Rental & Profit Yields" })}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {t({ bn: "মিনিমাম শেয়ার এন্ট্রি", en: "Affordable Entry" })}
+              </p>
+              <p className="mt-1 text-2xl font-black text-slate-900">
+                ৳১,০০০+
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {t({ bn: "সকল আয়ের মানুষের উপযোগী", en: "Accessible to Everyone" })}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {t({ bn: "ট্র্যাকিং ও রিপোর্ট", en: "Digital Tracking" })}
+              </p>
+              <p className="mt-1 text-2xl font-black text-sky-600">
+                ২৪/৭
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {t({ bn: "পোর্টফোলিও ড্যাশবোর্ড", en: "Online Portfolio Dashboard" })}
+              </p>
+            </div>
+          </div> */}
+        </div>
+      </section>
+      <section className="bg-slate-50 pt-10 pb-20">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
+                    {/* Header Title & Showing Count above Search */}
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/70 px-3 py-1 text-xs font-bold text-emerald-800 mb-2">
+                <Building2 className="h-3.5 w-3.5 text-emerald-600" />
+                {t({ bn: "সক্রিয় বাণিজ্যিক প্রকল্পসমূহ", en: "Active Commercial Projects" })}
+              </div>
+              <h2 className="text-2xl font-extrabold text-slate-900 sm:text-3xl tracking-tight">
+                {t({ bn: "উপলব্ধ সকল প্রজেক্ট তালিকা", en: "All Available Projects" })}
+              </h2>
+              <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                {t({
+                  bn: "আপনার পছন্দ অনুযায়ী ফিল্টার করে লাভজনক প্রজেক্ট বেছে নিন এবং সরাসরি শেয়ার ক্রয় করুন।",
+                  en: "Filter by category or location to discover high-yield commercial assets and invest instantly.",
+                })}
+              </p>
+            </div>
+
+            {/* Total / Showing Count Badge */}
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm text-xs sm:text-sm font-semibold text-slate-700 w-fit shrink-0">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>
+                {t({
+                  bn: `মোট ${num(totalProjects || filtered.length)} টির মধ্যে ${num(filtered.length)} টি প্রদর্শিত হচ্ছে`,
+                  en: `Showing ${filtered.length} of ${totalProjects || filtered.length} projects`,
+                })}
+              </span>
+            </div>
+          </div>
+
           <div className="grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_220px_220px]">
             <label className="relative">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

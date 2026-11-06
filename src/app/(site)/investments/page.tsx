@@ -60,38 +60,38 @@ export default function InvestmentMenuPage() {
   const totalMaturityReturn = useMemo(() => Math.round(calcAmount + annualProfit * calcYears), [calcAmount, annualProfit, calcYears]);
 
   // Fallback demo projects if none returned by API
-  const displayProjects = projects.length > 0 ? projects : [
-    {
-      uuid: "sample-1",
-      name: "Riverfront Business Center",
-      location: "Gulshan-2, Dhaka",
-      pricePerShare: 25000,
-      totalShares: 100,
-      expectedAnnualReturn: 18.5,
-      thumbnailUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85",
-      category: { id: 1, name: "Commercial" },
-    },
-    {
-      uuid: "sample-2",
-      name: "Pinecrest Eco Resort & Villas",
-      location: "Sreemangal, Sylhet",
-      pricePerShare: 35000,
-      totalShares: 80,
-      expectedAnnualReturn: 21.0,
-      thumbnailUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=85",
-      category: { id: 2, name: "Resort & Hotel" },
-    },
-    {
-      uuid: "sample-3",
-      name: "Smart Logistics & Tech Park",
-      location: "Gazipur, Dhaka",
-      pricePerShare: 15000,
-      totalShares: 200,
-      expectedAnnualReturn: 16.0,
-      thumbnailUrl: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=85",
-      category: { id: 3, name: "Industrial" },
-    },
-  ];
+  // const displayProjects = projects.length > 0 ? projects : [
+  //   {
+  //     uuid: "sample-1",
+  //     name: "Riverfront Business Center",
+  //     location: "Gulshan-2, Dhaka",
+  //     pricePerShare: 25000,
+  //     totalShares: 100,
+  //     expectedAnnualReturn: 18.5,
+  //     thumbnailUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85",
+  //     category: { id: 1, name: "Commercial" },
+  //   },
+  //   {
+  //     uuid: "sample-2",
+  //     name: "Pinecrest Eco Resort & Villas",
+  //     location: "Sreemangal, Sylhet",
+  //     pricePerShare: 35000,
+  //     totalShares: 80,
+  //     expectedAnnualReturn: 21.0,
+  //     thumbnailUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=85",
+  //     category: { id: 2, name: "Resort & Hotel" },
+  //   },
+  //   {
+  //     uuid: "sample-3",
+  //     name: "Smart Logistics & Tech Park",
+  //     location: "Gazipur, Dhaka",
+  //     pricePerShare: 15000,
+  //     totalShares: 200,
+  //     expectedAnnualReturn: 16.0,
+  //     thumbnailUrl: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=1200&q=85",
+  //     category: { id: 3, name: "Industrial" },
+  //   },
+  // ];
 
   // Core navigation items
   const items = [
@@ -201,11 +201,11 @@ export default function InvestmentMenuPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
-                  href="/my-investments"
+                  href="/dashboard/my-investments"
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
                 >
                   <Search className="h-4 w-4 text-emerald-600" />
-                  {t({ bn: "বিনিয়োগ ট্র্যাক করুন (লগইন ছাড়া)", en: "Track Investments (No Login)" })}
+                  {t({ bn: "আমার ইনভেস্টমেন্ট দেখুন", en: "My Investments Dashboard" })}
                 </Link>
               </div>
 
@@ -289,7 +289,7 @@ export default function InvestmentMenuPage() {
       </section>
 
       {/* ───────────────── 3. FEATURED ACTIVE PROJECTS (DYNAMIC) ───────────────── */}
-      <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6 lg:px-8">
+      {/* <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div>
             <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-emerald-600">
@@ -321,7 +321,7 @@ export default function InvestmentMenuPage() {
               key={proj.uuid}
               className="group flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl"
             >
-              {/* Project Image */}
+              
               <div className="relative h-56 w-full overflow-hidden bg-slate-100">
                 <Image
                   src={
@@ -350,7 +350,7 @@ export default function InvestmentMenuPage() {
                 )}
               </div>
 
-              {/* Project Body */}
+              
               <div className="flex flex-1 flex-col justify-between p-6">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 group-hover:text-emerald-700 transition line-clamp-1">
@@ -393,7 +393,7 @@ export default function InvestmentMenuPage() {
             </div>
           ))}
         </div>
-      </section>
+      </section> */}
 
       {/* ───────────────── 4. THREE PILLARS INVESTMENT MODEL (STATIC WITH IMAGES) ───────────────── */}
       <section className="mx-auto mt-24 max-w-7xl px-4 sm:px-6 lg:px-8">
