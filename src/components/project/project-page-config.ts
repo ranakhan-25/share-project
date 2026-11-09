@@ -1,33 +1,722 @@
-/**
- * Config for the generic report pages (see project-api-page.tsx).
- * `endpoint` is appended to `${NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/`.
- * NOTE: these endpoints are best guesses - adjust them to match your backend.
- */
-export type ProjectPageConfig = {
+import type { ProjectApiColumn, ProjectApiField } from "./project-api-page";
+
+export interface ProjectPageConfig {
   title: string;
-  titleBn?: string;
   endpoint: string;
-  description?: string;
+  fields?: ProjectApiField[];
+  columns: ProjectApiColumn[];
+  fixedValues?: Record<string, unknown>;
+  readOnly?: boolean;
+}
+
+const projects: ProjectApiField[] = [
+  {
+    name: "projectId",
+    label: "Project",
+    type: "select",
+    required: true,
+    source: {
+      endpoint: "/project",
+      labelKey: "name",
+      valueKey: "uuid",
+    },
+  },
+];
+
+const flatLands: ProjectApiField[] = [
+  ...projects,
+  {
+    name: "flatLandId",
+    label: "Flat / Plot",
+    type: "select",
+    required: true,
+    source: {
+      endpoint: "/flat-land",
+      labelKey: "flatLandNo",
+      valueKey: "uuid",
+    },
+  },
+];
+
+const bookingColumns: ProjectApiColumn[] = [
+  { key: "code", label: "Booking No." },
+  { key: "bookingDate", label: "Date" },
+  { key: "customerName", label: "Customer" },
+  { key: "flatLand.flatLandNo", label: "Flat / Plot" },
+  { key: "grandTotal", label: "Total" },
+  { key: "paid", label: "Paid" },
+  { key: "due", label: "Due" },
+  { key: "status", label: "Status" },
+];
+
+const billingCoreFields: ProjectApiField[] = [
+  ...projects,
+  { name: "title", label: "Title", required: true },
+  { name: "code", label: "Reference No." },
+  { name: "recordDate", label: "Date", type: "date" },
+  { name: "amount", label: "Amount", type: "number" },
+  { name: "status", label: "Status", defaultValue: "active" },
+  { name: "description", label: "Description", type: "textarea" },
+];
+
+const billingExtra = (
+  name: string,
+  label: string,
+  type: ProjectApiField["type"] = "text",
+): ProjectApiField => ({
+  name,
+  label,
+  type,
+  storage: "details",
+});
+
+const billingColumns: ProjectApiColumn[] = [
+  { key: "title", label: "Title" },
+  { key: "code", label: "Reference No." },
+  { key: "project.name", label: "Project" },
+  { key: "recordDate", label: "Date" },
+  { key: "amount", label: "Amount" },
+  { key: "status", label: "Status" },
+];
+
+export const projectPageConfigs: Record<string, ProjectPageConfig> = {
+  assignShare: {
+    title: "Share Assignment",
+    endpoint: "/project-share-assignments",
+    fields: [
+      ...projects,
+      { name: "shareCode", label: "Share Code", required: true },
+      { name: "customerName", label: "Customer Name", required: true },
+      {
+        name: "noOfShares",
+        label: "Number of Shares",
+        type: "number",
+        required: true,
+      },
+      { name: "shareAmount", label: "Share Amount", type: "number" },
+      { name: "paidAmount", label: "Paid Amount", type: "number" },
+      { name: "due", label: "Due", type: "number" },
+      { name: "points", label: "Holder Points", type: "number" },
+      { name: "email", label: "Email" },
+      { name: "mobile", label: "Mobile" },
+      { name: "nid", label: "NID" },
+      { name: "flatLand", label: "Flat / Land" },
+      { name: "siteName", label: "Site" },
+      { name: "assignedAt", label: "Assigned Date", type: "date" },
+      { name: "status", label: "Status", defaultValue: "active" },
+      { name: "note", label: "Note", type: "textarea" },
+    ],
+    columns: [
+      { key: "shareCode", label: "Share Code" },
+      { key: "customerName", label: "Customer" },
+      { key: "noOfShares", label: "Shares" },
+      { key: "shareAmount", label: "Share Amount" },
+      { key: "paidAmount", label: "Paid" },
+      { key: "due", label: "Due" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  shareConfiguration: {
+    title: "Project Share Configuration",
+    endpoint: "/project-share-configurations",
+    fields: [
+      ...projects,
+      { name: "titleName", label: "Title", required: true },
+      { name: "shareType", label: "Share Type", required: true },
+      { name: "taskNames", label: "Task Names", type: "textarea" },
+      { name: "assignType", label: "Assign Type", required: true },
+      {
+        name: "configurationAmount",
+        label: "Amount",
+        type: "number",
+        required: true,
+      },
+      { name: "status", label: "Status", defaultValue: "active" },
+    ],
+    columns: [
+      { key: "titleName", label: "Title" },
+      { key: "shareType", label: "Share Type" },
+      { key: "assignType", label: "Assign Type" },
+      { key: "configurationAmount", label: "Amount" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  shareReport: {
+    title: "Share Report",
+    endpoint: "/project-share-assignments",
+    readOnly: true,
+    columns: [
+      { key: "shareCode", label: "Share Code" },
+      { key: "customerName", label: "Customer" },
+      { key: "noOfShares", label: "Shares" },
+      { key: "shareAmount", label: "Amount" },
+      { key: "paidAmount", label: "Paid" },
+      { key: "due", label: "Due" },
+    ],
+  },
+  shareCollectionReport: {
+    title: "Share Collection Report",
+    endpoint: "/project-share-assignments/reports/collection",
+    readOnly: true,
+    columns: [
+      { key: "shareCode", label: "Share Code" },
+      { key: "customerName", label: "Customer" },
+      { key: "shareAmount", label: "Amount" },
+      { key: "paidAmount", label: "Collected" },
+      { key: "due", label: "Due" },
+    ],
+  },
+  penaltyReport: {
+    title: "Penalty Report",
+    endpoint: "/project-share-assignments/reports/penalty",
+    readOnly: true,
+    columns: [
+      { key: "shareCode", label: "Share Code" },
+      { key: "customerName", label: "Customer" },
+      { key: "penaltyAmount", label: "Penalty" },
+      { key: "due", label: "Due" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  holdersPointReport: {
+    title: "Share Holders Point Report",
+    endpoint: "/project-share-assignments/reports/holders-point",
+    readOnly: true,
+    columns: [
+      { key: "shareCode", label: "Share Code" },
+      { key: "customerName", label: "Holder" },
+      { key: "noOfShares", label: "Shares" },
+      { key: "points", label: "Points" },
+    ],
+  },
+  flat: {
+    title: "Flat",
+    endpoint: "/flat-land/flats",
+    fixedValues: { propertyType: "flat" },
+    fields: [
+      ...projects,
+      { name: "flatLandNo", label: "Flat No.", required: true },
+      { name: "siteName", label: "Site" },
+      { name: "blockName", label: "Block" },
+      { name: "siteBlock", label: "Site / Block" },
+      { name: "unit", label: "Unit" },
+      { name: "bedroom", label: "Bedrooms", type: "number" },
+      { name: "bathroom", label: "Bathrooms", type: "number" },
+      { name: "size", label: "Size" },
+      { name: "pricePerUnit", label: "Price per Unit", type: "number" },
+      { name: "parkingCost", label: "Parking Cost", type: "number" },
+      { name: "utilityCharge", label: "Utility Charge", type: "number" },
+      { name: "facing", label: "Facing" },
+      { name: "amenities", label: "Amenities", type: "textarea" },
+      { name: "status", label: "Status", defaultValue: "Available" },
+    ],
+    columns: [
+      { key: "flatLandNo", label: "Flat No." },
+      { key: "project.name", label: "Project" },
+      { key: "siteName", label: "Site" },
+      { key: "blockName", label: "Block" },
+      { key: "size", label: "Size" },
+      { key: "pricePerUnit", label: "Price" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  landRoad: {
+    title: "Land Road",
+    endpoint: "/land-infrastructure/roads",
+    fixedValues: { kind: "road" },
+    fields: [
+      ...projects,
+      { name: "name", label: "Road Name / No.", required: true },
+      { name: "size", label: "Road Size" },
+      { name: "details", label: "Details" },
+    ],
+    columns: [
+      { key: "name", label: "Road" },
+      { key: "size", label: "Size" },
+      { key: "project.name", label: "Project" },
+      { key: "details", label: "Details" },
+    ],
+  },
+  landBlock: {
+    title: "Land Block",
+    endpoint: "/land-infrastructure/blocks",
+    fixedValues: { kind: "block" },
+    fields: [
+      ...projects,
+      { name: "name", label: "Block Name", required: true },
+      { name: "size", label: "Block Size" },
+      { name: "details", label: "Details" },
+    ],
+    columns: [
+      { key: "name", label: "Block" },
+      { key: "size", label: "Size" },
+      { key: "project.name", label: "Project" },
+      { key: "details", label: "Details" },
+    ],
+  },
+  landDetails: {
+    title: "Land Details",
+    endpoint: "/flat-land/lands",
+    fixedValues: { propertyType: "land" },
+    fields: [
+      ...projects,
+      { name: "flatLandNo", label: "Plot No.", required: true },
+      { name: "siteName", label: "Site" },
+      { name: "blockName", label: "Block" },
+      { name: "roadNo", label: "Road No." },
+      { name: "roadSize", label: "Road Size" },
+      { name: "plotLocation", label: "Plot Location" },
+      { name: "size", label: "Plot Size" },
+      { name: "unit", label: "Unit" },
+      { name: "pricePerUnit", label: "Price per Unit", type: "number" },
+      { name: "facing", label: "Facing" },
+      { name: "status", label: "Status", defaultValue: "Available" },
+    ],
+    columns: [
+      { key: "flatLandNo", label: "Plot No." },
+      { key: "siteName", label: "Site" },
+      { key: "blockName", label: "Block" },
+      { key: "roadNo", label: "Road" },
+      { key: "size", label: "Size" },
+      { key: "pricePerUnit", label: "Price" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  booking: {
+    title: "Flat / Land Booking",
+    endpoint: "/flat-land-bookings",
+    fields: [
+      ...flatLands,
+      { name: "code", label: "Booking No.", required: true },
+      {
+        name: "bookingDate",
+        label: "Booking Date",
+        type: "date",
+        required: true,
+      },
+      { name: "customerName", label: "Customer", required: true },
+      { name: "salesBy", label: "Sales By" },
+      { name: "rate", label: "Rate", type: "number" },
+      { name: "otherCost", label: "Other Cost", type: "number" },
+      { name: "discount", label: "Discount", type: "number" },
+      { name: "grandTotal", label: "Grand Total", type: "number" },
+      { name: "paid", label: "Paid", type: "number" },
+      { name: "due", label: "Due", type: "number" },
+      { name: "status", label: "Status", defaultValue: "Pending" },
+      { name: "attachment", label: "Attachment URL" },
+    ],
+    columns: bookingColumns,
+  },
+  saleOffer: {
+    title: "Sale Offer",
+    endpoint: "/flat-land-offers",
+    fields: [
+      ...flatLands,
+      { name: "code", label: "Offer No.", required: true },
+      { name: "offerDate", label: "Offer Date", type: "date", required: true },
+      { name: "customerName", label: "Customer" },
+      { name: "salesBy", label: "Sales By" },
+      { name: "rate", label: "Rate", type: "number" },
+      { name: "otherCost", label: "Other Cost", type: "number" },
+      { name: "discount", label: "Discount", type: "number" },
+      { name: "grandTotal", label: "Grand Total", type: "number" },
+      { name: "paid", label: "Paid", type: "number" },
+      { name: "due", label: "Due", type: "number" },
+      { name: "approvalStatus", label: "Approval Status" },
+    ],
+    columns: [
+      { key: "code", label: "Offer No." },
+      { key: "offerDate", label: "Date" },
+      { key: "customerName", label: "Customer" },
+      { key: "flatLand.flatLandNo", label: "Flat / Plot" },
+      { key: "grandTotal", label: "Total" },
+      { key: "approvalStatus", label: "Approval" },
+    ],
+  },
+  flatLandSale: {
+    title: "Flat / Land Sale",
+    endpoint: "/flat-land-bookings",
+    readOnly: true,
+    columns: bookingColumns,
+  },
+  flatLandSaleReport: {
+    title: "Flat / Land Sale Report",
+    endpoint: "/flat-land-bookings/reports/sales",
+    readOnly: true,
+    columns: bookingColumns,
+  },
+  saleCollectionReport: {
+    title: "Sale Collection Report",
+    endpoint: "/flat-land-bookings/reports/collection",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Booking No." },
+      { key: "customerName", label: "Customer" },
+      { key: "flatLand.flatLandNo", label: "Flat / Plot" },
+      { key: "paid", label: "Collected" },
+      { key: "due", label: "Due" },
+      { key: "bookingDate", label: "Date" },
+    ],
+  },
+  plotDistributionReport: {
+    title: "Plot Distribution Report",
+    endpoint: "/flat-land-bookings/reports/plot-distribution",
+    readOnly: true,
+    columns: [
+      { key: "flatLandNo", label: "Plot No." },
+      { key: "siteName", label: "Site" },
+      { key: "blockName", label: "Block" },
+      { key: "status", label: "Status" },
+      { key: "customerName", label: "Customer" },
+    ],
+  },
+  agingReport: {
+    title: "Flat / Land Aging Report",
+    endpoint: "/flat-land-bookings/reports/aging",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Booking No." },
+      { key: "customerName", label: "Customer" },
+      { key: "flatLand.flatLandNo", label: "Flat / Plot" },
+      { key: "due", label: "Due" },
+      { key: "bookingDate", label: "Booking Date" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  installmentReport: {
+    title: "Installment Report",
+    endpoint: "/flat-land-bookings/reports/installments",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Booking No." },
+      { key: "customerName", label: "Customer" },
+      { key: "grandTotal", label: "Total" },
+      { key: "paid", label: "Paid" },
+      { key: "due", label: "Due" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  projectDetailsReport: {
+    title: "Project Details Report",
+    endpoint: "/project/reports/details",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Project Code" },
+      { key: "name", label: "Project Name" },
+      { key: "projectType", label: "Type" },
+      { key: "location", label: "Location" },
+      { key: "projectManager", label: "Project Manager" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  projectSummaryReport: {
+    title: "Project Summary Report",
+    endpoint: "/project/reports/summary",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Project Code" },
+      { key: "name", label: "Project Name" },
+      { key: "totalBudget", label: "Budget" },
+      { key: "progressPercentage", label: "Progress %" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  projectAtGlanceReport: {
+    title: "Project At-a-Glance Report",
+    endpoint: "/project/reports/at-a-glance",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Project Code" },
+      { key: "name", label: "Project Name" },
+      { key: "projectType", label: "Type" },
+      { key: "startDate", label: "Start Date" },
+      { key: "endDate", label: "End Date" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  projectFinancialReport: {
+    title: "Project Financial Report",
+    endpoint: "/project/reports/financial",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Project Code" },
+      { key: "name", label: "Project Name" },
+      { key: "totalBudget", label: "Budget" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  projectProgressReport: {
+    title: "Project Progress Report",
+    endpoint: "/project/reports/progress",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Project Code" },
+      { key: "name", label: "Project Name" },
+      { key: "progressPercentage", label: "Progress %" },
+      { key: "startDate", label: "Start Date" },
+      { key: "endDate", label: "End Date" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  projectIncomeReport: {
+    title: "Project-wise Income Report",
+    endpoint: "/project/reports/income/project-wise",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Project Code" },
+      { key: "name", label: "Project Name" },
+      { key: "flatLandCollection", label: "Flat/Land Collection" },
+      { key: "shareCollection", label: "Share Collection" },
+      { key: "totalIncome", label: "Total Income" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  siteIncomeReport: {
+    title: "Site-wise Income Report",
+    endpoint: "/project/reports/income/site-wise",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Site Code" },
+      { key: "name", label: "Site" },
+      { key: "project.name", label: "Project" },
+      { key: "location", label: "Location" },
+      { key: "flatLandCollection", label: "Flat/Land Collection" },
+      { key: "shareCollection", label: "Share Collection" },
+      { key: "totalIncome", label: "Total Income" },
+    ],
+  },
+  contractAtGlanceReport: {
+    title: "Contract At-a-Glance Report",
+    endpoint: "/contractor/reports/at-a-glance",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Contractor Code" },
+      { key: "name", label: "Contractor" },
+      { key: "businessName", label: "Business" },
+      { key: "mobileNo", label: "Mobile" },
+      { key: "under", label: "Type" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  contractSummaryReport: {
+    title: "Contract Summary Report",
+    endpoint: "/contractor/reports/project-summary",
+    readOnly: true,
+    columns: [
+      { key: "code", label: "Contractor Code" },
+      { key: "name", label: "Contractor" },
+      { key: "creditLimit", label: "Credit Limit" },
+      { key: "dueDate", label: "Due Date" },
+      { key: "under", label: "Type" },
+      { key: "status", label: "Status" },
+    ],
+  },
+  billingCategory: {
+    title: "Billing Category",
+    endpoint: "/category",
+    fields: [
+      {
+        name: "type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Product", label: "Product" },
+          { value: "Service", label: "Service" },
+        ],
+      },
+      { name: "code", label: "Code", required: true },
+      { name: "name", label: "Name", required: true },
+      { name: "description", label: "Description", type: "textarea" },
+    ],
+    columns: [
+      { key: "type", label: "Type" },
+      { key: "code", label: "Code" },
+      { key: "name", label: "Name" },
+      { key: "description", label: "Description" },
+    ],
+  },
+  billingSubCategory: {
+    title: "Billing Sub-category",
+    endpoint: "/billing-sub-category",
+    fields: [
+      {
+        name: "type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: [
+          { value: "Product", label: "Product" },
+          { value: "Service", label: "Service" },
+        ],
+      },
+      {
+        name: "categoryId",
+        label: "Category",
+        type: "select",
+        source: { endpoint: "/category", labelKey: "name", valueKey: "uuid" },
+      },
+      { name: "code", label: "Code", required: true },
+      { name: "name", label: "Name", required: true },
+      { name: "description", label: "Description", type: "textarea" },
+    ],
+    columns: [
+      { key: "type", label: "Type" },
+      { key: "category.name", label: "Category" },
+      { key: "code", label: "Code" },
+      { key: "name", label: "Name" },
+    ],
+  },
+  billingBillItem: {
+    title: "Bill Item",
+    endpoint: "/project-billing/bill-items",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("unit", "Unit"),
+      billingExtra("rate", "Rate", "number"),
+      billingExtra("category", "Category"),
+    ],
+    columns: billingColumns,
+  },
+  billingServiceWorkName: {
+    title: "Service Work Name",
+    endpoint: "/project-billing/service-work-names",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("unit", "Unit"),
+      billingExtra("rate", "Rate", "number"),
+    ],
+    columns: billingColumns,
+  },
+  billingBoqTitle: {
+    title: "BOQ Title",
+    endpoint: "/boq",
+    fields: [
+      { name: "uid", label: "UID" },
+      { name: "date", label: "Date", type: "date", required: true },
+      { name: "titleOfWork", label: "Title of Work", required: true },
+      { name: "task", label: "Task", required: true },
+      { name: "budget", label: "Budget", type: "number", required: true },
+      {
+        name: "percentageOfTotalBudget",
+        label: "Budget Percentage",
+        type: "number",
+        required: true,
+      },
+      {
+        name: "perSftBudget",
+        label: "Per Sq. Ft. Budget",
+        type: "number",
+        required: true,
+      },
+      { name: "cost", label: "Cost", type: "number", required: true },
+      { name: "available", label: "Available", type: "number", required: true },
+    ],
+    columns: [
+      { key: "uid", label: "UID" },
+      { key: "titleOfWork", label: "Title of Work" },
+      { key: "task", label: "Task" },
+      { key: "budget", label: "Budget" },
+      { key: "cost", label: "Cost" },
+      { key: "available", label: "Available" },
+    ],
+  },
+  billingBillInvoice: {
+    title: "Bill Invoice",
+    endpoint: "/project-billing/bill-invoices",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("invoiceNo", "Invoice No."),
+      billingExtra("supplier", "Supplier"),
+      billingExtra("dueAmount", "Due Amount", "number"),
+    ],
+    columns: billingColumns,
+  },
+  billingContractorBill: {
+    title: "Contractor Bill",
+    endpoint: "/project-billing/contractor-bills",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("contractorName", "Contractor"),
+      billingExtra("workOrderNo", "Work Order No."),
+      billingExtra("paidAmount", "Paid Amount", "number"),
+      billingExtra("dueAmount", "Due Amount", "number"),
+    ],
+    columns: billingColumns,
+  },
+  billingLabourWorkBill: {
+    title: "Labour Work Bill",
+    endpoint: "/project-billing/labour-work-bills",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("workerName", "Worker"),
+      billingExtra("workName", "Work Name"),
+      billingExtra("quantity", "Quantity", "number"),
+      billingExtra("unit", "Unit"),
+      billingExtra("rate", "Rate", "number"),
+    ],
+    columns: billingColumns,
+  },
+  billingLabourWorkBillReport: {
+    title: "Labour Work Bill Report",
+    endpoint: "/project-billing/labour-work-bills/reports",
+    readOnly: true,
+    columns: billingColumns,
+  },
+  billingWorkOrder: {
+    title: "Work Order",
+    endpoint: "/project-billing/work-orders",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("contractorName", "Contractor"),
+      billingExtra("startDate", "Start Date", "date"),
+      billingExtra("endDate", "End Date", "date"),
+      billingExtra("workName", "Work Name"),
+    ],
+    columns: billingColumns,
+  },
+  billingContractorWorkOrder: {
+    title: "Contractor Work Order",
+    endpoint: "/project-billing/contractor-work-orders",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("contractorName", "Contractor"),
+      billingExtra("startDate", "Start Date", "date"),
+      billingExtra("endDate", "End Date", "date"),
+      billingExtra("workName", "Work Name"),
+    ],
+    columns: billingColumns,
+  },
+  billingPeriodBilling: {
+    title: "Period Billing",
+    endpoint: "/project-billing/period-billings",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("period", "Period"),
+      billingExtra("fromDate", "From Date", "date"),
+      billingExtra("toDate", "To Date", "date"),
+    ],
+    columns: billingColumns,
+  },
+  billingAdjustmentBilling: {
+    title: "Adjustment Billing",
+    endpoint: "/project-billing/adjustment-billings",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("adjustmentType", "Adjustment Type"),
+      billingExtra("referenceNo", "Reference No."),
+    ],
+    columns: billingColumns,
+  },
+  billingQuote: {
+    title: "Quote",
+    endpoint: "/project-billing/quotes",
+    fields: [
+      ...billingCoreFields,
+      billingExtra("customerName", "Customer"),
+      billingExtra("validUntil", "Valid Until", "date"),
+      billingExtra("terms", "Terms", "textarea"),
+    ],
+    columns: billingColumns,
+  },
 };
-
-export const projectPageConfigs = {
-  // share project
-  shareReport: { title: "Share Report", titleBn: "শেয়ার রিপোর্ট", endpoint: "project-share-assignments/reports/share" },
-  shareCollectionReport: { title: "Share Collection Report", titleBn: "শেয়ার কালেকশন রিপোর্ট", endpoint: "project-share-assignments/reports/collection" },
-  penaltyReport: { title: "Penalty Report", titleBn: "পেনাল্টি রিপোর্ট", endpoint: "project-share-assignments/reports/penalty" },
-  holdersPointReport: { title: "Share Holders Point Report", titleBn: "শেয়ারহোল্ডার পয়েন্ট রিপোর্ট", endpoint: "project-share-assignments/reports/points" },
-
-  // flat & land
-  flatLandSale: { title: "Flat / Land Sale", titleBn: "ফ্ল্যাট/ল্যান্ড বিক্রয়", endpoint: "flat-land/sales" },
-  flatLandSaleReport: { title: "Flat / Land Sale Report", titleBn: "ফ্ল্যাট/ল্যান্ড বিক্রয় রিপোর্ট", endpoint: "flat-land/reports/sale" },
-  saleOffer: { title: "Sale Offer", titleBn: "সেল অফার", endpoint: "flat-land/sale-offers" },
-  saleCollectionReport: { title: "Sale Collection Report", titleBn: "বিক্রয় কালেকশন রিপোর্ট", endpoint: "flat-land/reports/collection" },
-  installmentReport: { title: "Installment Report", titleBn: "কিস্তি রিপোর্ট", endpoint: "flat-land/reports/installment" },
-  agingReport: { title: "Aging Report", titleBn: "এজিং রিপোর্ট", endpoint: "flat-land/reports/aging" },
-  plotDistributionReport: { title: "Plot Distribution Report", titleBn: "প্লট ডিস্ট্রিবিউশন রিপোর্ট", endpoint: "flat-land/reports/plot-distribution" },
-
-  // contract & billing
-  contractAtGlanceReport: { title: "Contract At A Glance", titleBn: "চুক্তি এক নজরে", endpoint: "contract/reports/at-a-glance" },
-  contractSummaryReport: { title: "Contract Project Summary Report", titleBn: "চুক্তি প্রজেক্ট সারসংক্ষেপ", endpoint: "contract/reports/project-summary" },
-  billingLabourWorkBillReport: { title: "Labour Work Bill Report", titleBn: "লেবার ওয়ার্ক বিল রিপোর্ট", endpoint: "billing/reports/labour-work-bill" },
-} satisfies Record<string, ProjectPageConfig>;

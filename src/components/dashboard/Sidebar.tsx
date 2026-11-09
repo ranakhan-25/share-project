@@ -28,12 +28,12 @@ function Item({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: bool
 
   const inner = (
     <>
-      {active && <motion.span layoutId="side-active" className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-emerald-400" />}
-      <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-emerald-300" : ""}`} />
+      {active && <motion.span layoutId="side-active" className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-emerald-500" />}
+      <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-emerald-600" : ""}`} />
       {!collapsed && (
         <>
           <span className="flex-1 truncate text-left">{t(item.label)}</span>
-          {item.badge && <span className="rounded-md bg-emerald-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-300">{item.badge}</span>}
+          {item.badge && <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-700">{item.badge}</span>}
           {hasChildren && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />}
         </>
       )}

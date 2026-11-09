@@ -19,7 +19,7 @@ export default function CreatePublicProjectPage() {
     name: "", categoryId: 0, description: "", location: "", totalInvestmentAmount: 0,
     totalShares: 0, pricePerShare: 0, minimumInvestment: 0, expectedAnnualReturn: 0,
     startDate: "", endDate: "", creatorName: "", creatorEmail: "", creatorPhone: "",
-    creatorPassword: "", companyName: "",
+    companyName: "",
   });
   const [images, setImages] = useState<Array<{ url: string; title: string }>>([]);
   const [documents, setDocuments] = useState<Array<{ url: string; title: string }>>([]);
@@ -62,7 +62,7 @@ export default function CreatePublicProjectPage() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.name || !form.categoryId || !form.description || !form.location || !form.creatorName || !form.creatorEmail || !form.creatorPhone || !form.creatorPassword) {
+    if (!form.name || !form.categoryId || !form.description || !form.location || !form.creatorName || !form.creatorEmail || !form.creatorPhone) {
       toast.error(t({ bn: "সবগুলো প্রয়োজনীয় ফিল্ড পূরণ করুন", en: "Please fill in all required fields" }));
       return;
     }
@@ -117,7 +117,7 @@ export default function CreatePublicProjectPage() {
                     name: "", categoryId: 0, description: "", location: "", totalInvestmentAmount: 0,
                     totalShares: 0, pricePerShare: 0, minimumInvestment: 0, expectedAnnualReturn: 0,
                     startDate: "", endDate: "", creatorName: "", creatorEmail: "", creatorPhone: "",
-                    creatorPassword: "", companyName: "",
+                    companyName: "",
                   });
                   setImages([]);
                   setDocuments([]);
@@ -165,7 +165,7 @@ export default function CreatePublicProjectPage() {
               {t({ bn: "প্রজেক্টের সাধারণ তথ্য (Basic Information)", en: "Basic Project Information" })}
             </h2>
 
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-3">
               {/* Field: Project Name */}
               <div>
                 <label className={labelStyle}>
@@ -276,7 +276,7 @@ export default function CreatePublicProjectPage() {
               {t({ bn: "প্রজেক্ট ক্রিয়েটার ও ওনার তথ্য (Creator Information)", en: "Project Creator / Owner Details" })}
             </h2>
 
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-3">
               {/* Field: Creator Name */}
               <div>
                 <label className={labelStyle}>
@@ -317,22 +317,6 @@ export default function CreatePublicProjectPage() {
                   placeholder="017xxxxxxxx"
                   value={form.creatorPhone}
                   onChange={(e) => setForm({ ...form, creatorPhone: e.target.value })}
-                  className={inputStyle}
-                />
-              </div>
-
-              {/* Field: Password */}
-              <div>
-                <label className={labelStyle}>
-                  {t({ bn: "অ্যাকাউন্ট পাসওয়ার্ড (নূন্যতম ৬ অক্ষর)", en: "Account Password (Min 6 chars)" })} <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  required
-                  type="password"
-                  minLength={6}
-                  placeholder="••••••••"
-                  value={form.creatorPassword}
-                  onChange={(e) => setForm({ ...form, creatorPassword: e.target.value })}
                   className={inputStyle}
                 />
               </div>
@@ -467,7 +451,7 @@ export default function CreatePublicProjectPage() {
               {t({ bn: "প্রজেক্টের ছবি ও কাগজপত্র (Media & Documents)", en: "Project Media & Documents" })}
             </h2>
 
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-3">
               {/* Field: Images */}
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-5 transition hover:bg-slate-50">
                 <label className="block cursor-pointer">

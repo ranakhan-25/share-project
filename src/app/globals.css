@@ -1,7 +1,16 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: var(--font-jakarta), var(--font-hind), ui-sans-serif, system-ui, sans-serif;
+
+  --color-surface: var(--surface);
+  --color-canvas: var(--canvas);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
 
   --color-ink-50: #f4f6fb;
   --color-ink-100: #e6eaf4;
@@ -21,6 +30,15 @@
   --animate-marquee: marquee 40s linear infinite;
   --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
   --animate-shimmer: shimmer 3s linear infinite;
+}
+
+:root {
+  --surface: #ffffff;
+  --canvas: #f8fafc;
+  --border: #e2e8f0;
+  --ink: #0f172a;
+  --ink-muted: #64748b;
+  --ink-faint: #94a3b8;
 }
 
 @keyframes float {
