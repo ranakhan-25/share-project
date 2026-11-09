@@ -1,147 +1,550 @@
 "use client";
 
-import { Download, FileSearch, Loader2, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLang } from "@/lib/i18n";
-import type { ProjectPageConfig } from "./project-page-config";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002").replace(/\/+$/, "");
+type ApiRow = Record<string, unknown> & { uuid: string };
 
-type Row = Record<string, unknown>;
+export interface ProjectApiField {
+  name: string;
+  label: string;
+  type?: "text" | "number" | "date" | "textarea" | "select";
+  required?: boolean;
+  defaultValue?: string;
+  storage?: "details";
+  options?: Array<{ value: string; label: string }>;
+  source?: {
+    endpoint: string;
+    labelKey: string;
+    valueKey: string;
+  };
+}
 
-function extractRows(value: unknown, depth = 0): Row[] {
-  if (depth > 5) return [];
-  if (Array.isArray(value)) {
-    return value.filter((v): v is Row => !!v && typeof v === "object" && !Array.isArray(v));
-  }
+export interface ProjectApiColumn {
+  key: string;
+  label: string;
+}
+
+interface ProjectApiPageProps {
+  title: string;
+  endpoint: string;
+  writeEndpoint?: string;
+  fields?: ProjectApiField[];
+  columns: ProjectApiColumn[];
+  fixedValues?: Record<string, unknown>;
+  readOnly?: boolean;
+}
+
+const API_ROOT = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002"}/realbizpro/api/v1`
+).replace(/\/+$/, "");
+
+const EMPTY_FIELDS: ProjectApiField[] = [];
+
+function rowsFrom<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
   if (!value || typeof value !== "object") return [];
-  const rec = value as Row;
-  for (const key of ["data", "rows", "items", "results"]) {
-    const rows = extractRows(rec[key], depth + 1);
-    if (rows.length) return rows;
+  const data = value as Record<string, unknown>;
+  for (const key of ["data", "items", "rows", "results"]) {
+    if (key in data) {
+      const rows = rowsFrom<T>(data[key]);
+      if (rows.length || Array.isArray(data[key])) return rows;
+    }
   }
   return [];
 }
 
-const show = (v: unknown) => (v == null || v === "" ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v));
-const humanize = (k: string) => k.replace(/([A-Z])/g, " $1").replace(/[_-]/g, " ").replace(/^./, (c) => c.toUpperCase());
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token =
+    typeof window !== "undefined" ? window.localStorage.getItem("token") : null;
+  const response = await fetch(`${API_ROOT}${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+    cache: "no-store",
+  });
+  const text = await response.text();
+  let body: unknown;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = text;
+    }
+  }
+  if (!response.ok) {
+    const payload =
+      body && typeof body === "object"
+        ? (body as Record<string, unknown>)
+        : undefined;
+    const message = payload?.message;
+    throw new Error(
+      Array.isArray(message)
+        ? message.join(", ")
+        : typeof message === "string"
+          ? message
+          : typeof body === "string"
+            ? body
+            : `Request failed (${response.status})`,
+    );
+  }
+  return body as T;
+}
 
-/** Generic table page that loads rows from the backend and renders every column it finds. */
-export default function ProjectApiPage({ title, titleBn, endpoint, description }: ProjectPageConfig) {
-  const { lang } = useLang();
-  const [rows, setRows] = useState<Row[]>([]);
+function valueAt(row: ApiRow, path: string): unknown {
+  return path.split(".").reduce<unknown>((value, key) => {
+    if (!value || typeof value !== "object") return undefined;
+    return (value as Record<string, unknown>)[key];
+  }, row);
+}
+
+function errorMessage(cause: unknown, fallback: string): string {
+  return cause instanceof Error ? cause.message : fallback;
+}
+
+export default function ProjectApiPage({
+  title,
+  endpoint,
+  writeEndpoint = endpoint,
+  fields = EMPTY_FIELDS,
+  columns,
+  fixedValues,
+  readOnly = false,
+}: ProjectApiPageProps) {
+  const [rows, setRows] = useState<ApiRow[]>([]);
+  const [options, setOptions] = useState<
+    Record<string, Array<{ value: string; label: string }>>
+  >({});
+  const [editorOpen, setEditorOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingUuid, setDeletingUuid] = useState("");
   const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [editing, setEditing] = useState<ApiRow | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("share-project:access-token") : null;
-      const res = await fetch(`${API_BASE}/realbizpro/api/v1/${endpoint}`, {
-        cache: "no-store",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      const [response, ...optionResponses] = await Promise.all([
+        request<unknown>(`${endpoint}?page=1&limit=100`),
+        ...fields
+          .filter((field) => field.source)
+          .map((field) =>
+            request<unknown>(`${field.source!.endpoint}?page=1&limit=100`),
+          ),
+      ]);
+      setRows(rowsFrom<ApiRow>(response));
+      const sourceFields = fields.filter((field) => field.source);
+      const nextOptions: Record<
+        string,
+        Array<{ value: string; label: string }>
+      > = {};
+      sourceFields.forEach((field, index) => {
+        const source = field.source!;
+        nextOptions[field.name] = rowsFrom<Record<string, unknown>>(
+          optionResponses[index],
+        )
+          .filter((row) => row[source.valueKey] != null)
+          .map((row) => ({
+            value: String(row[source.valueKey]),
+            label: String(row[source.labelKey] ?? row[source.valueKey]),
+          }));
       });
-      const payload: unknown = await res.json().catch(() => null);
-      if (!res.ok) {
-        const msg = payload && typeof payload === "object" && "message" in payload ? String((payload as { message: unknown }).message) : `Request failed (${res.status})`;
-        throw new Error(msg);
-      }
-      setRows(extractRows(payload));
-    } catch (e) {
+      setOptions(nextOptions);
+    } catch (cause) {
       setRows([]);
-      setError(e instanceof Error ? e.message : "Could not load data.");
+      setError(errorMessage(cause, `Could not load ${title.toLowerCase()}.`));
     } finally {
       setLoading(false);
     }
-  }, [endpoint]);
+  }, [endpoint, fields, title]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const columns = useMemo(() => Array.from(new Set(rows.flatMap((r) => Object.keys(r)))).filter((c) => !/uuid|^id$/i.test(c)).slice(0, 14), [rows]);
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? rows.filter((r) => Object.values(r).some((v) => show(v).toLowerCase().includes(q))) : rows;
-  }, [rows, query]);
+  const visibleRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const matches = rows.filter((row) =>
+      columns.some((column) =>
+        String(valueAt(row, column.key) ?? "")
+          .toLowerCase()
+          .includes(term),
+      ),
+    );
+    const pages = Math.max(1, Math.ceil(matches.length / pageSize));
+    const start = (Math.min(page, pages) - 1) * pageSize;
+    return {
+      data: matches.slice(start, start + pageSize),
+      total: matches.length,
+      pages,
+      start,
+    };
+  }, [columns, page, pageSize, rows, search]);
 
-  const heading = lang === "bn" && titleBn ? titleBn : title;
+  const openCreate = () => {
+    setEditing(null);
+    setForm(
+      Object.fromEntries(
+        fields.map((field) => [field.name, field.defaultValue ?? ""]),
+      ),
+    );
+    setError("");
+  };
 
-  const exportCsv = () => {
-    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    const csv = [columns.map(humanize).map(esc).join(","), ...filtered.map((r) => columns.map((c) => esc(show(r[c]))).join(","))].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${endpoint.replace(/\//g, "-")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const openEdit = (row: ApiRow) => {
+    setEditing(row);
+    setForm(
+      Object.fromEntries(
+        fields.map((field) => [
+          field.name,
+          String(
+            valueAt(
+              row,
+              field.storage === "details"
+                ? `details.${field.name}`
+                : field.name,
+            ) ??
+              field.defaultValue ??
+              "",
+          ),
+        ]),
+      ),
+    );
+    setError("");
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setForm(
+      Object.fromEntries(
+        fields.map((field) => [field.name, field.defaultValue ?? ""]),
+      ),
+    );
+    setError("");
+  };
+
+  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const payload: Record<string, unknown> = { ...fixedValues };
+      const details: Record<string, unknown> = {};
+      for (const field of fields) {
+        const value = form[field.name]?.trim() ?? "";
+        if (!value) continue;
+        const fieldValue = field.type === "number" ? Number(value) : value;
+        if (field.storage === "details") details[field.name] = fieldValue;
+        else payload[field.name] = fieldValue;
+      }
+      if (Object.keys(details).length) payload.details = details;
+      await request(
+        editing
+          ? `${writeEndpoint}/${encodeURIComponent(editing.uuid)}`
+          : writeEndpoint,
+        {
+          method: editing ? "PATCH" : "POST",
+          body: JSON.stringify(payload),
+        },
+      );
+      cancelEdit();
+      await load();
+    } catch (cause) {
+      setError(errorMessage(cause, `Could not save ${title.toLowerCase()}.`));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (uuid: string) => {
+    if (!window.confirm(`Delete this ${title.toLowerCase()} record?`)) return;
+    setDeletingUuid(uuid);
+    setError("");
+    try {
+      await request(`${writeEndpoint}/${encodeURIComponent(uuid)}`, {
+        method: "DELETE",
+      });
+      await load();
+    } catch (cause) {
+      setError(errorMessage(cause, `Could not delete ${title.toLowerCase()}.`));
+    } finally {
+      setDeletingUuid("");
+    }
   };
 
   return (
-    <div className="space-y-5 p-1">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{heading}</h1>
-          {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={lang === "bn" ? "খুঁজুন…" : "Search…"} className="w-56 rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" />
+    <section className="min-h-screen bg-slate-50 p-4 text-slate-800 sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-4">
+        <header className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-xs text-indigo-600">Project / API Data</p>
+            <h1 className="text-xl font-semibold">{title}</h1>
           </div>
-          <button onClick={() => void load()} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50" aria-label="Refresh">
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button onClick={exportCsv} disabled={!filtered.length} className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-40">
-            <Download className="h-4 w-4" /> CSV
-          </button>
-        </div>
-      </header>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Add {title}
+            </button>
+          )}
+        </header>
 
-      {error && (
-        <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          {error}
-          <span className="mt-1 block text-xs text-amber-700/80">
-            {lang === "bn" ? "এন্ডপয়েন্ট:" : "Endpoint:"} <code>/realbizpro/api/v1/{endpoint}</code>
-          </span>
+        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <label className="text-sm">
+            Show{" "}
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+              className="mx-1 rounded border border-slate-300 px-2 py-1"
+            >
+              {[10, 25, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+            entries
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            Search
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              className="rounded border border-slate-300 px-3 py-2"
+            />
+          </label>
         </div>
-      )}
 
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="scroll-thin overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        {error && (
+          <div
+            role="alert"
+            className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+          >
+            {error}
+          </div>
+        )}
+
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead className="bg-indigo-600 text-xs uppercase text-white">
               <tr>
-                {columns.length ? columns.map((c) => <th key={c} className="whitespace-nowrap px-4 py-3.5">{humanize(c)}</th>) : <th className="px-4 py-3.5">{heading}</th>}
+                <th className="px-4 py-3">#</th>
+                {columns.map((column) => (
+                  <th key={column.key} className="px-4 py-3">
+                    {column.label}
+                  </th>
+                ))}
+                {!readOnly && <th className="px-4 py-3">Actions</th>}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr><td colSpan={Math.max(columns.length, 1)} className="py-16 text-center text-slate-400"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
-              ) : filtered.length ? (
-                filtered.map((r, i) => (
-                  <tr key={String(r.uuid ?? r.id ?? i)} className="border-t border-slate-100 transition hover:bg-emerald-50/40">
-                    {columns.map((c) => <td key={c} className="whitespace-nowrap px-4 py-3 text-slate-700">{show(r[c])}</td>)}
+                <tr>
+                  <td
+                    colSpan={columns.length + (readOnly ? 1 : 2)}
+                    className="px-4 py-8 text-center text-slate-500"
+                  >
+                    Loading {title.toLowerCase()}...
+                  </td>
+                </tr>
+              ) : visibleRows.data.length ? (
+                visibleRows.data.map((row, index) => (
+                  <tr key={row.uuid} className="hover:bg-indigo-50/40">
+                    <td className="px-4 py-3">
+                      {visibleRows.start + index + 1}
+                    </td>
+                    {columns.map((column) => (
+                      <td key={column.key} className="px-4 py-3">
+                        {String(valueAt(row, column.key) ?? "—")}
+                      </td>
+                    ))}
+                    {!readOnly && (
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(row)}
+                          className="mr-3 text-indigo-700 hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void remove(row.uuid)}
+                          disabled={deletingUuid === row.uuid}
+                          className="text-rose-700 hover:underline disabled:opacity-50"
+                        >
+                          {deletingUuid === row.uuid ? "Deleting..." : "Delete"}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={Math.max(columns.length, 1)} className="py-16 text-center text-slate-400">
-                    <FileSearch className="mx-auto mb-2 h-8 w-8" />
-                    {lang === "bn" ? "কোনো ডেটা পাওয়া যায়নি" : "No data available"}
+                  <td
+                    colSpan={columns.length + (readOnly ? 1 : 2)}
+                    className="px-4 py-8 text-center text-slate-500"
+                  >
+                    {rows.length
+                      ? "No records match your search."
+                      : `No ${title.toLowerCase()} records found.`}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
-          {filtered.length} {lang === "bn" ? "টি রেকর্ড" : filtered.length === 1 ? "record" : "records"}
+
+        <footer className="flex items-center justify-between text-sm text-slate-600">
+          <span>
+            Showing {visibleRows.total ? visibleRows.start + 1 : 0} to{" "}
+            {Math.min(visibleRows.start + pageSize, visibleRows.total)} of{" "}
+            {visibleRows.total} entries
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page <= 1 || loading}
+              className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="rounded bg-indigo-600 px-3 py-1 text-white">
+              {Math.min(page, visibleRows.pages)} / {visibleRows.pages}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setPage((current) => Math.min(visibleRows.pages, current + 1))
+              }
+              disabled={page >= visibleRows.pages || loading}
+              className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </footer>
+      </div>
+
+      {editorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <form
+            onSubmit={save}
+            className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                {editing ? `Edit ${title}` : `Add ${title}`}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setEditorOpen(false)}
+                className="rounded px-2 py-1 text-slate-500 hover:bg-slate-100"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {fields.map((field) => (
+                <label key={field.name} className="space-y-1 text-sm">
+                  <span>
+                    {field.label}
+                    {field.required ? " *" : ""}
+                  </span>
+                  {field.type === "textarea" ? (
+                    <textarea
+                      required={field.required}
+                      value={form[field.name] ?? ""}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          [field.name]: event.target.value,
+                        }))
+                      }
+                      className="min-h-20 w-full rounded border border-slate-300 px-3 py-2"
+                    />
+                  ) : field.type === "select" ? (
+                    <select
+                      required={field.required}
+                      value={form[field.name] ?? ""}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          [field.name]: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded border border-slate-300 px-3 py-2"
+                    >
+                      <option value="">Select {field.label}</option>
+                      {(field.options ?? options[field.name] ?? []).map(
+                        (option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  ) : (
+                    <input
+                      type={field.type ?? "text"}
+                      required={field.required}
+                      value={form[field.name] ?? ""}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          [field.name]: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded border border-slate-300 px-3 py-2"
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+            {error && (
+              <p role="alert" className="text-sm text-rose-700">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditorOpen(false)}
+                className="rounded border border-slate-300 px-4 py-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded bg-indigo-600 px-4 py-2 text-white disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </form>
         </div>
-      </section>
-    </div>
+      )}
+    </section>
   );
 }
