@@ -98,9 +98,54 @@ export async function logoutShareUser() {
   await api.post("/realbizpro/api/v1/share-user/logout", {});
 }
 
+export type ShareDashboardMonthlyPoint = {
+  year: number;
+  monthIndex: number;
+  shareValue: number;
+  collected: number;
+  monthlyCollected: number;
+  monthlyTarget: number;
+  projectCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+};
+
+export type ShareUserDashboardData = {
+  counts?: Record<string, number>;
+  totalProjects?: number;
+  totalShareValue?: number;
+  totalCollected?: number;
+  totalShares?: number;
+  soldShares?: number;
+  remainingShares?: number;
+  growth?: {
+    shareValueDeltaPct?: number;
+    projectDeltaPct?: number;
+    pendingDeltaPct?: number;
+    rejectedDeltaPct?: number;
+  };
+  monthlySeries?: ShareDashboardMonthlyPoint[];
+  allocation?: Array<{ name: string; value: number }>;
+  topProjects?: Array<{ uuid?: string; name: string; soldShares: number; totalShares: number; soldPercent: number; value?: number }>;
+  recentTransactions?: Array<{
+    uuid: string;
+    code?: string | null;
+    shareholderName: string;
+    projectUuid?: string;
+    projectName: string;
+    quantity?: number;
+    amount: number;
+    status: "paid" | "pending" | "overdue";
+    rawStatus?: string;
+    createdAt: string;
+  }>;
+  leaderboard?: Array<{ name: string; pts: number; totalAmount?: number; shares?: number; count?: number }>;
+  recentProjects?: Array<Record<string, unknown>>;
+};
+
 export async function getShareProjectUserDashboard() {
   const response = await api.get(`${ROOT}/user/dashboard`);
-  return unwrap<Record<string, unknown>>(response.data);
+  return unwrap<ShareUserDashboardData>(response.data);
 }
 
 export async function getShareProjectPortfolio() {

@@ -15,10 +15,45 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Auth guard: no token → login page. Dashboard cannot be accessed without login.
   useEffect(() => {
-    if (!getStoredAccessToken()) {
+    const token = getStoredAccessToken();
+    if (!token) {
       router.replace("/login");
       return;
     }
+
+    if (typeof document !== "undefined") {
+      document.cookie = `share-project:access-token=${token}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `admin_access_token=${token}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `access_token=${token}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax`;
+    }
+
+    if (typeof window !== "undefined" && !(window as unknown as { __shareProjectFetchPatched?: boolean }).__shareProjectFetchPatched) {
+      const origFetch = window.fetch.bind(window);
+      const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002").replace(/\/+$/, "");
+      (window as unknown as { __shareProjectFetchPatched?: boolean }).__shareProjectFetchPatched = true;
+      window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const isBackendCall =
+          url.startsWith(apiBase) ||
+          url.includes("/realbizpro/api/v1") ||
+          url.startsWith("/api/backend");
+        if (isBackendCall) {
+          const activeToken = getStoredAccessToken();
+          if (activeToken) {
+            const headers = new Headers(
+              init?.headers ?? (input instanceof Request ? input.headers : undefined),
+            );
+            if (!headers.has("authorization")) {
+              headers.set("Authorization", `Bearer ${activeToken}`);
+              return origFetch(input, { ...init, headers });
+            }
+          }
+        }
+        return origFetch(input, init);
+      };
+    }
+
     try {
       setCollapsed(localStorage.getItem("share-project:sidebar") === "collapsed");
     } catch {
