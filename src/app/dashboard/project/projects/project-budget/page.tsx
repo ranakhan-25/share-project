@@ -18,13 +18,15 @@ import {
   Loader2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Edit,
+  Trash2
 } from 'lucide-react';
+import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 // Backend Response Type
 interface ApiBudget {
   uuid: string;
-  uid: string;
   id: string;
   projectUuid: string;
   budgetCode: string;
@@ -56,6 +58,11 @@ interface SummaryData {
   variancePercent: string;
 }
 
+interface ProjectOption {
+  uuid: string;
+  name: string;
+}
+
 interface PaginationMeta {
   total: number;
   page: number;
@@ -65,13 +72,15 @@ interface PaginationMeta {
 
 export default function ProjectBudgetPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
-  const DEFAULT_PROJECT_UUID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 
   // State
   const [budgets, setBudgets] = useState<ProjectBudget[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
   const [summary, setSummary] = useState<SummaryData>({ plannedTotal: 0, revisedTotal: 0, totalVariance: 0, variancePercent: '0' });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,33 +94,73 @@ export default function ProjectBudgetPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<ProjectBudget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectBudget | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [formData, setFormData] = useState({
     category: 'Material' as string,
     plannedAmount: '',
     revisedAmount: ''
   });
 
-  // 1. FETCH BUDGETS (GET List with Filters & Pagination) - ROBUST VERSION
-  const fetchBudgets = async (page = 1, limit = 10) => {
+  const getHeaders = () => {
+    const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  };
+
+  const notifySuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  // 1. FETCH USER'S PROJECTS
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/project?limit=100`, { headers: getHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data?.data?.data || data?.data?.items || data?.data || [];
+      const opts: ProjectOption[] = list.map((p: any) => ({
+        uuid: p.uuid,
+        name: p.projectName || p.name || 'Unnamed Project'
+      }));
+      setProjects(opts);
+      if (opts.length > 0) {
+        setSelectedProjectUuid(opts[0].uuid);
+      }
+    } catch (e) {
+      console.error('Failed to load projects', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // 2. FETCH BUDGETS (GET)
+  const fetchBudgets = async (page = 1, limit = 10, projectUuid = selectedProjectUuid) => {
+    if (!projectUuid) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      let url = `${API_BASE_URL}/project-budgets?projectUuid=${DEFAULT_PROJECT_UUID}&page=${page}&limit=${limit}`;
-      
+      let url = `${API_BASE_URL}/project-budgets?projectUuid=${projectUuid}&page=${page}&limit=${limit}`;
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
       if (selectedCategory !== 'All') url += `&category=${selectedCategory}`;
       if (selectedStatus !== 'All') url += `&status=${selectedStatus}`;
 
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getHeaders() });
       const result = await response.json();
-      
-      console.log("Fetched Budgets Response:", result); // Debugging purpose
       
       let rawBudgets: ApiBudget[] = [];
       let metaData: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 };
       
-      // ✅ Robust Parsing: Handle all possible backend response shapes
       if (Array.isArray(result)) {
         rawBudgets = result;
         metaData = { total: result.length, page, limit, totalPages: Math.ceil(result.length / limit) };
@@ -122,12 +171,10 @@ export default function ProjectBudgetPage() {
         rawBudgets = result.data;
         metaData = result.meta || { total: result.data.length, page, limit, totalPages: Math.ceil(result.data.length / limit) };
       } else if (result.data && Array.isArray(result.data.data)) {
-        // In case of nested { data: { data: [], meta: {} } }
         rawBudgets = result.data.data;
         metaData = result.data.meta || result.meta || { total: result.data.data.length, page, limit, totalPages: Math.ceil(result.data.data.length / limit) };
       }
 
-      // ✅ Safe Mapping to avoid exceptions
       const mappedBudgets: ProjectBudget[] = rawBudgets.map((b) => {
         const planned = parseFloat(String(b.plannedAmount || 0)) || 0;
         const revised = parseFloat(String(b.revisedAmount || planned)) || planned;
@@ -135,7 +182,7 @@ export default function ProjectBudgetPage() {
         const variancePct = b.variancePercent !== undefined ? b.variancePercent : (planned > 0 ? (variance / planned) * 100 : 0);
 
         return {
-          uuid: b.uuid || b.id, // Fallback if uuid missing
+          uuid: b.uuid || b.id,
           code: b.budgetCode || 'N/A',
           category: b.category || 'Unknown',
           plannedAmount: planned,
@@ -152,25 +199,26 @@ export default function ProjectBudgetPage() {
     } catch (error) {
       console.error("Error fetching budgets:", error);
       setErrorMsg("Failed to load budgets. Please check your connection.");
-      setBudgets([]); // Clear data on error
+      setBudgets([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 2. FETCH SUMMARY (Top Cards)
-  const fetchSummary = async () => {
+  // 3. FETCH SUMMARY
+  const fetchSummary = async (projectUuid = selectedProjectUuid) => {
+    if (!projectUuid) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/project-budgets/summary?projectUuid=${DEFAULT_PROJECT_UUID}`);
+      const response = await fetch(`${API_BASE_URL}/project-budgets/summary?projectUuid=${projectUuid}`, {
+        headers: getHeaders()
+      });
       const result = await response.json();
       
-      // ✅ Robust Summary Handling
       if (result.success && result.data) {
         setSummary(result.data);
       } else if (result.data) {
         setSummary(result.data);
       } else if (result.plannedTotal !== undefined) {
-        // If data is directly returned without wrapper
         setSummary(result);
       }
     } catch (error) {
@@ -178,29 +226,29 @@ export default function ProjectBudgetPage() {
     }
   };
 
-  // Trigger fetch on filter/page changes
   useEffect(() => {
-    fetchBudgets(currentPage, pageLimit);
-  }, [currentPage, pageLimit, searchQuery, selectedCategory, selectedStatus]);
+    if (selectedProjectUuid) {
+      fetchBudgets(currentPage, pageLimit, selectedProjectUuid);
+      fetchSummary(selectedProjectUuid);
+    }
+  }, [selectedProjectUuid, currentPage, pageLimit, searchQuery, selectedCategory, selectedStatus]);
 
-  useEffect(() => {
-    fetchSummary();
-  }, []);
-
-  // 3. CREATE BUDGET (POST)
+  // 4. CREATE BUDGET (POST)
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProjectUuid) {
+      setErrorMsg('Please select a project first.');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg(null);
 
     const plannedNum = parseFloat(formData.plannedAmount) || 0;
     const revisedNum = parseFloat(formData.revisedAmount) || plannedNum;
-
-    // Auto-generate a unique budget code (e.g., BGT-1234)
     const generatedCode = `BGT-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const payload = {
-      projectUuid: DEFAULT_PROJECT_UUID,
+      projectUuid: selectedProjectUuid,
       budgetCode: generatedCode,
       category: formData.category,
       plannedAmount: plannedNum,
@@ -213,7 +261,7 @@ export default function ProjectBudgetPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/project-budgets`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -222,10 +270,10 @@ export default function ProjectBudgetPage() {
         throw new Error(errorData.message || 'Failed to create budget');
       }
 
-      // ✅ Refresh data after successful creation
-      await fetchBudgets(1, pageLimit);
-      await fetchSummary();
+      await fetchBudgets(1, pageLimit, selectedProjectUuid);
+      await fetchSummary(selectedProjectUuid);
       setIsModalOpen(false);
+      notifySuccess('Budget category created successfully!');
       
       setFormData({ category: 'Material', plannedAmount: '', revisedAmount: '' });
     } catch (error: any) {
@@ -235,61 +283,126 @@ export default function ProjectBudgetPage() {
     }
   };
 
-  // Pagination Handlers
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= meta.totalPages) {
-      setCurrentPage(newPage);
+  // 5. UPDATE BUDGET (PATCH)
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBudget) return;
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-budgets/${editingBudget.uuid}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          plannedAmount: Number(editingBudget.plannedAmount),
+          revisedAmount: Number(editingBudget.revisedAmount),
+          status: editingBudget.status
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to update budget');
+      }
+
+      await fetchBudgets(currentPage, pageLimit, selectedProjectUuid);
+      await fetchSummary(selectedProjectUuid);
+      setEditingBudget(null);
+      notifySuccess('Budget updated successfully!');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleLimitChange = (newLimit: number) => {
-    setPageLimit(newLimit);
-    setCurrentPage(1);
+  // 6. DELETE BUDGET (DELETE)
+  const handleDeleteBudget = async () => {
+    if (!deleteTarget) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-budgets/${deleteTarget.uuid}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to delete budget');
+      }
+
+      setBudgets(budgets.filter(b => b.uuid !== deleteTarget.uuid));
+      setDeleteTarget(null);
+      await fetchSummary(selectedProjectUuid);
+      notifySuccess('Budget deleted successfully!');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Formatting helper
   const formatCurrency = (val: number) => {
-    return val.toLocaleString('en-US', { minimumFractionDigits: 2 });
+    return (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
   };
 
   return (
-    <div className="min-h-screen bg-white p-6 lg:p-8 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50/50 p-6 lg:p-8 font-sans text-slate-800">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <nav className="flex items-center text-sm text-slate-500 space-x-2 mb-1">
-            <Link href="/projects" className="flex items-center hover:text-blue-600 transition-colors">
-              <Home className="w-4 h-4 mr-1 text-slate-600" /> Projects
+            <Link href="/dashboard" className="flex items-center hover:text-blue-600 transition-colors">
+              <Home className="w-4 h-4 mr-1 text-slate-600" /> Dashboard
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="hover:text-blue-600 cursor-pointer">proj-skyline-001</span>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="font-semibold text-slate-900">Budget</span>
+            <span className="font-semibold text-slate-900">Project Budget</span>
           </nav>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Project Budget Management</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Project Selector */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-500 uppercase">Project:</label>
+            <select
+              value={selectedProjectUuid}
+              onChange={(e) => setSelectedProjectUuid(e.target.value)}
+              className="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
+            >
+              {projects.length === 0 && <option value="">No Projects Found</option>}
+              {projects.map((p) => (
+                <option key={p.uuid} value={p.uuid}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-xl shadow-sm transition-all"
           >
             <Plus className="w-4 h-4" /> New Budget Category
           </button>
         </div>
       </div>
 
-      {/* Error Alert */}
+      {/* Alerts */}
+      {successMsg && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" /> {successMsg}
+        </div>
+      )}
+
       {errorMsg && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
-          <AlertCircle className="w-5 h-5" /> {errorMsg}
+          <AlertCircle className="w-5 h-5 text-red-600" /> {errorMsg}
         </div>
       )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Planned Total */}
         <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Planned Total Budget</p>
@@ -300,7 +413,6 @@ export default function ProjectBudgetPage() {
           </div>
         </div>
 
-        {/* Revised Total */}
         <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Revised Total Budget</p>
@@ -311,7 +423,6 @@ export default function ProjectBudgetPage() {
           </div>
         </div>
 
-        {/* Total Variance */}
         <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Variance ($)</p>
@@ -324,7 +435,6 @@ export default function ProjectBudgetPage() {
           </div>
         </div>
 
-        {/* Overall Variance % */}
         <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Overall Variance (%)</p>
@@ -344,7 +454,6 @@ export default function ProjectBudgetPage() {
         {/* Filters */}
         <div className="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            {/* Category Filter */}
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-slate-500 uppercase">Category:</label>
               <select
@@ -361,7 +470,6 @@ export default function ProjectBudgetPage() {
               </select>
             </div>
 
-            {/* Status Filter */}
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-slate-500 uppercase">Status:</label>
               <select
@@ -377,7 +485,6 @@ export default function ProjectBudgetPage() {
             </div>
           </div>
 
-          {/* Search Input */}
           <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
@@ -398,7 +505,6 @@ export default function ProjectBudgetPage() {
           </div>
         ) : (
           <>
-            {/* Budget Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -410,6 +516,7 @@ export default function ProjectBudgetPage() {
                     <th className="py-3.5 px-4">Variance ($)</th>
                     <th className="py-3.5 px-4">Variance (%)</th>
                     <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
@@ -447,13 +554,29 @@ export default function ProjectBudgetPage() {
                             </span>
                           )}
                         </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setEditingBudget(bgt)}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit Budget"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(bgt)}
+                              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Budget"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
-                        No budget entries found.
-                      </td>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">No budget entries found.</td>
                     </tr>
                   )}
                 </tbody>
@@ -465,10 +588,10 @@ export default function ProjectBudgetPage() {
         {/* Footer with Pagination */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-3">
           <div className="flex items-center gap-2">
-            <span>Showing {budgets.length} of {meta.total} budget entries</span>
+            <span>Showing {budgets.length} of {meta.total} total categories</span>
             <select 
               value={pageLimit} 
-              onChange={(e) => handleLimitChange(Number(e.target.value))}
+              onChange={(e) => { setPageLimit(Number(e.target.value)); setCurrentPage(1); }}
               className="bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none cursor-pointer"
             >
               <option value={5}>5 / page</option>
@@ -478,40 +601,19 @@ export default function ProjectBudgetPage() {
             </select>
           </div>
 
-          {/* Pagination Controls */}
           <div className="flex items-center gap-1">
             <button
-              onClick={() => handlePageChange(currentPage - 1)}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
               className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            
-            {Array.from({ length: Math.min(meta.totalPages, 5) }, (_, i) => {
-              let pageNum;
-              if (meta.totalPages <= 5) pageNum = i + 1;
-              else if (currentPage <= 3) pageNum = i + 1;
-              else if (currentPage >= meta.totalPages - 2) pageNum = meta.totalPages - 4 + i;
-              else pageNum = currentPage - 2 + i;
-              
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white border border-blue-600'
-                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
+            <span className="px-3 py-1 font-semibold text-slate-700">
+              Page {meta.page} of {meta.totalPages || 1}
+            </span>
             <button
-              onClick={() => handlePageChange(currentPage + 1)}
+              onClick={() => setCurrentPage(p => Math.min(meta.totalPages, p + 1))}
               disabled={currentPage >= meta.totalPages}
               className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
@@ -519,31 +621,22 @@ export default function ProjectBudgetPage() {
             </button>
           </div>
 
-          <span>Project Budget Module v03.06</span>
+          <span>Project Budget Module</span>
         </div>
       </div>
 
       {/* CREATE MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Create Budget Category Entry</h2>
-              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <h2 className="text-lg font-bold text-slate-900">Add Budget Category</h2>
+              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
             </div>
-
             <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
-              
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Category *</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm capitalize"
-                >
+                <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm capitalize">
                   <option value="Material">Material</option>
                   <option value="Labour">Labour</option>
                   <option value="Equipment">Equipment</option>
@@ -551,58 +644,81 @@ export default function ProjectBudgetPage() {
                   <option value="Subcontractor">Subcontractor</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Planned Amount ($) *</label>
-                <div className="relative">
-                  <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="0.00"
-                    value={formData.plannedAmount}
-                    onChange={(e) => setFormData({ ...formData, plannedAmount: e.target.value })}
-                    className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl pl-9 pr-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm"
-                  />
-                </div>
+                <input type="number" step="0.01" required placeholder="e.g. 500000" value={formData.plannedAmount} onChange={(e) => setFormData({ ...formData, plannedAmount: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Revised Amount ($)</label>
-                <div className="relative">
-                  <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Defaults to planned amount if empty"
-                    value={formData.revisedAmount}
-                    onChange={(e) => setFormData({ ...formData, revisedAmount: e.target.value })}
-                    className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl pl-9 pr-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm"
-                  />
-                </div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Revised Amount ($) (Optional)</label>
+                <input type="number" step="0.01" placeholder="Leave blank to match planned" value={formData.revisedAmount} onChange={(e) => setFormData({ ...formData, revisedAmount: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
               </div>
-
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center gap-2"
-                >
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center gap-2">
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   {isSubmitting ? 'Saving...' : 'Save Budget'}
                 </button>
               </div>
-
             </form>
+          </div>
+        </div>
+      )}
 
+      {/* EDIT MODAL */}
+      {editingBudget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Edit Budget — {editingBudget.code}</h2>
+              <button onClick={() => setEditingBudget(null)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Category</label>
+                <input type="text" disabled value={editingBudget.category} className="bg-slate-100 border border-slate-200 text-slate-500 text-sm rounded-xl px-3.5 py-2.5 w-full capitalize cursor-not-allowed" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Planned Amount ($) *</label>
+                <input type="number" step="0.01" required value={editingBudget.plannedAmount} onChange={(e) => setEditingBudget({ ...editingBudget, plannedAmount: parseFloat(e.target.value) || 0 })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Revised Amount ($) *</label>
+                <input type="number" step="0.01" required value={editingBudget.revisedAmount} onChange={(e) => setEditingBudget({ ...editingBudget, revisedAmount: parseFloat(e.target.value) || 0 })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Status</label>
+                <select value={editingBudget.status} onChange={(e) => setEditingBudget({ ...editingBudget, status: e.target.value as any })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm">
+                  <option value="On Track">On Track</option>
+                  <option value="Warning">Warning</option>
+                  <option value="Exceeded">Exceeded</option>
+                </select>
+              </div>
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" onClick={() => setEditingBudget(null)} className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm">
+                  {isSubmitting ? 'Updating...' : 'Update Budget'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE MODAL */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Delete Budget?</h3>
+            <p className="text-sm text-slate-500 mb-6">Are you sure you want to delete <span className="font-semibold text-slate-800">{deleteTarget.category}</span> ({deleteTarget.code})?</p>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50">Cancel</button>
+              <button onClick={handleDeleteBudget} disabled={isSubmitting} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-sm">
+                {isSubmitting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

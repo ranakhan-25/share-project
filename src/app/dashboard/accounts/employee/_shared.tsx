@@ -47,18 +47,18 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
 
   return (
     <div className="relative w-full" ref={ref}>
-      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-left focus:ring-2 focus:ring-indigo-500 flex items-center justify-between">
-        <span className={selected ? "text-slate-800" : "text-slate-400"}>{selected ? selected.name : placeholder}</span>
+      <button type="button" onClick={() => setOpen((v) => !v)} className="h-10 w-full bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-left outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 flex items-center justify-between">
+        <span className={selected ? "text-slate-800 font-medium" : "text-slate-400"}>{selected ? selected.name : placeholder}</span>
         <ChevronDown className="w-4 h-4 text-slate-400" />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg overflow-hidden">
+        <div className="absolute z-50 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
           <div className="p-2 border-b border-slate-100">
-            <input autoFocus type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none" />
+            <input autoFocus type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-200 rounded-lg outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500/20" />
           </div>
           <div className="max-h-48 overflow-y-auto">
             {filtered.length > 0 ? filtered.map((o: any) => (
-              <button key={o.uuid} type="button" onClick={() => { onChange(o.uuid); setOpen(false); setQuery(""); }} className={`w-full text-left px-3 py-2 text-sm ${value === o.uuid ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-700 hover:bg-slate-50"}`}>
+              <button key={o.uuid} type="button" onClick={() => { onChange(o.uuid); setOpen(false); setQuery(""); }} className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm transition ${value === o.uuid ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}>
                 {o.name}
               </button>
             )) : <div className="px-3 py-2 text-xs text-slate-400 text-center">No options found</div>}

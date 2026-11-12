@@ -16,8 +16,12 @@ import {
   Loader2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Trash2,
+  Edit,
+  CheckCircle2
 } from 'lucide-react';
+import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 // Backend Response Type
 interface ApiTask {
@@ -54,7 +58,11 @@ interface ProjectTask {
   reminderBefore?: number;
 }
 
-// Pagination Meta Type
+interface ProjectOption {
+  uuid: string;
+  name: string;
+}
+
 interface PaginationMeta {
   total: number;
   page: number;
@@ -64,12 +72,14 @@ interface PaginationMeta {
 
 export default function ProjectTasksPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
-  const DEFAULT_PROJECT_UUID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 
   // State
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,7 +95,10 @@ export default function ProjectTasksPage() {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<ProjectTask | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectTask | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [formData, setFormData] = useState({
     title: '',
     milestoneUuid: '',
@@ -97,14 +110,53 @@ export default function ProjectTasksPage() {
     hasAttachment: false
   });
 
-  // 1. FETCH TASKS (GET) with Pagination
-  const fetchTasks = async (page = 1, limit = 10) => {
+  const getHeaders = () => {
+    const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  };
+
+  const notifySuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  // 1. FETCH USER'S PROJECTS
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/project?limit=100`, { headers: getHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data?.data?.data || data?.data?.items || data?.data || [];
+      const opts: ProjectOption[] = list.map((p: any) => ({
+        uuid: p.uuid,
+        name: p.projectName || p.name || 'Unnamed Project'
+      }));
+      setProjects(opts);
+      if (opts.length > 0) {
+        setSelectedProjectUuid(opts[0].uuid);
+      }
+    } catch (e) {
+      console.error('Failed to load projects', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // 2. FETCH TASKS (GET)
+  const fetchTasks = async (page = 1, limit = 10, projectUuid = selectedProjectUuid) => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/project-tasks?projectUuid=${DEFAULT_PROJECT_UUID}&page=${page}&limit=${limit}`
-      );
+      const url = projectUuid 
+        ? `${API_BASE_URL}/project-tasks?projectUuid=${projectUuid}&page=${page}&limit=${limit}`
+        : `${API_BASE_URL}/project-tasks?page=${page}&limit=${limit}`;
+
+      const response = await fetch(url, { headers: getHeaders() });
       const result = await response.json();
       
       let rawTasks: ApiTask[] = [];
@@ -125,7 +177,7 @@ export default function ProjectTasksPage() {
       }
 
       const mappedTasks: ProjectTask[] = rawTasks.map((t) => ({
-        uuid: t.uuid, // ✅ Always use uuid
+        uuid: t.uuid,
         code: t.taskCode,
         projectUuid: t.projectUuid,
         title: t.title,
@@ -151,21 +203,27 @@ export default function ProjectTasksPage() {
   };
 
   useEffect(() => {
-    fetchTasks(currentPage, pageLimit);
-  }, [currentPage, pageLimit]);
+    if (selectedProjectUuid) {
+      fetchTasks(currentPage, pageLimit, selectedProjectUuid);
+    }
+  }, [selectedProjectUuid, currentPage, pageLimit]);
 
-  // 2. CREATE TASK (POST)
+  // 3. CREATE TASK (POST)
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProjectUuid) {
+      setErrorMsg('Please select a project first.');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg(null);
 
     const finalMilestoneUuid = formData.milestoneUuid.trim() === '' ? null : formData.milestoneUuid.trim();
 
     const payload = {
-      projectUuid: DEFAULT_PROJECT_UUID,
+      projectUuid: selectedProjectUuid,
       milestoneUuid: finalMilestoneUuid,
-      taskCode: `TSK-${Math.floor(Math.random() * 1000)}`,
+      taskCode: `TSK-${Math.floor(Math.random() * 9000 + 1000)}`,
       title: formData.title,
       assignee: formData.assignee,
       priority: formData.priority,
@@ -181,7 +239,7 @@ export default function ProjectTasksPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/project-tasks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -190,8 +248,9 @@ export default function ProjectTasksPage() {
         throw new Error(errorData.message || 'Failed to create task');
       }
 
-      await fetchTasks(1, pageLimit); // Reset to page 1 after creation
+      await fetchTasks(1, pageLimit, selectedProjectUuid);
       setIsModalOpen(false);
+      notifySuccess('Task created successfully!');
       
       setFormData({
         title: '',
@@ -211,17 +270,50 @@ export default function ProjectTasksPage() {
     }
   };
 
-  // 3. UPDATE STATUS (PATCH)
+  // 4. UPDATE TASK (PATCH)
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-tasks/${editingTask.uuid}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          title: editingTask.title,
+          assignee: editingTask.assignee,
+          priority: editingTask.priority,
+          status: editingTask.status,
+          description: editingTask.description
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to update task');
+      }
+
+      setTasks(tasks.map(t => t.uuid === editingTask.uuid ? editingTask : t));
+      setEditingTask(null);
+      notifySuccess('Task updated successfully!');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleStatusChange = async (uuid: string, newStatus: any) => {
     try {
       const response = await fetch(`${API_BASE_URL}/project-tasks/${uuid}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify({ status: newStatus })
       });
 
       if (response.ok) {
         setTasks(tasks.map(t => t.uuid === uuid ? { ...t, status: newStatus } : t));
+        notifySuccess('Task status updated!');
       } else {
         const err = await response.json();
         alert(err.message || "Failed to update status");
@@ -231,7 +323,32 @@ export default function ProjectTasksPage() {
     }
   };
 
-  // Filter Logic (Client-side filtering on current page)
+  // 5. DELETE TASK
+  const handleDeleteTask = async () => {
+    if (!deleteTarget) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-tasks/${deleteTarget.uuid}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to delete task');
+      }
+
+      setTasks(tasks.filter(t => t.uuid !== deleteTarget.uuid));
+      setDeleteTarget(null);
+      notifySuccess('Task deleted successfully!');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Filter Logic
   const assigneesList = useMemo(() => ['All', ...Array.from(new Set(tasks.map(t => t.assignee)))], [tasks]);
 
   const filteredTasks = useMemo(() => {
@@ -262,24 +379,37 @@ export default function ProjectTasksPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-6 lg:p-8 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50/50 p-6 lg:p-8 font-sans text-slate-800">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <nav className="flex items-center text-sm text-slate-500 space-x-2 mb-1">
-            <Link href="/projects" className="flex items-center hover:text-blue-600 transition-colors">
-              <Home className="w-4 h-4 mr-1 text-slate-600" /> Projects
+            <Link href="/dashboard" className="flex items-center hover:text-blue-600 transition-colors">
+              <Home className="w-4 h-4 mr-1 text-slate-600" /> Dashboard
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="hover:text-blue-600 cursor-pointer">proj-skyline-001</span>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="font-semibold text-slate-900">Tasks</span>
+            <span className="font-semibold text-slate-900">Project Tasks</span>
           </nav>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Project Tasks Management</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Project Selector */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-500 uppercase">Project:</label>
+            <select
+              value={selectedProjectUuid}
+              onChange={(e) => setSelectedProjectUuid(e.target.value)}
+              className="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
+            >
+              {projects.length === 0 && <option value="">No Projects Found</option>}
+              {projects.map((p) => (
+                <option key={p.uuid} value={p.uuid}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
             <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}><List className="w-3.5 h-3.5" /> List</button>
             <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'kanban' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}><Kanban className="w-3.5 h-3.5" /> Kanban</button>
@@ -288,17 +418,24 @@ export default function ProjectTasksPage() {
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-xl shadow-sm transition-all"
           >
             <Plus className="w-4 h-4" /> Create Task
           </button>
         </div>
       </div>
 
-      {/* Error Alert */}
+      {/* Alerts */}
+      {successMsg && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          {successMsg}
+        </div>
+      )}
+
       {errorMsg && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
-          <AlertCircle className="w-5 h-5" />
+          <AlertCircle className="w-5 h-5 text-red-600" />
           {errorMsg}
         </div>
       )}
@@ -364,6 +501,7 @@ export default function ProjectTasksPage() {
                       <th className="py-3.5 px-4">Due Date</th>
                       <th className="py-3.5 px-4">Status</th>
                       <th className="py-3.5 px-4 text-center">Attachment</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -374,6 +512,7 @@ export default function ProjectTasksPage() {
                           <td className="py-3.5 px-4 font-semibold text-slate-900">
                             <div className="flex flex-col">
                               <span>{task.title}</span>
+                              {task.description && <span className="text-xs text-slate-500 font-normal">{task.description}</span>}
                             </div>
                           </td>
                           <td className="py-3.5 px-4 text-slate-700">{task.assignee}</td>
@@ -409,11 +548,29 @@ export default function ProjectTasksPage() {
                               <span className="text-slate-300 text-xs">—</span>
                             )}
                           </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => setEditingTask(task)}
+                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Edit Task"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteTarget(task)}
+                                className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete Task"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-400">No task entries found.</td>
+                        <td colSpan={8} className="py-12 text-center text-slate-400">No task entries found.</td>
                       </tr>
                     )}
                   </tbody>
@@ -457,7 +614,7 @@ export default function ProjectTasksPage() {
             {viewMode === 'calendar' && (
               <div className="p-8 text-center text-slate-500">
                 <CalendarIcon className="w-10 h-10 text-blue-600 mx-auto mb-2" />
-                <p className="font-bold text-slate-800">Calendar Timeline Mode Enabled</p>
+                <p className="font-bold text-slate-800">Calendar Timeline Mode</p>
                 <p className="text-sm text-slate-500 mt-1">Showing upcoming task deadlines.</p>
               </div>
             )}
@@ -480,7 +637,6 @@ export default function ProjectTasksPage() {
             </select>
           </div>
 
-          {/* Pagination Controls */}
           <div className="flex items-center gap-1">
             <button
               onClick={() => handlePageChange(currentPage - 1)}
@@ -489,35 +645,9 @@ export default function ProjectTasksPage() {
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            
-            {/* Page Numbers */}
-            {Array.from({ length: Math.min(meta.totalPages, 5) }, (_, i) => {
-              let pageNum;
-              if (meta.totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= meta.totalPages - 2) {
-                pageNum = meta.totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
-              
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white border border-blue-600'
-                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
+            <span className="px-3 py-1 font-semibold text-slate-700">
+              Page {meta.page} of {meta.totalPages || 1}
+            </span>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= meta.totalPages}
@@ -527,7 +657,7 @@ export default function ProjectTasksPage() {
             </button>
           </div>
 
-          <span>Project Tasks Module v03.05</span>
+          <span>Project Tasks Module</span>
         </div>
       </div>
 
@@ -546,18 +676,6 @@ export default function ProjectTasksPage() {
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Title *</label>
                 <input type="text" required placeholder="e.g. Inspect Rebar Spacing" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Milestone UUID (Optional)</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. 3fa85f64-5717-4562-b3fc-2c963f66afa6" 
-                  value={formData.milestoneUuid} 
-                  onChange={(e) => setFormData({ ...formData, milestoneUuid: e.target.value })} 
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" 
-                />
-                <p className="text-[10px] text-slate-400 mt-1">Leave empty if no milestone. Must be a valid UUID if provided.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -591,13 +709,6 @@ export default function ProjectTasksPage() {
                 <textarea rows={3} placeholder="Task instructions..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
               </div>
 
-              <div className="flex items-center pt-2">
-                <label className="relative flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={formData.hasAttachment} onChange={(e) => setFormData({ ...formData, hasAttachment: e.target.checked })} className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
-                  <span className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><Upload className="w-4 h-4 text-slate-400" /> Upload Supporting Attachment</span>
-                </label>
-              </div>
-
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center gap-2">
@@ -607,6 +718,68 @@ export default function ProjectTasksPage() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MODAL */}
+      {editingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Edit Task — {editingTask.code}</h2>
+              <button onClick={() => setEditingTask(null)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Title *</label>
+                <input type="text" required value={editingTask.title} onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Assignee</label>
+                  <input type="text" value={editingTask.assignee} onChange={(e) => setEditingTask({ ...editingTask, assignee: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Status</label>
+                  <select value={editingTask.status} onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value as any })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm">
+                    <option value="Todo">Todo</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Under Review">Under Review</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Description</label>
+                <textarea rows={3} value={editingTask.description || ''} onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
+              </div>
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" onClick={() => setEditingTask(null)} className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm">
+                  {isSubmitting ? 'Updating...' : 'Update Task'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Delete Task?</h3>
+            <p className="text-sm text-slate-500 mb-6">Are you sure you want to delete <span className="font-semibold text-slate-800">{deleteTarget.title}</span> ({deleteTarget.code})?</p>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50">Cancel</button>
+              <button onClick={handleDeleteTask} disabled={isSubmitting} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-sm">
+                {isSubmitting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

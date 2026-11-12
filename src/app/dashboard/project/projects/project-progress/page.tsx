@@ -24,8 +24,12 @@ import {
   Info,
   Loader2,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Home,
+  Edit,
+  Trash2
 } from 'lucide-react';
+import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 // Frontend UI Types
 interface ProgressRecord {
@@ -48,6 +52,11 @@ interface SummaryData {
   status: string;
 }
 
+interface ProjectOption {
+  uuid: string;
+  name: string;
+}
+
 interface PaginationMeta {
   total: number;
   page: number;
@@ -57,10 +66,11 @@ interface PaginationMeta {
 
 export default function ProjectProgressPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
-  const DEFAULT_PROJECT_UUID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 
   // State
   const [progressLogs, setProgressLogs] = useState<ProgressRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
   const [summary, setSummary] = useState<SummaryData>({
     latestPhysical: 0,
     latestFinancial: 0,
@@ -70,6 +80,7 @@ export default function ProjectProgressPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -83,6 +94,8 @@ export default function ProjectProgressPage() {
 
   // Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<ProgressRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProgressRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPhotosModal, setSelectedPhotosModal] = useState<string[] | null>(null);
 
@@ -97,26 +110,63 @@ export default function ProjectProgressPage() {
     photos: [] as string[]
   });
 
-  // 1. FETCH PROGRESS LOGS (GET List with Filters & Pagination)
-  const fetchProgressLogs = async (page = 1, limit = 10) => {
+  const getHeaders = () => {
+    const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  };
+
+  const notifySuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  // 1. FETCH USER'S PROJECTS
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/project?limit=100`, { headers: getHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data?.data?.data || data?.data?.items || data?.data || [];
+      const opts: ProjectOption[] = list.map((p: any) => ({
+        uuid: p.uuid,
+        name: p.projectName || p.name || 'Unnamed Project'
+      }));
+      setProjects(opts);
+      if (opts.length > 0) {
+        setSelectedProjectUuid(opts[0].uuid);
+      }
+    } catch (e) {
+      console.error('Failed to load projects', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  // 2. FETCH PROGRESS LOGS (GET)
+  const fetchProgressLogs = async (page = 1, limit = 10, projectUuid = selectedProjectUuid) => {
+    if (!projectUuid) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      let url = `${API_BASE_URL}/project-progress?projectUuid=${DEFAULT_PROJECT_UUID}&page=${page}&limit=${limit}`;
-      
+      let url = `${API_BASE_URL}/project-progress?projectUuid=${projectUuid}&page=${page}&limit=${limit}`;
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
       if (fromDate) url += `&fromDate=${fromDate}`;
       if (toDate) url += `&toDate=${toDate}`;
 
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getHeaders() });
       const result = await response.json();
-      
-      console.log("=== DEBUG: Fetched Progress Response ===", result);
 
       let rawLogs: any[] = [];
       let metaData: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 };
 
-      // Robust Parsing (সব ধরনের রেসপন্স হ্যান্ডেল করবে)
       if (Array.isArray(result)) {
         rawLogs = result;
         metaData = { total: result.length, page, limit, totalPages: Math.ceil(result.length / limit) };
@@ -131,7 +181,6 @@ export default function ProjectProgressPage() {
         metaData = result.data.meta || result.meta || { total: rawLogs.length, page, limit, totalPages: Math.ceil(rawLogs.length / limit) };
       }
 
-      // Safe Mapping
       const mappedLogs: ProgressRecord[] = rawLogs.map((log) => {
         const physical = parseFloat(String(log.physicalPct || 0)) || 0;
         const financial = parseFloat(String(log.financialPct || 0)) || 0;
@@ -164,12 +213,14 @@ export default function ProjectProgressPage() {
     }
   };
 
-  // 2. FETCH SUMMARY
-  const fetchSummary = async () => {
+  // 3. FETCH SUMMARY
+  const fetchSummary = async (projectUuid = selectedProjectUuid) => {
+    if (!projectUuid) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/project-progress/summary?projectUuid=${DEFAULT_PROJECT_UUID}`);
+      const response = await fetch(`${API_BASE_URL}/project-progress/summary?projectUuid=${projectUuid}`, {
+        headers: getHeaders()
+      });
       const result = await response.json();
-      console.log("=== DEBUG: Fetched Summary ===", result);
 
       if (result.success && result.data) {
         setSummary(result.data);
@@ -183,14 +234,12 @@ export default function ProjectProgressPage() {
     }
   };
 
-  // Triggers
   useEffect(() => {
-    fetchProgressLogs(currentPage, pageLimit);
-  }, [currentPage, pageLimit, searchQuery, fromDate, toDate]);
-
-  useEffect(() => {
-    fetchSummary();
-  }, []);
+    if (selectedProjectUuid) {
+      fetchProgressLogs(currentPage, pageLimit, selectedProjectUuid);
+      fetchSummary(selectedProjectUuid);
+    }
+  }, [selectedProjectUuid, currentPage, pageLimit, searchQuery, fromDate, toDate]);
 
   // Handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -198,20 +247,13 @@ export default function ProjectProgressPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSimulatedFileUpload = () => {
-    const dummyImages = [
-      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=400&q=80'
-    ];
-    setFormData((prev) => ({
-      ...prev,
-      photos: [...prev.photos, dummyImages[prev.photos.length % dummyImages.length]]
-    }));
-  };
-
-  // 3. CREATE PROGRESS (POST)
+  // 4. CREATE PROGRESS (POST)
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProjectUuid) {
+      setErrorMsg('Please select a project first.');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg(null);
 
@@ -233,7 +275,7 @@ export default function ProjectProgressPage() {
     const isoDate = new Date(formData.asOfDate).toISOString();
 
     const payload = {
-      projectUuid: DEFAULT_PROJECT_UUID,
+      projectUuid: selectedProjectUuid,
       asOfDate: isoDate,
       physicalPct: physNum,
       financialPct: finNum,
@@ -247,20 +289,19 @@ export default function ProjectProgressPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/project-progress`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         body: JSON.stringify(payload)
       });
 
       const responseData = await response.json();
-      console.log("POST Response:", responseData);
-
       if (!response.ok) {
         throw new Error(responseData.message || 'Failed to create progress log');
       }
 
-      await fetchProgressLogs(1, pageLimit);
-      await fetchSummary();
+      await fetchProgressLogs(1, pageLimit, selectedProjectUuid);
+      await fetchSummary(selectedProjectUuid);
       setIsCreateModalOpen(false);
+      notifySuccess('Progress log created successfully!');
 
       setFormData({
         asOfDate: getTodayDate(),
@@ -276,59 +317,127 @@ export default function ProjectProgressPage() {
     }
   };
 
-  // Pagination Handlers
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= meta.totalPages) {
-      setCurrentPage(newPage);
+  // 5. UPDATE PROGRESS (PATCH)
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRecord) return;
+    setIsSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-progress/${editingRecord.uuid}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          physicalPct: Number(editingRecord.physicalPct),
+          financialPct: Number(editingRecord.financialPct),
+          remarks: editingRecord.remarks
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to update progress log');
+      }
+
+      await fetchProgressLogs(currentPage, pageLimit, selectedProjectUuid);
+      await fetchSummary(selectedProjectUuid);
+      setEditingRecord(null);
+      notifySuccess('Progress log updated successfully!');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleLimitChange = (newLimit: number) => {
-    setPageLimit(newLimit);
-    setCurrentPage(1);
+  // 6. DELETE PROGRESS (DELETE)
+  const handleDeleteProgress = async () => {
+    if (!deleteTarget) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-progress/${deleteTarget.uuid}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to delete progress log');
+      }
+
+      setProgressLogs(progressLogs.filter(p => p.uuid !== deleteTarget.uuid));
+      setDeleteTarget(null);
+      await fetchSummary(selectedProjectUuid);
+      notifySuccess('Progress log deleted successfully!');
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-50/50 text-slate-800 p-6 lg:p-8 font-sans">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <nav className="flex items-center text-sm text-slate-500 space-x-2 mb-1">
-            <Link href="/projects" className="hover:text-blue-600 cursor-pointer">Projects</Link>
+            <Link href="/dashboard" className="flex items-center hover:text-blue-600 transition-colors">
+              <Home className="w-4 h-4 mr-1 text-slate-600" /> Dashboard
+            </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="hover:text-blue-600 cursor-pointer">PRJ-2026-001</span>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="font-semibold text-slate-800">Progress</span>
+            <span className="font-semibold text-slate-900">Project Progress</span>
           </nav>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2.5">
-              <TrendingUp className="w-7 h-7 text-blue-600" /> Feature 03.07 · Progress Management
+              <TrendingUp className="w-7 h-7 text-blue-600" /> Project Progress Management
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-blue-50 text-blue-700 border border-blue-200">
-              /projects/:uuid/progress
-            </span>
           </div>
         </div>
 
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl shadow-xs transition-all shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Log Progress Update
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Project Selector */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-500 uppercase">Project:</label>
+            <select
+              value={selectedProjectUuid}
+              onChange={(e) => setSelectedProjectUuid(e.target.value)}
+              className="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
+            >
+              {projects.length === 0 && <option value="">No Projects Found</option>}
+              {projects.map((p) => (
+                <option key={p.uuid} value={p.uuid}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-xl shadow-sm transition-all shrink-0"
+          >
+            <Plus className="w-4 h-4" /> Log Progress Update
+          </button>
+        </div>
       </div>
 
-      {/* Error Alert */}
+      {/* Alerts */}
+      {successMsg && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" /> {successMsg}
+        </div>
+      )}
+
       {errorMsg && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
-          <AlertCircle className="w-5 h-5" /> {errorMsg}
+          <AlertCircle className="w-5 h-5 text-red-600" /> {errorMsg}
         </div>
       )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Latest Physical %</p>
             <h3 className="text-2xl font-bold text-slate-900 mt-1">{summary.latestPhysical}%</h3>
@@ -339,7 +448,7 @@ export default function ProjectProgressPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Latest Financial %</p>
             <h3 className="text-2xl font-bold text-slate-900 mt-1">{summary.latestFinancial}%</h3>
@@ -350,7 +459,7 @@ export default function ProjectProgressPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Progress Variance</p>
             <h3 className={`text-2xl font-bold mt-1 ${Number(summary.progressVariance) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -360,7 +469,7 @@ export default function ProjectProgressPage() {
               {Number(summary.progressVariance) >= 0 ? (
                 <span className="text-emerald-600 flex items-center gap-0.5"><ArrowUpRight className="w-3.5 h-3.5" /> Ahead of schedule</span>
               ) : (
-                <span className="text-rose-600 flex items-center gap-0.5"><ArrowDownRight className="w-3.5 h-3.5" /> Behind financial burn</span>
+                <span className="text-rose-600 flex items-center gap-0.5"><ArrowDownRight className="w-3.5 h-3.5" /> Behind schedule</span>
               )}
             </p>
           </div>
@@ -369,7 +478,7 @@ export default function ProjectProgressPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Audit Logs</p>
             <h3 className="text-2xl font-bold text-slate-900 mt-1">{summary.totalLogs}</h3>
@@ -381,186 +490,127 @@ export default function ProjectProgressPage() {
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-xs space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <Filter className="w-4 h-4 text-blue-600" /> Filter Progress Entries
-          </span>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setFromDate('');
-              setToDate('');
-              setCurrentPage(1);
-            }}
-            className="text-xs font-semibold text-blue-600 hover:underline"
-          >
-            Clear Filters
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="md:col-span-2 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+      {/* Main Container */}
+      <div className="border border-slate-200 rounded-2xl shadow-sm bg-white overflow-hidden">
+        
+        {/* Filters */}
+        <div className="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
               type="text"
-              placeholder="Search in remarks or author..."
+              placeholder="Search remarks, inspector..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl pl-9 pr-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl pl-10 pr-4 py-2 w-full focus:outline-none focus:border-blue-600 shadow-sm"
             />
           </div>
 
-          <div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-500 uppercase">From:</label>
             <input
               type="date"
-              title="From As Of Date"
               value={fromDate}
-              onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
-              className="bg-white border border-slate-200 text-slate-800 text-xs rounded-xl px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              onChange={(e) => setFromDate(e.target.value)}
+              className="bg-white border border-slate-200 text-xs rounded-xl px-2.5 py-1.5 outline-none shadow-sm"
             />
-          </div>
-
-          <div>
+            <label className="text-xs font-semibold text-slate-500 uppercase ml-2">To:</label>
             <input
               type="date"
-              title="To As Of Date"
               value={toDate}
-              onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
-              className="bg-white border border-slate-200 text-slate-800 text-xs rounded-xl px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              onChange={(e) => setToDate(e.target.value)}
+              className="bg-white border border-slate-200 text-xs rounded-xl px-2.5 py-1.5 outline-none shadow-sm"
             />
           </div>
         </div>
-      </div>
 
-      {/* Table View */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-        <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <button className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-xs">
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel Export
-            </button>
-            <button className="inline-flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-xs">
-              <FileText className="w-3.5 h-3.5" /> PDF Log Summary
-            </button>
-            <span className="text-xs text-slate-500 ml-2">Total <strong className="text-slate-800">{meta.total}</strong> updates found</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Info className="w-3.5 h-3.5 text-blue-600" />
-            <span>Variance Formula: <code>physical_pct - financial_pct</code></span>
-          </div>
-        </div>
-
-        {/* Loading */}
+        {/* Loading State */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
-            <p>Loading progress records...</p>
+            <p>Loading progress audit trail...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-100/80 text-slate-700 text-xs uppercase tracking-wider font-bold border-b border-slate-200">
-                  <th className="py-3.5 px-4">As Of Date</th>
-                  <th className="py-3.5 px-4">Physical %</th>
-                  <th className="py-3.5 px-4">Financial %</th>
-                  <th className="py-3.5 px-4">Variance</th>
-                  <th className="py-3.5 px-4 w-1/3">Remarks</th>
-                  <th className="py-3.5 px-4 text-center">Photos</th>
-                  <th className="py-3.5 px-4 text-right">Logged By</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-800">
-                {progressLogs.length > 0 ? (
-                  progressLogs.map((log) => (
-                    <tr key={log.uuid} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="py-3.5 px-4 font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          {log.asOfDate}
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 font-mono">{log.physicalPct}%</span>
-                          <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200">
-                            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${log.physicalPct}%` }}></div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 font-mono">{log.financialPct}%</span>
-                          <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200">
-                            <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${log.financialPct}%` }}></div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4 whitespace-nowrap font-mono text-xs font-bold">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                          log.variance > 0
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : log.variance < 0
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}>
-                          {log.variance > 0 ? `+${log.variance}%` : `${log.variance}%`}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-xs text-slate-600">
-                        <p className="line-clamp-2" title={log.remarks}>{log.remarks}</p>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        {log.photos.length > 0 ? (
-                          <button
-                            onClick={() => setSelectedPhotosModal(log.photos)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
-                          >
-                            <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                            <span>{log.photos.length} Photo{log.photos.length > 1 ? 's' : ''}</span>
-                          </button>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">None</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right text-xs text-slate-500 whitespace-nowrap">
-                        <div>
-                          <span className="font-medium text-slate-800">{log.loggedBy}</span>
-                          <p className="text-[10px] text-slate-400">
-                            {new Date(log.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
-                      No progress updates found.
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider font-bold border-b border-slate-200">
+                    <th className="py-3.5 px-4">As of Date</th>
+                    <th className="py-3.5 px-4">Physical Progress</th>
+                    <th className="py-3.5 px-4">Financial Progress</th>
+                    <th className="py-3.5 px-4">Variance</th>
+                    <th className="py-3.5 px-4">Remarks</th>
+                    <th className="py-3.5 px-4">Inspector</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {progressLogs.length > 0 ? (
+                    progressLogs.map((log) => (
+                      <tr key={log.uuid} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-semibold text-blue-600">{log.asOfDate}</td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                              <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min(100, log.physicalPct)}%` }} />
+                            </div>
+                            <span className="font-bold text-slate-900">{log.physicalPct}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                              <div className="bg-indigo-600 h-2 rounded-full" style={{ width: `${Math.min(100, log.financialPct)}%` }} />
+                            </div>
+                            <span className="font-bold text-slate-900">{log.financialPct}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-bold">
+                          <span className={log.variance >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                            {log.variance > 0 ? `+${log.variance}%` : `${log.variance}%`}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-700 max-w-xs truncate" title={log.remarks}>{log.remarks}</td>
+                        <td className="py-3.5 px-4 text-slate-600 text-xs">{log.loggedBy}</td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setEditingRecord(log)}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit Log"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(log)}
+                              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Log"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">No progress entries recorded for this project.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Footer with Pagination */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-500">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-3">
           <div className="flex items-center gap-2">
-            <span>Showing {progressLogs.length} of {meta.total} records</span>
-            <select
-              value={pageLimit}
-              onChange={(e) => handleLimitChange(Number(e.target.value))}
+            <span>Showing {progressLogs.length} of {meta.total} total logs</span>
+            <select 
+              value={pageLimit} 
+              onChange={(e) => { setPageLimit(Number(e.target.value)); setCurrentPage(1); }}
               className="bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none cursor-pointer"
             >
               <option value={5}>5 / page</option>
@@ -572,37 +622,17 @@ export default function ProjectProgressPage() {
 
           <div className="flex items-center gap-1">
             <button
-              onClick={() => handlePageChange(currentPage - 1)}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
               className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-
-            {Array.from({ length: Math.min(meta.totalPages, 5) }, (_, i) => {
-              let pageNum;
-              if (meta.totalPages <= 5) pageNum = i + 1;
-              else if (currentPage <= 3) pageNum = i + 1;
-              else if (currentPage >= meta.totalPages - 2) pageNum = meta.totalPages - 4 + i;
-              else pageNum = currentPage - 2 + i;
-
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white border border-blue-600'
-                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
+            <span className="px-3 py-1 font-semibold text-slate-700">
+              Page {meta.page} of {meta.totalPages || 1}
+            </span>
             <button
-              onClick={() => handlePageChange(currentPage + 1)}
+              onClick={() => setCurrentPage(p => Math.min(meta.totalPages, p + 1))}
               disabled={currentPage >= meta.totalPages}
               className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
@@ -610,190 +640,97 @@ export default function ProjectProgressPage() {
             </button>
           </div>
 
-          <span>Route endpoint: <code>/projects/:uuid/progress</code></span>
+          <span>Project Progress Module</span>
         </div>
       </div>
 
       {/* CREATE MODAL */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
-            
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Log Progress Update</h2>
-                  <p className="text-xs font-mono text-slate-500">/projects/:uuid/progress/create</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Log Progress Update</h2>
+              <button onClick={() => setIsCreateModalOpen(false)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
             </div>
-
-            <form onSubmit={handleCreateSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
-              
+            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  As Of Date <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  name="asOfDate"
-                  required
-                  value={formData.asOfDate}
-                  onChange={handleInputChange}
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-xs"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">Defaults to today's date if unmodified</p>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">As of Date *</label>
+                <input type="date" required name="asOfDate" value={formData.asOfDate} onChange={handleInputChange} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Physical Progress % <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      name="physicalPct"
-                      required
-                      placeholder="e.g. 45.0"
-                      value={formData.physicalPct}
-                      onChange={handleInputChange}
-                      className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl pl-3.5 pr-8 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-xs"
-                    />
-                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</span>
-                  </div>
+                  <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Physical % *</label>
+                  <input type="number" min="0" max="100" step="0.1" required name="physicalPct" placeholder="e.g. 25.5" value={formData.physicalPct} onChange={handleInputChange} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Financial Progress % <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      name="financialPct"
-                      required
-                      placeholder="e.g. 42.0"
-                      value={formData.financialPct}
-                      onChange={handleInputChange}
-                      className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl pl-3.5 pr-8 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-xs"
-                    />
-                    <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</span>
-                  </div>
+                  <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Financial % *</label>
+                  <input type="number" min="0" max="100" step="0.1" required name="financialPct" placeholder="e.g. 20.0" value={formData.financialPct} onChange={handleInputChange} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
                 </div>
               </div>
-
-              {formData.physicalPct !== '' && formData.financialPct !== '' && (
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-600">Computed Variance:</span>
-                  <span className="font-mono font-bold text-slate-900">
-                    {(parseFloat(formData.physicalPct || '0') - parseFloat(formData.financialPct || '0')).toFixed(2)}%
-                  </span>
-                </div>
-              )}
-
               <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  Remarks / Status Notes
-                </label>
-                <textarea
-                  name="remarks"
-                  rows={3}
-                  placeholder="Enter detailed site inspection notes, completed milestones, or issues..."
-                  value={formData.remarks}
-                  onChange={handleInputChange}
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-xs"
-                />
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Remarks & Field Notes</label>
+                <textarea rows={3} name="remarks" placeholder="Site observations, delays, or milestones..." value={formData.remarks} onChange={handleInputChange} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
               </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  Site Photos Attachments
-                </label>
-                <div
-                  onClick={handleSimulatedFileUpload}
-                  className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer"
-                >
-                  <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1" />
-                  <p className="text-xs text-slate-600 font-medium">Click to attach site images (Multiple)</p>
-                  <p className="text-[10px] text-slate-400">PNG, JPG up to 10MB</p>
-                </div>
-
-                {formData.photos.length > 0 && (
-                  <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-                    {formData.photos.map((url, idx) => (
-                      <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0">
-                        <img src={url} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setFormData(p => ({ ...p, photos: p.photos.filter((_, i) => i !== idx) }))}
-                          className="absolute top-1 right-1 bg-slate-900/70 text-white rounded-full p-0.5 hover:bg-rose-600 transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-2"
-                >
+                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center gap-2">
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {isSubmitting ? 'Saving...' : 'Save Progress Update'}
+                  {isSubmitting ? 'Saving...' : 'Save Log'}
                 </button>
               </div>
-
             </form>
           </div>
         </div>
       )}
 
-      {/* Photo Gallery Preview Modal */}
-      {selectedPhotosModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-2xl overflow-hidden p-6 relative">
-            <button
-              onClick={() => setSelectedPhotosModal(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-blue-600" /> Attached Site Inspection Photos
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
-              {selectedPhotosModal.map((imgUrl, i) => (
-                <div key={i} className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                  <img src={imgUrl} alt={`Site inspection ${i}`} className="w-full h-48 object-cover" />
+      {/* EDIT MODAL */}
+      {editingRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Edit Progress Log</h2>
+              <button onClick={() => setEditingRecord(null)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Physical % *</label>
+                  <input type="number" min="0" max="100" step="0.1" required value={editingRecord.physicalPct} onChange={(e) => setEditingRecord({ ...editingRecord, physicalPct: parseFloat(e.target.value) || 0 })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
                 </div>
-              ))}
+                <div>
+                  <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Financial % *</label>
+                  <input type="number" min="0" max="100" step="0.1" required value={editingRecord.financialPct} onChange={(e) => setEditingRecord({ ...editingRecord, financialPct: parseFloat(e.target.value) || 0 })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Remarks</label>
+                <textarea rows={3} value={editingRecord.remarks} onChange={(e) => setEditingRecord({ ...editingRecord, remarks: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm" />
+              </div>
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" onClick={() => setEditingRecord(null)} className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm">
+                  {isSubmitting ? 'Updating...' : 'Update Log'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE MODAL */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Delete Progress Log?</h3>
+            <p className="text-sm text-slate-500 mb-6">Are you sure you want to delete progress log for <span className="font-semibold text-slate-800">{deleteTarget.asOfDate}</span>?</p>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50">Cancel</button>
+              <button onClick={handleDeleteProgress} disabled={isSubmitting} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-sm">
+                {isSubmitting ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>

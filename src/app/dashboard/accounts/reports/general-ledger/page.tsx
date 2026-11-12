@@ -8,7 +8,9 @@ import {
   FileText, 
   ArrowLeft,
   X,
-  MoreVertical 
+  MoreVertical,
+  Search,
+  ChevronDown
 } from 'lucide-react';
 
 interface LedgerRow {
@@ -76,22 +78,24 @@ export default function GeneralLedger() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6 font-sans text-slate-800">
-      <div className="space-y-6">
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
         
         {/* Top Header with Breadcrumbs & Back Button */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center text-sm text-slate-600 space-x-2">
-            <span className="hover:text-blue-600 cursor-pointer">Home</span>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="hover:text-blue-600 cursor-pointer">Accounts Module (Report)</span>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="font-semibold text-slate-900">General Ledger</span>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2">
+            <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Accounts Module (Report)</span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            <span className="font-semibold text-slate-900 bg-white px-2.5 py-1 rounded-md border border-slate-200/80 shadow-2xs">
+              General Ledger
+            </span>
+          </nav>
 
           <button 
             onClick={handleBackToPrevious}
-            className="bg-emerald-800 hover:bg-emerald-900 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg flex items-center space-x-2 shadow transition"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 hover:shadow-sm active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Previous</span>
@@ -99,177 +103,210 @@ export default function GeneralLedger() {
         </div>
 
         {/* Main Card Container */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-6">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-sm space-y-6">
           
           {/* Top Filters Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
             
             {/* Select Date */}
             <div>
-              <label className="block text-slate-600 font-medium mb-1.5">Select Date</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Select Date
+              </label>
               <div className="relative">
                 <input 
                   type="text" 
                   value={selectDate} 
                   onChange={(e) => setSelectDate(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-9 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
                 />
-                <Calendar className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
             {/* Chart Of Account */}
             <div>
-              <label className="block text-slate-600 font-medium mb-1.5">Chart Of Account</label>
-              <select 
-                value={chartOfAccount} 
-                onChange={(e) => setChartOfAccount(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Chart Of Account">Select Chart Of Account</option>
-                <option value="Cash">Cash</option>
-                <option value="Bank Accounts">Bank Accounts</option>
-              </select>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Chart Of Account
+              </label>
+              <div className="relative">
+                <select 
+                  value={chartOfAccount} 
+                  onChange={(e) => setChartOfAccount(e.target.value)}
+                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+                >
+                  <option value="Select Chart Of Account">Select Chart Of Account</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Accounts">Bank Accounts</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
 
             {/* Company with Clear Action */}
             <div>
-              <label className="block text-slate-600 font-medium mb-1.5">Company</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Company
+              </label>
               <div className="relative">
                 <input 
                   type="text" 
                   value={company} 
                   onChange={(e) => setCompany(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500 pr-10"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-9 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
                 />
-                <button 
-                  onClick={() => setCompany('')}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                {company && (
+                  <button 
+                    onClick={() => setCompany('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 transition"
+                    title="Clear"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Project */}
             <div>
-              <label className="block text-slate-600 font-medium mb-1.5">Project</label>
-              <select 
-                value={project} 
-                onChange={(e) => setProject(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Project">Select Project</option>
-                <option value="Rifat Eyecon City">Rifat Eyecon City</option>
-                <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
-              </select>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Project
+              </label>
+              <div className="relative">
+                <select 
+                  value={project} 
+                  onChange={(e) => setProject(e.target.value)}
+                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+                >
+                  <option value="Select Project">Select Project</option>
+                  <option value="Rifat Eyecon City">Rifat Eyecon City</option>
+                  <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
 
             {/* Sitess */}
             <div>
-              <label className="block text-slate-600 font-medium mb-1.5">Sitess</label>
-              <select 
-                value={sitess} 
-                onChange={(e) => setSitess(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Site">Select Site</option>
-                <option value="Main Site">Main Site</option>
-              </select>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Sitess
+              </label>
+              <div className="relative">
+                <select 
+                  value={sitess} 
+                  onChange={(e) => setSitess(e.target.value)}
+                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+                >
+                  <option value="Select Site">Select Site</option>
+                  <option value="Main Site">Main Site</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
 
           </div>
 
-          {/* Table Action Controls Header (Excel, PDF, Column Options button, Show entries & Search) */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-            <div className="flex items-center space-x-2">
+          {/* Action Row: Export Buttons (Left) & More Options (Right) */}
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <div className="flex items-center gap-2">
               <button 
                 onClick={handleExportExcel}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg flex items-center space-x-1.5 shadow transition"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-2xs transition hover:bg-emerald-700 active:scale-95"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>Excel</span>
               </button>
               <button 
                 onClick={handleExportPDF}
-                className="bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg flex items-center space-x-1.5 shadow transition"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-2xs transition hover:bg-rose-700 active:scale-95"
               >
                 <FileText className="w-4 h-4" />
                 <span>PDF</span>
               </button>
             </div>
 
-            <button className="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-600 hover:bg-slate-50 flex items-center space-x-1 shadow-sm">
+            <button 
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-2xs transition hover:bg-slate-50 hover:text-slate-800"
+              title="More options"
+            >
               <MoreVertical className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-            <div className="flex items-center text-sm text-slate-600 space-x-2">
+          {/* Entries & Search Controls Bar */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
+            <div className="flex items-center text-xs sm:text-sm text-slate-600 gap-2">
               <span>Show</span>
-              <select 
-                value={entriesPerPage} 
-                onChange={(e) => { setEntriesPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                className="border border-slate-300 rounded-lg px-3 py-1.5 bg-white text-sm"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <div className="relative">
+                <select 
+                  value={entriesPerPage} 
+                  onChange={(e) => { setEntriesPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                  className="h-8 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-7 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
               <span>entries</span>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-slate-600 font-medium">Search:</span>
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input 
                 type="text" 
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 placeholder="Search ledger..."
-                className="border border-slate-300 rounded-lg px-4 py-2 text-sm w-full sm:w-64 focus:outline-none focus:border-purple-500" 
+                className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-9 pr-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10" 
               />
             </div>
           </div>
 
-          {/* Data Table */}
-          <div className="overflow-x-auto border border-[#7b68ee]/40 rounded-xl shadow-sm">
+          {/* Data Table with Modern Header */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
-                <tr className="bg-[#6b58e8] text-white font-bold tracking-wide">
-                  <th className="p-3.5 border-r border-purple-400 w-16 text-center whitespace-nowrap">ID</th>
-                  <th className="p-3.5 border-r border-purple-400 w-28 whitespace-nowrap">DATE</th>
-                  <th className="p-3.5 border-r border-purple-400 whitespace-nowrap">PROJECT</th>
-                  <th className="p-3.5 border-r border-purple-400 whitespace-nowrap">DESCRIPTION</th>
-                  <th className="p-3.5 border-r border-purple-400 whitespace-nowrap">VOUCHER TYPE</th>
-                  <th className="p-3.5 border-r border-purple-400 whitespace-nowrap">VOUCHER NO</th>
-                  <th className="p-3.5 border-r border-purple-400 text-right whitespace-nowrap w-32">DEBIT</th>
-                  <th className="p-3.5 border-r border-purple-400 text-right whitespace-nowrap w-32">CREDIT</th>
-                  <th className="p-3.5 border-r border-purple-400 text-right whitespace-nowrap w-32">BALANCE</th>
-                  <th className="p-3.5 text-center whitespace-nowrap w-24">NOTE</th>
+                <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold tracking-wider">
+                  <th className="px-3.5 py-3 text-center whitespace-nowrap w-16">ID</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap w-28">DATE</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">PROJECT</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">DESCRIPTION</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">VOUCHER TYPE</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">VOUCHER NO</th>
+                  <th className="px-3.5 py-3 text-right whitespace-nowrap w-32">DEBIT</th>
+                  <th className="px-3.5 py-3 text-right whitespace-nowrap w-32">CREDIT</th>
+                  <th className="px-3.5 py-3 text-right whitespace-nowrap w-32">BALANCE</th>
+                  <th className="px-3.5 py-3 text-center whitespace-nowrap w-24">NOTE</th>
                 </tr>
               </thead>
-              <tbody className="bg-white text-slate-700">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {currentTableData.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-12 text-slate-400 italic bg-slate-50 text-base">
+                    <td colSpan={10} className="text-center py-12 text-slate-400 italic bg-slate-50/50 text-sm">
                       No matching general ledger records found.
                     </td>
                   </tr>
                 ) : (
                   currentTableData.map((row, index) => (
-                    <tr key={index} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                      <td className="p-3.5 border-r text-center font-medium">{row.id}</td>
-                      <td className="p-3.5 border-r">{row.date}</td>
-                      <td className="p-3.5 border-r">{row.project}</td>
-                      <td className="p-3.5 border-r font-medium text-slate-900">{row.description}</td>
-                      <td className="p-3.5 border-r">{row.voucherType}</td>
-                      <td className="p-3.5 border-r">{row.voucherNo}</td>
-                      <td className="p-3.5 border-r text-right"></td>
-                      <td className="p-3.5 border-r text-right"></td>
-                      <td className="p-3.5 border-r text-right font-medium">
+                    <tr key={index} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-3.5 py-3 text-center font-medium text-slate-500">{row.id || '—'}</td>
+                      <td className="px-3.5 py-3 text-slate-600">{row.date || '—'}</td>
+                      <td className="px-3.5 py-3 text-slate-600">{row.project || '—'}</td>
+                      <td className="px-3.5 py-3 font-semibold text-slate-900">{row.description}</td>
+                      <td className="px-3.5 py-3 text-slate-600">{row.voucherType || '—'}</td>
+                      <td className="px-3.5 py-3 text-slate-600 font-mono text-xs">{row.voucherNo || '—'}</td>
+                      <td className="px-3.5 py-3 text-right font-mono text-slate-700">
+                        {row.debit > 0 ? row.debit.toLocaleString('en-US', { minimumFractionDigits: 2 }) : ''}
+                      </td>
+                      <td className="px-3.5 py-3 text-right font-mono text-slate-700">
+                        {row.credit > 0 ? row.credit.toLocaleString('en-US', { minimumFractionDigits: 2 }) : ''}
+                      </td>
+                      <td className="px-3.5 py-3 text-right font-mono font-bold text-slate-900">
                         {row.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="p-3.5 text-center text-slate-500">{row.note}</td>
+                      <td className="px-3.5 py-3 text-center text-slate-400">{row.note || '—'}</td>
                     </tr>
                   ))
                 )}
@@ -277,28 +314,40 @@ export default function GeneralLedger() {
               
               {/* Table Footer Total Row */}
               <tfoot>
-                <tr className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-300">
-                  <td colSpan={6} className="p-3.5 text-right uppercase tracking-wider">Total</td>
-                  <td className="p-3.5 border-r text-right">{totalDebit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="p-3.5 border-r text-right">{totalCredit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="p-3.5 border-r text-right">{totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="p-3.5"></td>
+                <tr className="bg-slate-50/90 font-bold text-slate-900 border-t-2 border-slate-200">
+                  <td colSpan={6} className="px-3.5 py-3 text-right uppercase tracking-wider text-xs font-extrabold text-slate-700">
+                    TOTAL
+                  </td>
+                  <td className="px-3.5 py-3 text-right font-mono font-bold text-slate-900">
+                    {totalDebit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-3.5 py-3 text-right font-mono font-bold text-slate-900">
+                    {totalCredit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-3.5 py-3 text-right font-mono font-bold text-emerald-700">
+                    {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-3.5 py-3"></td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
           {/* Bottom Pagination Bar */}
-          <div className="flex flex-wrap items-center justify-between text-sm text-slate-600 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm text-slate-500 pt-2 border-t border-slate-100">
             <span>
               Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + entriesPerPage, filteredData.length)} of {filteredData.length} entries
             </span>
             
-            <div className="flex space-x-1.5">
+            <div className="flex items-center gap-1.5">
               <button 
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className={`px-3 py-1.5 rounded-lg font-medium ${currentPage === 1 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  currentPage === 1 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
+                }`}
               >
                 Previous
               </button>
@@ -307,7 +356,11 @@ export default function GeneralLedger() {
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
-                  className={`px-3.5 py-1.5 rounded-lg font-semibold transition ${currentPage === pageNum ? 'bg-[#6b58e8] text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                  className={`h-8 min-w-8 px-2.5 rounded-lg text-xs font-bold transition ${
+                    currentPage === pageNum 
+                      ? 'bg-indigo-600 text-white shadow-xs' 
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
                 >
                   {pageNum}
                 </button>
@@ -316,7 +369,11 @@ export default function GeneralLedger() {
               <button 
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-3 py-1.5 rounded-lg font-medium ${currentPage === totalPages || totalPages === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  currentPage === totalPages || totalPages === 0 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
+                }`}
               >
                 Next
               </button>

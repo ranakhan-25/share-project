@@ -186,82 +186,97 @@ export default function ProjectTypePage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-gray-50 font-sans text-gray-800">
-      <header className="flex flex-col items-start justify-between gap-3 border-b bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:px-6">
-        <div className="flex items-center space-x-2 text-sm text-gray-500">
-          <span className="shrink-0 font-medium text-purple-600">Home</span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-          <span className="flex shrink-0 items-center font-medium text-purple-600">
-            Project <ChevronDown className="ml-0.5 h-3 w-3" />
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-          <span className="shrink-0 font-semibold text-gray-700">Project Type</span>
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Project</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Project Type
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Project Type
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenCreate}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Create Project Type</span>
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleOpenCreate}
-          className="flex w-full items-center justify-center rounded-md bg-[#6B5BFF] px-4 py-2 text-sm font-medium text-white shadow transition-colors hover:bg-[#5848e0] sm:w-auto"
-        >
-          <Plus className="mr-1.5 h-4 w-4" /> Create Project Type
-        </button>
-      </header>
 
-      <main className="mx-auto w-full max-w-[98%] flex-1 px-3 py-4 sm:px-6 sm:py-8">
         {error && !isModalOpen && !deleteTarget && (
-          <div className="mb-4 flex items-center justify-between rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
             <span>{error}</span>
-            <button type="button" onClick={() => setError("")} aria-label="Dismiss error">×</button>
+            <button type="button" onClick={() => setError("")} aria-label="Dismiss error" className="text-rose-500 hover:text-rose-700">×</button>
           </div>
         )}
 
-        <section className="mb-4 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
-          <button type="button" className="flex items-center justify-between rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm sm:w-auto">
-            Select Columns <ChevronDown className="ml-2 h-4 w-4 text-gray-500" />
-          </button>
-          <label className="flex items-center justify-end gap-2 text-sm font-medium text-gray-600">
-            Search:
-            <span className="relative w-full sm:w-64">
+        {/* ====================== TABLE CONTAINER ====================== */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <button type="button" className="inline-flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 sm:w-auto">
+              Select Columns <ChevronDown className="ml-2 h-4 w-4 text-slate-500" />
+            </button>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
                 type="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                className="w-full rounded-md border bg-white py-1.5 pl-3 pr-8 text-sm"
+                placeholder="Search..."
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10"
                 aria-label="Search project types"
               />
-              <Search className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            </span>
-          </label>
-        </section>
+            </div>
+          </div>
 
-        <div className="mb-4 overflow-hidden rounded-lg border bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px] border-collapse text-left">
+          <div className="overflow-x-auto min-h-[300px]">
+            <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
               <thead>
-                <tr className="bg-[#6B5BFF] text-xs font-semibold uppercase tracking-wider text-white">
-                  <th className="px-4 py-3.5">ID</th>
-                  <th className="px-4 py-3.5">Code</th>
-                  <th className="px-4 py-3.5">Name</th>
-                  <th className="px-4 py-3.5 text-right">Action</th>
+                <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">ID</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">CODE</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">NAME</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-center tracking-wide">ACTION</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 text-sm">
+              <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
                 {loading ? (
-                  <tr><td colSpan={4} className="px-6 py-8 text-center">Loading project types...</td></tr>
+                  <tr><td colSpan={4} className="px-6 py-16 text-center text-slate-400">Loading project types...</td></tr>
                 ) : filteredProjectTypes.length === 0 ? (
-                  <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-400">No matching records found.</td></tr>
+                  <tr>
+                    <td colSpan={4} className="text-center py-16 text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <p className="text-sm font-medium">No matching records found.</p>
+                      </div>
+                    </td>
+                  </tr>
                 ) : (
                   filteredProjectTypes.map((item) => (
-                    <tr key={item.uuid} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 font-medium">{item.id}</td>
-                      <td className="px-4 py-4 text-gray-600">{item.code}</td>
-                      <td className="px-4 py-4">{item.name}</td>
-                      <td className="space-x-2 whitespace-nowrap px-4 py-4 text-right">
-                        <button type="button" onClick={() => handleOpenEdit(item)} className="inline-flex rounded bg-[#6B5BFF] p-2 text-white" title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button type="button" onClick={() => { setError(""); setDeleteTarget(item); }} className="inline-flex rounded bg-[#E5484D] p-2 text-white" title="Delete">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                    <tr key={item.uuid} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{item.id}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-600">{item.code}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{item.name}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button type="button" onClick={() => handleOpenEdit(item)} className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95" title="Edit">
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => { setError(""); setDeleteTarget(item); }} className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95" title="Delete">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -269,31 +284,55 @@ export default function ProjectTypePage() {
               </tbody>
             </table>
           </div>
+
+          {/* Table Footer */}
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+            <span>
+              Showing {filteredProjectTypes.length > 0 ? 1 : 0} to {filteredProjectTypes.length} of {filteredProjectTypes.length} entries
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
+                disabled
+              >
+                Previous
+              </button>
+              <button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold shadow-2xs">
+                1
+              </button>
+              <button
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
+                disabled
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
-          <div className="my-auto w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
+          <div className="my-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold">{editingItem ? "Edit Project Type" : "Create Project Type"}</h2>
-              <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="text-2xl text-gray-500" aria-label="Close">
+              <h2 className="text-lg font-bold text-slate-900">{editingItem ? "Edit Project Type" : "Create Project Type"}</h2>
+              <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600" aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            {error && <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+            {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
             <form onSubmit={handleSubmit} className="space-y-4">
-              <label className="block text-sm font-medium">
-                Code
-                <input value={codeValue} maxLength={50} onChange={(event) => setCodeValue(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" />
-              </label>
-              <label className="block text-sm font-medium">
-                Name *
-                <input required maxLength={255} value={nameValue} onChange={(event) => setNameValue(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" />
-              </label>
-              <div className="flex justify-end gap-3 border-t pt-4">
-                <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
-                <button type="submit" disabled={saving} className="rounded-lg bg-[#6B5BFF] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving..." : editingItem ? "Update" : "Create"}</button>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Code</label>
+                <input value={codeValue} maxLength={50} onChange={(event) => setCodeValue(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Name *</label>
+                <input required maxLength={255} value={nameValue} onChange={(event) => setNameValue(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" />
+              </div>
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 transition">Cancel</button>
+                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-5 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition disabled:opacity-50">{saving ? "Saving..." : editingItem ? "Update" : "Create"}</button>
               </div>
             </form>
           </div>
@@ -301,14 +340,14 @@ export default function ProjectTypePage() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-bold">Delete Project Type</h2>
-            <p className="mt-3 text-sm text-gray-600">Delete <strong>{deleteTarget.name}</strong>?</p>
-            {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" disabled={deleting} onClick={() => { setDeleteTarget(null); setError(""); }} className="rounded border px-4 py-2 text-sm">Cancel</button>
-              <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{deleting ? "Deleting..." : "Confirm Delete"}</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900">Delete Project Type</h2>
+            <p className="mt-2 text-sm text-slate-600">Are you sure you want to delete <strong>{deleteTarget.name}</strong>?</p>
+            {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={deleting} onClick={() => { setDeleteTarget(null); setError(""); }} className="rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 transition">Cancel</button>
+              <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition disabled:opacity-50">{deleting ? "Deleting..." : "Confirm Delete"}</button>
             </div>
           </div>
         </div>

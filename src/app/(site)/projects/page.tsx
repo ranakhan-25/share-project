@@ -165,172 +165,146 @@ export default function ProjectsPage() {
 
   return (
     <>
-            {/* ───────────────── ENHANCED RICH HERO BANNER ───────────────── */}
-      <section className="relative isolate overflow-hidden bg-white pb-10 pt-32 text-slate-900 border-b border-slate-200/80">
-        {/* Soft background grid & ambient light accents */}
-        <div className="bg-grid absolute inset-0 -z-10 opacity-[0.12]" />
-        <div className="absolute left-1/4 -top-20 -z-10 h-[32rem] w-[32rem] rounded-full bg-emerald-400/10 blur-[130px] pointer-events-none" />
-        <div className="absolute right-10 top-20 -z-10 h-[26rem] w-[26rem] rounded-full bg-sky-400/10 blur-[120px] pointer-events-none" />
+      {/* ───────────────── HERO BANNER ───────────────── */}
+      <section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-slate-50/60 to-emerald-50/40 pt-28 pb-14 lg:pt-32 lg:pb-16 border-b border-slate-200/80">
+        <div className="bg-grid absolute inset-0 -z-10 opacity-[0.1]" />
+        <div className="pointer-events-none absolute -top-24 -left-24 -z-10 h-96 w-96 rounded-full bg-emerald-400/10 blur-[120px]" />
+        <div className="pointer-events-none absolute -bottom-24 right-0 -z-10 h-96 w-96 rounded-full bg-sky-400/10 blur-[120px]" />
 
         <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
-          {/* Breadcrumb Navigation */}
-          <nav className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 mb-6">
-            <Link href="/" className="transition hover:text-slate-900 font-medium">
-              {t({ bn: "হোম", en: "Home" })}
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
-            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              {t({ bn: "বাণিজ্যিক প্রজেক্ট মার্কেটপ্লেস", en: "Commercial Projects Directory" })}
-            </span>
-          </nav>
+          <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-10">
+            {/* Left Side: Content & CTA */}
+            <div className="lg:col-span-6">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-3.5 py-1.5 text-xs font-bold text-emerald-800 shadow-sm">
+                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                {t({
+                  bn: "১০০% যাচাইকৃত বাণিজ্যিক প্রজেক্ট",
+                  en: "100% Vetted Commercial Projects",
+                })}
+              </div>
 
-          {/* Badge & Creator CTA Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/80 px-4 py-1.5 text-xs font-bold text-emerald-800 shadow-sm backdrop-blur-md w-fit">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-              {t({
-                bn: "১০০% যাচাইকৃত প্রজেক্ট • ফ্র্যাকশনাল কো-ওনারশিপ পোর্টাল",
-                en: "100% Vetted Projects • Fractional Co-Ownership Portal",
-              })}
-            </div>
+              <h1 className="mt-5 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl leading-[1.18]">
+                {t({
+                  bn: "সেরা বাণিজ্যিক প্রজেক্টে ",
+                  en: "Invest in Verified ",
+                })}
+                <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 bg-clip-text text-transparent">
+                  {t({
+                    bn: "নিরাপদে বিনিয়োগ করুন",
+                    en: "Commercial Assets",
+                  })}
+                </span>
+              </h1>
 
-            <Link
-              href="/projects/create"
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md transition hover:bg-emerald-600 hover:scale-[1.02] active:scale-95 w-fit"
-            >
-              <PlusCircle className="h-4 w-4" />
-              {t({ bn: "নতুন প্রজেক্ট যুক্ত করুন", en: "Submit a Project" })}
-            </Link>
-          </div>
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600">
+                {t({
+                  bn: "প্রতিটি প্রজেক্ট আইনি অডিট ও আর্থিক যাচাইয়ের পর লাইভ করা হয়। স্বচ্ছ হিসাব ও নিয়মিত রিটার্নের মাধ্যমে সহজেই যৌথ মালিকানায় যুক্ত হোন।",
+                  en: "Every project is legally audited and financially vetted before going live. Co-own commercial assets with transparent reporting and steady returns.",
+                })}
+              </p>
 
-          {/* Main Headline */}
-          <h1 className="max-w-4xl text-3xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl text-slate-900 leading-[1.15]">
-            {t({
-              bn: "বাছাইকৃত সেরা বাণিজ্যিক প্রজেক্ট খুঁজুন ও ",
-              en: "Discover High-Yield Commercial Assets & ",
-            })}
-            <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 bg-clip-text text-transparent">
-              {t({
-                bn: "নিরাপদে বিনিয়োগ করুন",
-                en: "Invest with Confidence",
-              })}
-            </span>
-          </h1>
+              {/* Compact, Readable Highlights */}
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-xl">
+                {[
+                  {
+                    icon: ShieldCheck,
+                    text: { bn: "আইনি চুক্তি ও সুরক্ষা", en: "Legally Backed Deeds" },
+                  },
+                  {
+                    icon: TrendingUp,
+                    text: { bn: "নিয়মিত ভাড়া ও লভ্যাংশ", en: "Predictable Rental Yields" },
+                  },
+                  {
+                    icon: Coins,
+                    text: { bn: "স্বল্প পুঁজিতে শেয়ার মালিকানা", en: "Low-Entry Fractional Shares" },
+                  },
+                  {
+                    icon: FileCheck2,
+                    text: { bn: "অডিটকৃত আর্থিক রিপোর্ট", en: "Audited Financial Reports" },
+                  },
+                ].map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white/80 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-700 shadow-xs"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span>{t(item.text)}</span>
+                    </div>
+                  );
+                })}
+              </div>
 
-          {/* Rich Content Paragraphs */}
-          <div className="mt-6 max-w-3xl space-y-3 text-sm sm:text-base leading-relaxed text-slate-600">
-            <p>
-              {t({
-                bn: "স্বচ্ছ আর্থিক তথ্য, সুস্পষ্ট ঝুঁকি ব্যবস্থাপনা এবং নিয়মিত প্রজেক্টভিত্তিক রিটার্ন নিশ্চিত করতে আমাদের প্রতিটি প্রজেক্ট কঠোর পেশাদার অডিট ও আইনি পর্যালোচনার পরই লাইভ করা হয়।",
-                en: "To guarantee transparent financial insights, clear risk mitigation, and steady cash flows, every project undergoes comprehensive legal audits and feasibility reviews before going live.",
-              })}
-            </p>
-            {/* <p className="text-slate-500">
-              {t({
-                bn: "বাণিজ্যিক রিয়েল এস্টেট, রিসোর্ট, শপিং মল, কৃষি খামার ও আধুনিক সম্পদে যৌথ মালিকানা গ্রহণ করুন। আপনার সঞ্চয় অনুযায়ী যেকোনো পরিমাণের শেয়ার কিনে নিয়মিত ভাড়াভিত্তিক লভ্যাংশ এবং দীর্ঘমেয়াদী মূলধন বৃদ্ধি উপভোগ করুন।",
-                en: "Co-own premium commercial real estate, resorts, retail spaces, and agro-ventures. Purchase fractional shares tailored to your budget and enjoy predictable rental distributions coupled with long-term capital appreciation.",
-              })}
-            </p> */}
-          </div>
-
-          {/* Feature Highlights Pills */}
-          <div className="mt-8 flex flex-wrap gap-2.5 sm:gap-3">
-            {[
-              {
-                icon: ShieldCheck,
-                text: { bn: "আইনগতভাবে অনুমোদিত চুক্তি", en: "Legally Backed Deeds" },
-              },
-              {
-                icon: TrendingUp,
-                text: { bn: "নিয়মিত ভাড়া ও ডিভিডেন্ড", en: "Predictable Rental Yields" },
-              },
-              {
-                icon: Coins,
-                text: { bn: "স্বল্প পুঁজিতে ফ্র্যাকশনাল ওনারশিপ", en: "Fractional Ownership from Low Entry" },
-              },
-              {
-                icon: FileCheck2,
-                text: { bn: "সুপার এডমিন মনিটরিং ও অডিট", en: "Super Admin Audited Reports" },
-              },
-            ].map((pill, idx) => {
-              const Icon = pill.icon;
-              return (
-                <div
-                  key={idx}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+              {/* Submit Project CTA below Left Content */}
+              <div className="mt-7 flex flex-wrap items-center gap-4">
+                <Link
+                  href="/projects/create"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-600 hover:scale-[1.01] active:scale-95"
                 >
-                  <Icon className="h-4 w-4 text-emerald-600" />
-                  <span>{t(pill.text)}</span>
+                  <PlusCircle className="h-4 w-4" />
+                  {t({ bn: "সাবমিট প্রজেক্ট", en: "Submit a Project" })}
+                </Link>
+              </div>
+            </div>
+
+            {/* Right Side: Banner Image */}
+            <div className="lg:col-span-6">
+              <div className="relative h-[340px] sm:h-[420px] lg:h-[460px] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-lg">
+                <Image
+                  src="/image/images1.jpg"
+                  alt={t({ bn: "বাণিজ্যিক প্রজেক্ট ব্যানার", en: "Commercial Projects Banner" })}
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                />
+
+                {/* Subtle bottom summary overlay */}
+                <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/80 bg-white/90 px-4 py-3 shadow-md backdrop-blur-md">
+                  <div className="grid grid-cols-3 divide-x divide-slate-200 text-center">
+                    <div>
+                      <p className="text-base font-extrabold text-slate-900">
+                        {loading ? "..." : totalProjects > 0 ? `${totalProjects}+` : "10+"}
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {t({ bn: "লাইভ প্রজেক্ট", en: "Live Projects" })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-base font-extrabold text-emerald-600">১৫–২৫%</p>
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {t({ bn: "বার্ষিক রিটার্ন", en: "Annual ROI" })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-base font-extrabold text-slate-900">১০০%</p>
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {t({ bn: "যাচাইকৃত", en: "Audited" })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
-
-          {/* Quick Metrics / Stats Bar */}
-          {/* <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4 border-t border-slate-100 pt-8">
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                {t({ bn: "সক্রিয় প্রজেক্ট", en: "Live Projects" })}
-              </p>
-              <p className="mt-1 text-2xl font-black text-slate-900">
-                {loading ? "..." : totalProjects > 0 ? `${totalProjects}+` : "10+"}
-              </p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {t({ bn: "সুপার এডমিন যাচাইকৃত", en: "Vetted & Published" })}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                {t({ bn: "প্রত্যাশিত বার্ষিক রিটার্ন", en: "Expected Annual ROI" })}
-              </p>
-              <p className="mt-1 text-2xl font-black text-emerald-600">
-                ১৫% - ২৫%
-              </p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {t({ bn: "ভাড়া ও লাভ্যাংশ ভিত্তিক", en: "Rental & Profit Yields" })}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                {t({ bn: "মিনিমাম শেয়ার এন্ট্রি", en: "Affordable Entry" })}
-              </p>
-              <p className="mt-1 text-2xl font-black text-slate-900">
-                ৳১,০০০+
-              </p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {t({ bn: "সকল আয়ের মানুষের উপযোগী", en: "Accessible to Everyone" })}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                {t({ bn: "ট্র্যাকিং ও রিপোর্ট", en: "Digital Tracking" })}
-              </p>
-              <p className="mt-1 text-2xl font-black text-sky-600">
-                ২৪/৭
-              </p>
-              <p className="mt-1 text-[11px] text-slate-500">
-                {t({ bn: "পোর্টফোলিও ড্যাশবোর্ড", en: "Online Portfolio Dashboard" })}
-              </p>
-            </div>
-          </div> */}
         </div>
       </section>
-      <section className="bg-slate-50 pt-10 pb-20">
+      <section className="bg-slate-50 pt-7 pb-16">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-                    {/* Header Title & Showing Count above Search */}
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          {/* Header Title & Showing Count above Search */}
+          <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/70 px-3 py-1 text-xs font-bold text-emerald-800 mb-2">
+              {/* <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100/80 px-3 py-1 text-xs font-bold text-emerald-900 mb-1.5">
                 <Building2 className="h-3.5 w-3.5 text-emerald-600" />
                 {t({ bn: "সক্রিয় বাণিজ্যিক প্রকল্পসমূহ", en: "Active Commercial Projects" })}
-              </div>
-              <h2 className="text-2xl font-extrabold text-slate-900 sm:text-3xl tracking-tight">
+              </div> */}
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
                 {t({ bn: "উপলব্ধ সকল প্রজেক্ট তালিকা", en: "All Available Projects" })}
               </h2>
-              <p className="mt-1 text-xs sm:text-sm text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-500">
                 {t({
                   bn: "আপনার পছন্দ অনুযায়ী ফিল্টার করে লাভজনক প্রজেক্ট বেছে নিন এবং সরাসরি শেয়ার ক্রয় করুন।",
                   en: "Filter by category or location to discover high-yield commercial assets and invest instantly.",
@@ -339,8 +313,8 @@ export default function ProjectsPage() {
             </div>
 
             {/* Total / Showing Count Badge */}
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm text-xs sm:text-sm font-semibold text-slate-700 w-fit shrink-0">
-              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 shadow-xs text-xs font-semibold text-slate-700 w-fit shrink-0">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>
                 {t({
                   bn: `মোট ${num(totalProjects || filtered.length)} টির মধ্যে ${num(filtered.length)} টি প্রদর্শিত হচ্ছে`,
@@ -350,9 +324,10 @@ export default function ProjectsPage() {
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_220px_220px]">
-            <label className="relative">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          {/* Compact Filter Bar */}
+          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200/90 bg-white p-2 shadow-xs sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -360,45 +335,53 @@ export default function ProjectsPage() {
                   bn: "প্রজেক্ট বা স্থান খুঁজুন...",
                   en: "Search project or location...",
                 })}
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none focus:border-emerald-500"
+                className="h-10 w-full rounded-xl border border-transparent bg-slate-50 pl-10 pr-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-emerald-500 focus:bg-white"
               />
-            </label>
-            <label className="relative">
-              <SlidersHorizontal className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-11 text-sm outline-none"
-              >
-                <option value="all">
-                  {t({ bn: "সব ক্যাটাগরি", en: "All categories" })}
-                </option>
-                {categories.slice(1).map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none"
-            >
-              <option value="featured">
-                {t({ bn: "ফিচার্ড", en: "Featured" })}
-              </option>
-              <option value="price-low">
-                {t({ bn: "কম শেয়ার মূল্য", en: "Lowest share price" })}
-              </option>
-              <option value="return-high">
-                {t({ bn: "বেশি সম্ভাব্য রিটার্ন", en: "Highest return" })}
-              </option>
-              <option value="availability">
-                {t({ bn: "বেশি উপলব্ধ শেয়ার", en: "Most available shares" })}
-              </option>
-            </select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+              <div className="relative min-w-[150px] sm:min-w-[180px]">
+                <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-8 text-xs sm:text-sm font-medium text-slate-700 outline-none transition hover:bg-slate-100/70 focus:border-emerald-500 focus:bg-white"
+                >
+                  <option value="all">
+                    {t({ bn: "সব ক্যাটাগরি", en: "All categories" })}
+                  </option>
+                  {categories.slice(1).map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+                <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rotate-90 text-slate-400" />
+              </div>
+
+              <div className="relative min-w-[140px] sm:min-w-[170px]">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-3.5 pr-8 text-xs sm:text-sm font-medium text-slate-700 outline-none transition hover:bg-slate-100/70 focus:border-emerald-500 focus:bg-white"
+                >
+                  <option value="featured">
+                    {t({ bn: "ফিচার্ড", en: "Featured" })}
+                  </option>
+                  <option value="price-low">
+                    {t({ bn: "কম শেয়ার মূল্য", en: "Lowest share price" })}
+                  </option>
+                  <option value="return-high">
+                    {t({ bn: "বেশি সম্ভাব্য রিটার্ন", en: "Highest return" })}
+                  </option>
+                  <option value="availability">
+                    {t({ bn: "বেশি উপলব্ধ শেয়ার", en: "Most available shares" })}
+                  </option>
+                </select>
+                <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rotate-90 text-slate-400" />
+              </div>
+            </div>
           </div>
 
-          <div className="mt-8 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
             {loading && (
               <div className="col-span-full rounded-[28px] border border-dashed border-slate-300 bg-white py-16 text-center">
                 <p className="font-bold text-slate-700">

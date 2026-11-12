@@ -10,6 +10,7 @@ import {
   Activity, CalendarDays, CheckCircle2, Clock3, Edit3, Loader2, Plus,
   RefreshCw, Search, Trash2, X, ChevronRight, Home
 } from "lucide-react";
+import { getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 /* -------------------------------------------------------------------------- */
 /*                                  TYPES                                     */
@@ -58,12 +59,14 @@ const EMPTY_FORM: MilestoneForm = {
 /*                              API UTILITIES                                 */
 /* -------------------------------------------------------------------------- */
 async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== "undefined" ? getStoredAccessToken() : null;
   try {
     const response = await fetch(url, {
       ...options,
       headers: {
         Accept: "application/json",
         ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
     });
@@ -169,8 +172,12 @@ function MilestonesInner() {
   // ✅ অটো projectUuid
   const getFirstProjectUuid = async (): Promise<string | null> => {
     try {
+      const token = typeof window !== "undefined" ? getStoredAccessToken() : null;
       const res = await fetch(`${API_BASE_URL}/project?limit=1`, {
-        headers: { Accept: "application/json" }
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        }
       });
       if (!res.ok) return null;
       const text = await res.text();
@@ -317,95 +324,121 @@ function MilestonesInner() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <main className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
       <Toaster position="top-right" />
       
-      <div className="p-3 sm:p-4 lg:p-5 space-y-4 max-w-full">
+      <div className="mx-auto max-w-[1600px] space-y-5">
         
         {/* Header */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <nav className="mb-1 flex items-center gap-2 text-sm text-slate-500">
-              <Link href="/projects" className="flex items-center hover:text-blue-600"><Home className="mr-1 h-4 w-4" /> Projects</Link>
-              <ChevronRight className="h-4 w-4" />
-              <span className="font-semibold text-slate-900">Milestones</span>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <Link href="/projects" className="hover:text-emerald-700 font-medium transition">Projects</Link>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Milestones
+              </span>
             </nav>
-            <h1 className="text-2xl font-bold">Project Milestones</h1>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Project Milestones
+            </h1>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => void loadMilestones(true)} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50">
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => void loadMilestones(true)} 
+              disabled={loading} 
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 disabled:opacity-50"
+            >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
             </button>
-            <button onClick={openCreateModal} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+            <button 
+              onClick={openCreateModal} 
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+            >
               <Plus className="h-4 w-4" /> Add Milestone
             </button>
           </div>
         </header>
 
         {/* Stats */}
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Total" value={stats.total} icon={<CalendarDays size={20} />} iconClass="bg-blue-50 text-blue-700" />
           <StatCard title="Completed" value={stats.completed} icon={<CheckCircle2 size={20} />} iconClass="bg-emerald-50 text-emerald-700" />
           <StatCard title="In Progress" value={stats.inProgress} icon={<Clock3 size={20} />} iconClass="bg-amber-50 text-amber-700" />
           <StatCard title="Delayed" value={stats.delayed} icon={<Activity size={20} />} iconClass="bg-rose-50 text-rose-700" />
         </section>
 
-        {/* Table */}
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-base font-bold">All Milestones ({filteredMilestones.length})</h2>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-xl border py-2 pl-10 pr-3 text-sm outline-none focus:border-blue-500 sm:w-64" />
+        {/* Table Container */}
+        <section className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-800">All Milestones ({filteredMilestones.length})</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input 
+                  placeholder="Search..." 
+                  value={search} 
+                  onChange={(e) => setSearch(e.target.value)} 
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" 
+                />
               </div>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-xl border px-3 py-2 text-sm outline-none">
+              <select 
+                value={statusFilter} 
+                onChange={(e) => setStatusFilter(e.target.value)} 
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+              >
                 <option value="All">All Statuses</option>
                 {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3.5">Milestone</th>
-                  <th className="px-4 py-3.5">Planned Date</th>
-                  <th className="px-4 py-3.5">Actual Date</th>
-                  <th className="px-4 py-3.5">Progress</th>
-                  <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
+          <div className="overflow-x-auto min-h-[300px]">
+            <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
+              <thead>
+                <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">MILESTONE</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">PLANNED DATE</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">ACTUAL DATE</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">PROGRESS</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">STATUS</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-center tracking-wide">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
                 {loading ? (
-                  <tr><td colSpan={6} className="py-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-blue-600" /></td></tr>
+                  <tr><td colSpan={6} className="py-16 text-center text-slate-400"><Loader2 className="mx-auto h-6 w-6 animate-spin text-indigo-600" /></td></tr>
                 ) : filteredMilestones.length === 0 ? (
-                  <tr><td colSpan={6} className="py-10 text-center text-slate-400">No milestones found.</td></tr>
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <p className="text-sm font-medium">No milestones found.</p>
+                      </div>
+                    </td>
+                  </tr>
                 ) : (
                   filteredMilestones.map((item) => (
-                    <tr key={item.uuid} className="hover:bg-slate-50">
-                      <td className="px-4 py-3.5">
-                        <p className="font-semibold">{item.milestoneName}</p>
-                        <p className="text-xs text-slate-500">{item.milestoneCode}</p>
+                    <tr key={item.uuid} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-slate-900">{item.milestoneName}</p>
+                        <p className="font-mono text-xs text-slate-500">{item.milestoneCode}</p>
                       </td>
-                      <td className="px-4 py-3.5 text-slate-600">{item.plannedDate || "—"}</td>
-                      <td className="px-4 py-3.5 text-slate-600">{item.actualDate || "—"}</td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3 text-slate-600">{item.plannedDate || "—"}</td>
+                      <td className="px-4 py-3 text-slate-600">{item.actualDate || "—"}</td>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="h-2 w-20 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-600" style={{ width: `${item.progress}%` }} />
+                          <div className="h-2 w-20 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+                            <div className="h-full bg-indigo-600 rounded-full transition-all" style={{ width: `${item.progress}%` }} />
                           </div>
-                          <span className="text-xs">{item.progress}%</span>
+                          <span className="text-xs font-semibold text-slate-700">{item.progress}%</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5"><StatusBadge status={item.status} /></td>
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="flex justify-end gap-1">
-                          <button onClick={() => openEditModal(item)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg"><Edit3 size={16} /></button>
-                          <button onClick={() => void handleDelete(item)} disabled={deletingUuid === item.uuid} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg disabled:opacity-50">
-                            {deletingUuid === item.uuid ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                      <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button onClick={() => openEditModal(item)} className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95" title="Edit Milestone"><Edit3 size={15} /></button>
+                          <button onClick={() => void handleDelete(item)} disabled={deletingUuid === item.uuid} className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95 disabled:opacity-50" title="Delete Milestone">
+                            {deletingUuid === item.uuid ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                           </button>
                         </div>
                       </td>

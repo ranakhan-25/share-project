@@ -286,142 +286,166 @@ export default function AssetManagementSystem() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6 font-sans text-slate-800 relative">
-      
-      {/* ================= VIEW 1: ASSET LIST PAGE ================= */}
-      {activeView === 'list' && (
-        <div className="space-y-6">
-          
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center text-sm sm:text-base text-slate-600 space-x-2">
-              <span className="hover:text-blue-600 cursor-pointer">Home</span>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-              <span className="hover:text-blue-600 cursor-pointer">Accounts Module</span>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-              <span className="font-semibold text-slate-900">Asset List</span>
-            </div>
-
-            <button 
-              onClick={handleOpenNewAssetForm}
-              className="bg-[#6b58e8] hover:bg-[#5844d0] text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-lg flex items-center space-x-1.5 shadow transition"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add New Asset</span>
-            </button>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 space-y-6">
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800 relative">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* ================= VIEW 1: ASSET LIST PAGE ================= */}
+        {activeView === 'list' && (
+          <div className="space-y-5">
             
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-2">
-              <div className="flex items-center text-sm text-slate-600 space-x-2">
-                <span>Show</span>
-                <select 
-                  value={entries} 
-                  onChange={(e) => setEntries(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3.5 py-2 bg-white text-sm"
-                >
-                  <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                </select>
-                <span>entries</span>
+            {/* Top Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+                  <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Accounts Module</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                    Asset List
+                  </span>
+                </nav>
+                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+                  Asset List
+                </h1>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-slate-600 font-medium">Search:</span>
-                <input 
-                  type="text" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search name/location..."
-                  className="border border-slate-300 rounded-lg px-4 py-2 text-sm w-full sm:w-64 focus:outline-none focus:border-purple-500" 
-                />
-              </div>
+              <button 
+                onClick={handleOpenNewAssetForm}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add New Asset</span>
+              </button>
             </div>
 
-            <div className="overflow-x-auto border border-purple-300 rounded-xl shadow-sm">
-              <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                <thead>
-                  <tr className="bg-[#6b58e8] text-white font-bold uppercase tracking-wider">
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">SL</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Name</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Location</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Acquisition Date</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Original Value</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Method</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Book Value</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Depreciable Value</th>
-                    <th className="p-4 border-r border-purple-400 whitespace-nowrap">Status</th>
-                    <th className="p-4 text-center whitespace-nowrap">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white text-slate-700">
-                  {filteredAssets.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="text-center py-12 text-slate-400 italic bg-slate-50 text-base">
-                        No data available in table
-                      </td>
+            {/* List Table Container */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+              
+              <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center text-xs sm:text-sm text-slate-600 space-x-2">
+                  <span>Show</span>
+                  <select 
+                    value={entries} 
+                    onChange={(e) => setEntries(e.target.value)}
+                    className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+                  >
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                  <span>entries</span>
+                </div>
+
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search name/location..."
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" 
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto min-h-[300px]">
+                <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">SL</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">NAME</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">LOCATION</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">ACQUISITION DATE</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">ORIGINAL VALUE</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">METHOD</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">BOOK VALUE</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">DEPRECIABLE VALUE</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">STATUS</th>
+                      <th className="px-4 py-3.5 font-semibold text-white text-center tracking-wide">ACTION</th>
                     </tr>
-                  ) : (
-                    filteredAssets.map((item) => (
-                      <tr key={item.sl} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                        <td className="p-4 border-r font-medium">{item.sl}</td>
-                        <td className="p-4 border-r font-semibold text-slate-900">{item.name}</td>
-                        <td className="p-4 border-r">{item.location}</td>
-                        <td className="p-4 border-r">{item.acquisitionDate}</td>
-                        <td className="p-4 border-r">{item.originalValue.toLocaleString()}</td>
-                        <td className="p-4 border-r">{item.method}</td>
-                        <td className="p-4 border-r">{item.bookValue.toLocaleString()}</td>
-                        <td className="p-4 border-r">{item.depreciableValue}</td>
-                        <td className="p-4 border-r">
-                          <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-semibold">
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center space-x-2">
-                          {/* Edit Action Button */}
-                          <button 
-                            onClick={() => handleEditAsset(item)} 
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded shadow transition"
-                            title="Edit Asset"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          {/* Delete Action Button */}
-                          <button
-                            onClick={() => handleViewAsset(item)}
-                            className="bg-sky-600 hover:bg-sky-700 text-white p-2 rounded shadow transition"
-                            title="View Asset"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteAsset(item)} 
-                            className="bg-rose-600 hover:bg-rose-700 text-white p-2 rounded shadow transition"
-                            title="Delete Asset"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
+                    {filteredAssets.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="text-center py-16 text-slate-400">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <p className="text-sm font-medium">No data available in table</p>
+                          </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between text-sm text-slate-600 pt-2">
-              <span>Showing {filteredAssets.length > 0 ? 1 : 0} to {filteredAssets.length} of {filteredAssets.length} entries</span>
-              <div className="flex space-x-1.5">
-                <button className="px-4 py-2 rounded-lg font-medium bg-slate-100 text-slate-400 cursor-not-allowed">Previous</button>
-                <button className="px-4 py-2 rounded-lg font-semibold bg-[#6b58e8] text-white shadow">1</button>
-                <button className="px-4 py-2 rounded-lg font-medium bg-slate-100 text-slate-400 cursor-not-allowed">Next</button>
+                    ) : (
+                      filteredAssets.map((item) => (
+                        <tr key={item.sl} className="hover:bg-indigo-50/30 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-slate-900">{item.sl}</td>
+                          <td className="px-4 py-3 font-bold text-slate-900">{item.name}</td>
+                          <td className="px-4 py-3 text-slate-600">{item.location}</td>
+                          <td className="px-4 py-3 text-slate-600">{item.acquisitionDate}</td>
+                          <td className="px-4 py-3 text-slate-800">{item.originalValue.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-slate-600">{item.method}</td>
+                          <td className="px-4 py-3 font-medium text-slate-800">{item.bookValue.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-slate-800">{item.depreciableValue}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Edit Action Button */}
+                              <button 
+                                onClick={() => handleEditAsset(item)} 
+                                className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600 transition hover:bg-indigo-100 active:scale-95"
+                                title="Edit Asset"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              {/* View Action Button */}
+                              <button
+                                onClick={() => handleViewAsset(item)}
+                                className="rounded-lg bg-sky-50 p-1.5 text-sky-600 transition hover:bg-sky-100 active:scale-95"
+                                title="View Asset"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              {/* Delete Action Button */}
+                              <button 
+                                onClick={() => handleDeleteAsset(item)} 
+                                className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95"
+                                title="Delete Asset"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
 
+              {/* Table Footer / Pagination */}
+              <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+                <div>
+                  Showing {filteredAssets.length > 0 ? 1 : 0} to {filteredAssets.length} of {filteredAssets.length} entries
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button disabled className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed">
+                    Previous
+                  </button>
+                  <button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold shadow-2xs">
+                    1
+                  </button>
+                  <button disabled className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed">
+                    Next
+                  </button>
+                </div>
+              </div>
+
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* ================= VIEW 2: ASSET DETAILS & FORM PAGE ================= */}
       {activeView === 'details' && (
@@ -429,51 +453,51 @@ export default function AssetManagementSystem() {
           
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center text-sm sm:text-base text-slate-600 space-x-2">
-              <span onClick={() => setActiveView('list')} className="hover:text-blue-600 cursor-pointer">Home</span>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-              <span onClick={() => setActiveView('list')} className="hover:text-blue-600 cursor-pointer">Asset List</span>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-              <span className="font-semibold text-slate-900">{editingUuid ? 'Edit Asset' : 'New Asset'}</span>
+              <span onClick={() => setActiveView('list')} className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <span onClick={() => setActiveView('list')} className="hover:text-emerald-700 cursor-pointer font-medium transition">Asset List</span>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">{editingUuid ? 'Edit Asset' : 'New Asset'}</span>
             </div>
 
             <div className="flex items-center space-x-2">
               {/* +Asset Movement Action Button */}
               <button 
                 onClick={() => { setModalType('movement'); setIsModalOpen(true); }} 
-                className="bg-[#6b58e8] hover:bg-[#5844d0] text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" /> Asset Movement
               </button>
               {/* +Modify Depreciation Action Button */}
               <button 
                 onClick={() => { setModalType('depreciation'); setIsModalOpen(true); }} 
-                className="bg-[#6b58e8] hover:bg-[#5844d0] text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" /> Modify Depreciation
               </button>
               {/* +New Asset Action Button */}
               <button 
                 onClick={handleOpenNewAssetForm} 
-                className="bg-[#6b58e8] hover:bg-[#5844d0] text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" /> New Asset
               </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md border border-slate-200 px-6 py-2 flex space-x-8 text-sm font-medium">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 px-6 py-2 flex space-x-8 text-sm font-medium">
             {['Asset', 'Depreciation Board', 'Movement History', 'Revaluations History'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`py-3 border-b-2 transition-colors ${activeTab === tab ? 'border-purple-600 text-purple-600 font-semibold' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
+                className={`py-3 border-b-2 transition-colors ${activeTab === tab ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
               >
                 {tab}
               </button>
             ))}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 space-y-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-8 space-y-8">
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               
@@ -483,12 +507,12 @@ export default function AssetManagementSystem() {
                 <div className="space-y-4 text-sm">
                   {/* Item Name with Functional Add (+) button */}
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1.5">Item Name</label>
+                    <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Item Name</label>
                     <div className="flex gap-2">
                       <select 
                         value={itemName} 
                         onChange={(e) => setItemName(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
                       >
                         <option value="Select Item">Select Item</option>
                         {itemList.map((itm, idx) => (
@@ -498,7 +522,7 @@ export default function AssetManagementSystem() {
                       <button 
                         type="button"
                         onClick={() => { setModalType('item'); setIsModalOpen(true); }}
-                        className="bg-[#6b58e8] hover:bg-[#5844d0] text-white px-3 rounded-lg flex items-center justify-center transition shadow"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-xl flex items-center justify-center transition shadow-2xs active:scale-95"
                         title="Add New Item"
                       >
                         <Plus className="w-4 h-4" />
@@ -507,47 +531,47 @@ export default function AssetManagementSystem() {
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1.5">Original Value</label>
+                    <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Original Value</label>
                     <input 
                       type="number" 
                       value={originalValue} 
                       onChange={(e) => setOriginalValue(e.target.value ? Number(e.target.value) : '')}
-                      className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1.5">Location</label>
+                    <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Location</label>
                     <input
                       type="text"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="Enter asset location"
-                      className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1.5">Acquisition Date</label>
+                    <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Acquisition Date</label>
                     <div className="relative">
                       <input 
                         type="text" 
                         value={acquisitionDate} 
                         onChange={(e) => setAcquisitionDate(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
                       />
-                      <Calendar className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                      <Calendar className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
                     </div>
                   </div>
 
                   {/* Project with Functional Add (+) button */}
                   <div>
-                    <label className="block text-slate-700 font-medium mb-1.5">Project</label>
+                    <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Project</label>
                     <div className="flex gap-2">
                       <select 
                         value={project} 
                         onChange={(e) => setProject(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
                       >
                         <option value="Select a project">Select a project</option>
                         {projectList.map((prj, idx) => (
@@ -557,7 +581,7 @@ export default function AssetManagementSystem() {
                       <button 
                         type="button"
                         onClick={() => { setModalType('project'); setIsModalOpen(true); }}
-                        className="bg-[#6b58e8] hover:bg-[#5844d0] text-white px-3 rounded-lg flex items-center justify-center transition shadow"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 rounded-xl flex items-center justify-center transition shadow-2xs active:scale-95"
                         title="Add New Project"
                       >
                         <Plus className="w-4 h-4" />
@@ -571,11 +595,11 @@ export default function AssetManagementSystem() {
                   
                   <div className="space-y-4 text-sm">
                     <div>
-                      <label className="block text-slate-700 font-medium mb-1.5">Method</label>
+                      <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Method</label>
                       <select 
                         value={method} 
                         onChange={(e) => setMethod(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
                       >
                         <option value="Select">Select</option>
                         <option value="Straight Line">Straight Line</option>
@@ -585,25 +609,25 @@ export default function AssetManagementSystem() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
                       <div className="sm:col-span-2">
-                        <label className="block text-slate-700 font-medium mb-1.5">Duration</label>
+                        <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Duration</label>
                         <input
                           type="number"
                           min="0"
                           step="1"
                           value={duration} 
                           onChange={(e) => setDuration(e.target.value === '' ? '' : String(Math.max(0, Math.trunc(Number(e.target.value)))))}
-                          className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
                         />
                       </div>
                       <div className="pt-6 font-semibold text-slate-700">Year</div>
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 font-medium mb-1.5">Computation</label>
+                      <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Computation</label>
                       <select 
                         value={computation} 
                         onChange={(e) => setComputation(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
                       >
                         <option value="Select">Select</option>
                         <option value="Daily">Daily</option>
@@ -619,18 +643,18 @@ export default function AssetManagementSystem() {
               <div className="space-y-6">
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide border-b pb-2">Current Values</h3>
                 
-                <div className="space-y-4 text-sm bg-slate-50 p-6 rounded-xl border border-slate-200">
+                <div className="space-y-4 text-sm bg-slate-50/70 p-6 rounded-2xl border border-slate-200/80">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600 font-medium">Not Depreciable Value:</span>
                     <span className="font-semibold text-slate-900">{notDepreciableValue.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600 font-medium">Book Value:</span>
-                    <span className="font-semibold text-slate-900">{typeof originalValue === 'number' ? originalValue.toFixed(2) : '0.00'}</span>
+                    <span className="font-bold text-slate-900">{typeof originalValue === 'number' ? originalValue.toFixed(2) : '0.00'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600 font-medium">Depreciable Value:</span>
-                    <span className="font-semibold text-slate-900">{typeof originalValue === 'number' ? originalValue.toFixed(2) : '0.00'}</span>
+                    <span className="font-bold text-emerald-600">{typeof originalValue === 'number' ? originalValue.toFixed(2) : '0.00'}</span>
                   </div>
                 </div>
 
@@ -639,11 +663,11 @@ export default function AssetManagementSystem() {
                   
                   <div className="space-y-4 text-sm">
                     <div>
-                      <label className="block text-slate-700 font-medium mb-1.5">Expense Account</label>
+                      <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Expense Account</label>
                       <select 
                         value={expenseAccount} 
                         onChange={(e) => setExpenseAccount(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
                       >
                         <option value="Select Account">Select Account</option>
                         <option value="Depreciation Expense">Depreciation Expense</option>
@@ -651,11 +675,11 @@ export default function AssetManagementSystem() {
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 font-medium mb-1.5">If Tag Voucher No</label>
+                      <label className="block text-slate-700 font-semibold mb-1.5 text-xs">If Tag Voucher No</label>
                       <select 
                         value={voucherNo} 
                         onChange={(e) => setVoucherNo(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-purple-500"
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
                       >
                         <option value="Select Voucher No">Select Voucher No</option>
                         <option value="VCH-2025-001">VCH-2025-001</option>
@@ -673,13 +697,13 @@ export default function AssetManagementSystem() {
               <button 
                 onClick={handleSaveAsset}
                 disabled={isSaving}
-                className="bg-[#6b58e8] hover:bg-[#5844d0] text-white px-6 py-2.5 rounded-lg text-sm font-semibold shadow transition"
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95 disabled:opacity-50"
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </button>
               <button 
                 onClick={() => setActiveView('list')}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-2.5 rounded-lg text-sm font-semibold transition"
+                className="rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-2.5 text-xs sm:text-sm font-semibold transition"
               >
                 Cancel
               </button>
@@ -744,7 +768,7 @@ export default function AssetManagementSystem() {
                     value={dynamicInputVal} 
                     onChange={(e) => setDynamicInputVal(e.target.value)}
                     placeholder={`Enter ${modalType} name...`}
-                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10"
                     autoFocus
                   />
                 </div>
@@ -752,13 +776,13 @@ export default function AssetManagementSystem() {
                   <button 
                     type="button" 
                     onClick={() => setIsModalOpen(false)}
-                    className="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium"
+                    className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit"
-                    className="bg-[#6b58e8] text-white px-4 py-2 rounded-lg text-sm font-semibold shadow"
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95"
                   >
                     Add
                   </button>
@@ -770,7 +794,7 @@ export default function AssetManagementSystem() {
                 <div className="flex justify-end pt-2">
                   <button 
                     onClick={() => setIsModalOpen(false)}
-                    className="bg-[#6b58e8] text-white px-4 py-2 rounded-lg text-semibold shadow"
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 active:scale-95"
                   >
                     Close
                   </button>
@@ -782,6 +806,7 @@ export default function AssetManagementSystem() {
         </div>
       )}
 
+      </div>
     </div>
   );
 }

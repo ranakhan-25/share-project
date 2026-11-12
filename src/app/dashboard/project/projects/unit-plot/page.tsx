@@ -7,6 +7,7 @@ import {
   X, Loader2, AlertCircle, CheckCircle2, Eye, Edit, Trash2,
   Upload, FileSpreadsheet
 } from 'lucide-react';
+import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 /* ----------------------------------------------------------------------------
  * API CONFIG
@@ -36,7 +37,7 @@ interface UnitPlot {
 }
 
 async function request<T = any>(path: string, init?: RequestInit): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {

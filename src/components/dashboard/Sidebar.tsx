@@ -7,13 +7,109 @@ import { ChevronDown, ChevronsLeft, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
 import { Logo, LogoMark } from "@/components/site/Logo";
-import { sidebarMenu, type MenuItem } from "./sidebar-data";
+import { sidebarMenu, type MenuItem, type SubMenuItem } from "./sidebar-data";
+
+function SubItem({ item, onNavigate }: { item: SubMenuItem; onNavigate: () => void }) {
+  const pathname = usePathname();
+  const { t } = useLang();
+  const hasGrandChildren = !!item.children?.length;
+  const isGrandChildActive =
+    item.children?.some(
+      (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
+    ) ?? false;
+  const [open, setOpen] = useState(isGrandChildActive);
+
+  useEffect(() => {
+    if (isGrandChildActive) setOpen(true);
+  }, [isGrandChildActive]);
+
+  if (!hasGrandChildren) {
+    const on = item.href
+      ? pathname === item.href || pathname.startsWith(item.href + "/")
+      : false;
+    return (
+      <li>
+        <Link
+          href={item.href ?? "#"}
+          onClick={onNavigate}
+          className={`block rounded-lg px-3 py-2 text-[13px] transition ${
+            on
+              ? "bg-emerald-50 font-semibold text-emerald-700"
+              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+          }`}
+        >
+          {t(item.label)}
+        </Link>
+      </li>
+    );
+  }
+
+  return (
+    <li className="my-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition ${
+          isGrandChildActive
+            ? "text-emerald-700 font-semibold bg-emerald-50/50"
+            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+        }`}
+      >
+        <span className="truncate text-left">{t(item.label)}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.ul
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="ml-3 mt-0.5 space-y-0.5 overflow-hidden border-l border-slate-200 pl-2.5"
+          >
+            {item.children!.map((c) => {
+              const on =
+                pathname === c.href || pathname.startsWith(c.href + "/");
+              return (
+                <li key={c.href}>
+                  <Link
+                    href={c.href}
+                    onClick={onNavigate}
+                    className={`block rounded-lg px-2.5 py-1.5 text-xs transition ${
+                      on
+                        ? "bg-emerald-50 font-semibold text-emerald-700"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    {t(c.label)}
+                  </Link>
+                </li>
+              );
+            })}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </li>
+  );
+}
 
 function Item({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: boolean; onNavigate: () => void }) {
   const pathname = usePathname();
   const { t } = useLang();
   const hasChildren = !!item.children?.length;
-  const childActive = item.children?.some((c) => pathname === c.href || pathname.startsWith(c.href + "/")) ?? false;
+  const childActive =
+    item.children?.some((c) => {
+      if (c.children?.length) {
+        return c.children.some(
+          (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
+        );
+      }
+      return c.href ? pathname === c.href || pathname.startsWith(c.href + "/") : false;
+    }) ?? false;
   const selfActive = item.href ? (item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href)) : false;
   const active = selfActive || childActive;
   const [open, setOpen] = useState(childActive);
@@ -61,20 +157,9 @@ function Item({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: bool
             transition={{ duration: 0.25 }}
             className="ml-[26px] mt-1 space-y-0.5 overflow-hidden border-l border-slate-200 pl-3"
           >
-            {item.children!.map((c) => {
-              const on = pathname === c.href || pathname.startsWith(c.href + "/");
-              return (
-                <li key={c.href}>
-                  <Link
-                    href={c.href}
-                    onClick={onNavigate}
-                    className={`block rounded-lg px-3 py-2 text-[13px] transition ${on ? "bg-emerald-50 font-semibold text-emerald-700" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
-                  >
-                    {t(c.label)}
-                  </Link>
-                </li>
-              );
-            })}
+            {item.children!.map((c, idx) => (
+              <SubItem key={c.href ?? idx} item={c} onNavigate={onNavigate} />
+            ))}
           </motion.ul>
         )}
       </AnimatePresence>

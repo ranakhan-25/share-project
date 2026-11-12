@@ -1,0 +1,49 @@
+   ▲ Next.js 15.5.28
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.0.103:3002
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 5s
+ ○ Compiling /login ...
+ ✓ Compiled /login in 6.5s (1480 modules)
+ GET /login 200 in 9270ms
+ GET /login 200 in 839ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 6.9s (1581 modules)
+ GET /dashboard 200 in 7757ms
+ ○ Compiling /dashboard/project/projects/project-type ...
+ ✓ Compiled /dashboard/project/projects/project-type in 1616ms (1596 modules)
+ GET /dashboard/project/projects/project-type 200 in 2000ms
+ ○ Compiling /dashboard/project/projects/site ...
+ ✓ Compiled /dashboard/project/projects/site in 2.3s (1605 modules)
+ GET /dashboard/project/projects/site 200 in 2899ms
+ ○ Compiling /dashboard/project/projects/project ...
+ ✓ Compiled /dashboard/project/projects/project in 1799ms (1616 modules)
+ GET /dashboard/project/projects/project 200 in 2435ms
+ GET /dashboard/project/projects/site 200 in 296ms
+ GET /dashboard/project/projects/site 200 in 1575ms
+ ✓ Compiled in 4.6s (1630 modules)
+ ✓ Compiled in 1998ms (1630 modules)
+ ✓ Compiled in 2.5s (1630 modules)
+ ✓ Compiled in 2.1s (1630 modules)
+ ✓ Compiled in 3s (1630 modules)
+ ✓ Compiled in 4.4s (1630 modules)
+ ✓ Compiled in 1057ms (741 modules)
+ ✓ Compiled in 1044ms (741 modules)
+ ✓ Compiled in 1270ms (741 modules)
+ ✓ Compiled in 816ms (741 modules)
+ ✓ Compiled in 1068ms (741 modules)
+ ✓ Compiled in 851ms (741 modules)
+ ✓ Compiled in 1481ms (741 modules)
+ ✓ Compiled in 1219ms (741 modules)
+ ✓ Compiled in 1121ms (741 modules)
+ ✓ Compiled in 848ms (741 modules)
+ ✓ Compiled in 973ms (741 modules)
+ ✓ Compiled in 1155ms (741 modules)
+ ✓ Compiled in 2.1s (741 modules)
+ ✓ Compiled in 1495ms (741 modules)
+ ✓ Compiled in 893ms (741 modules)
+ ✓ Compiled in 1418ms (741 modules)
+ ✓ Compiled in 1392ms (741 modules)
+ ✓ Compiled in 1440ms (741 modules)
