@@ -9,6 +9,20 @@ import toast from "react-hot-toast";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 
+const getAuthHeaders = (): Record<string, string> => {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null;
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ====================== TYPES ======================
 interface Land {
   id: string;
@@ -70,10 +84,12 @@ export default function LandPage() {
   const fetchLands = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/flat-land/lands`);
+      const res = await fetch(`${API_PATH}/flat-land/lands`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
+        setDataList((json.data?.data || json.data || []).filter((item: any) => !item.deletedAt));
       }
     } catch (err) {
       toast.error("Failed to load lands");
@@ -85,13 +101,17 @@ export default function LandPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, {
+        headers: getAuthHeaders(),
+      });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      if (jsonProj.success) setProjects(jsonProj.data?.data || jsonProj.data || []);
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites`, {
+        headers: getAuthHeaders(),
+      });
       const jsonSite = await resSite.json();
-      if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
+      if (jsonSite.success) setSites(jsonSite.data?.data || jsonSite.data || []);
     } catch (err) {
       console.error("Error fetching dropdowns:", err);
     }
@@ -115,33 +135,18 @@ export default function LandPage() {
       projectId: formData.projectId,
       projectName: projects.find(p => p.uuid === formData.projectId)?.name || "",
       propertyType: "land",
-      uid: "string",
       flatLandNo: formData.flatLandNo,
-      siteBlock: "string",
-      siteName: formData.siteName,
-      blockName: formData.blockName,
-      roadNo: formData.roadNo,
-      roadSize: "string",
-      plotLocation: formData.plotLocation,
-      unit: formData.unit,
-      bedroom: 0,
-      bathroom: 0,
-      size: formData.size,
-      pricePerUnit: Number(formData.pricePerUnit),
-      parkingCost: 0,
-      utilityCharge: 0,
-      customerName: formData.customerName,
-      facing: "string",
-      amenities: "string",
-      drawing: "string",
-      dining: "string",
-      kitchen: "string",
-      balcony: "string",
-      parking: "string",
-      basement: "string",
-      subtotal: Number(formData.subtotal),
-      grandTotal: Number(formData.grandTotal),
-      status: formData.status,
+      siteName: formData.siteName || undefined,
+      blockName: formData.blockName || undefined,
+      roadNo: formData.roadNo || undefined,
+      plotLocation: formData.plotLocation || undefined,
+      unit: formData.unit || undefined,
+      size: formData.size || undefined,
+      pricePerUnit: Number(formData.pricePerUnit) || 0,
+      subtotal: Number(formData.subtotal) || 0,
+      grandTotal: Number(formData.grandTotal) || 0,
+      customerName: formData.customerName || undefined,
+      status: formData.status || "Available",
     };
 
     try {
@@ -153,7 +158,7 @@ export default function LandPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -179,6 +184,7 @@ export default function LandPage() {
     try {
       const res = await fetch(`${API_PATH}/flat-land/lands/${item.uuid}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         toast.success("Deleted successfully!");

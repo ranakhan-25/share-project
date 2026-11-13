@@ -24,6 +24,21 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export default function WorkOrderPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -89,6 +104,7 @@ export default function WorkOrderPage() {
     try {
       const res = await fetch(
         `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) {
         throw new Error(`${endpoint} returned ${res.status}`);
@@ -172,6 +188,7 @@ export default function WorkOrderPage() {
       // ⚠️ Endpoint apnar backend onujayi change korte hobe
       const res = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/work-orders?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error("Failed to load work orders");
       const json = await res.json();
@@ -253,11 +270,28 @@ export default function WorkOrderPage() {
       setLoading(true);
       if (!formData.projectId) throw new Error("Select a project");
       const payload = {
-        projectId: formData.projectId,
         title: `Work Order ${formData.code}`,
-        code: formData.code,
+        date: formData.date,
         recordDate: formData.date,
-        amount: grandTotal,
+        code: formData.code,
+        projectId: formData.projectId,
+        customerId: formData.customerId || undefined,
+        projectTypeId: formData.projectTypeId || undefined,
+        siteId: formData.siteId || undefined,
+        clientOrderNo: formData.clientOrderNo || undefined,
+        poNo: formData.poNo || undefined,
+        categoryId: categoryId || undefined,
+        subCategoryId: subCategoryId || undefined,
+        items: orderItems.map(({ id, ...item }) => item),
+        subtotal: Number(subtotal) || 0,
+        vatPercent: Number(formData.vatPercent) || 0,
+        vatInclude: Boolean(formData.vatInclude),
+        vatAmount: Number(vatAmount) || 0,
+        aitPercent: Number(formData.aitPercent) || 0,
+        aitInclude: Boolean(formData.aitInclude),
+        aitAmount: Number(aitAmount) || 0,
+        grandTotal: Number(grandTotal) || 0,
+        amount: Number(grandTotal) || 0,
         details: {
           ...formData,
           categoryId,
@@ -279,7 +313,7 @@ export default function WorkOrderPage() {
         }`,
         {
           method: isEditing ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         },
       );
@@ -354,7 +388,7 @@ export default function WorkOrderPage() {
             setLoading(true);
             const res = await fetch(
               `${API_BASE}${API_PREFIX}/project-billing/work-orders/${order.uuid}`,
-              { method: "DELETE" },
+              { method: "DELETE", headers: getAuthHeaders() },
             );
             if (!res.ok) {
               const errorData = await res.json().catch(() => ({}));

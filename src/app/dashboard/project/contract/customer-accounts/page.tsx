@@ -42,6 +42,21 @@ export interface Customer {
 // ---------- API helpers ----------
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // form values -> backend field names
 function toPayload(form: Partial<Customer>) {
   const clean = (v?: string) => {
@@ -74,10 +89,7 @@ async function handleRes(res: Response, action: string) {
 async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      // Authorization: `Bearer ${token}`  // add if needed
-    },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -112,7 +124,7 @@ async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
 async function createCustomer(form: Partial<Customer>) {
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(toPayload(form)),
   });
   return handleRes(res, "create customer");
@@ -124,7 +136,7 @@ async function updateCustomer(uuid: string, form: Partial<Customer>) {
     `${API_BASE}/realbizpro/api/v1/customer-account/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(toPayload(form)),
     },
   );
@@ -137,7 +149,7 @@ async function softDeleteCustomer(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/customer-account/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   return handleRes(res, "delete customer");

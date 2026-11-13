@@ -30,6 +30,21 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // ==================== TYPES ====================
 interface InvoiceItemRow {
   id?: string;
@@ -122,6 +137,7 @@ export default function InvoiceBillListPage() {
     try {
       const res = await fetch(
         `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) {
         console.error(`❌ ${label} fetch failed:`, res.status);
@@ -184,8 +200,8 @@ export default function InvoiceBillListPage() {
       setLoading(true);
       setError(null);
 
-      const url = `${API_BASE}${API_PREFIX}/project-billing/bill-invoices?page=1&limit=100`;
-      const res = await fetch(url);
+      const url = `${API_BASE}${API_PREFIX}/bill-invoice?page=1&limit=100`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -195,21 +211,18 @@ export default function InvoiceBillListPage() {
       const json = await res.json();
       const rows = json?.data?.data || json?.data || [];
       setInvoices(
-        rows.map((record: any) => {
-          const details = record.details || {};
-          return {
-            ...record,
-            date: record.recordDate,
-            customerId: details.customerId || "",
-            projectTypeId: details.projectTypeId || "",
-            paymentMethod: details.paymentMethod || "Cash",
-            paidAmount: Number(details.paidAmount || 0),
-            grandTotal: Number(record.amount || 0),
-            dueAmount: Number(details.dueAmount ?? record.amount ?? 0),
-            contentBody: details.contentBody || record.description || "",
-            items: Array.isArray(details.items) ? details.items : [],
-          };
-        }),
+        rows.map((record: any) => ({
+          ...record,
+          date: record.date ? String(record.date).slice(0, 10) : "",
+          customerId: record.customerId || "",
+          projectTypeId: record.projectTypeId || "",
+          paymentMethod: record.paymentMethod || "Cash",
+          paidAmount: Number(record.paidAmount || 0),
+          grandTotal: Number(record.grandTotal || 0),
+          dueAmount: Number(record.dueAmount ?? record.grandTotal ?? 0),
+          contentBody: record.contentBody || "",
+          items: Array.isArray(record.items) ? record.items : [],
+        })),
       );
     } catch (err: any) {
       console.error("❌ loadInvoices catch block:", err);
@@ -246,8 +259,10 @@ export default function InvoiceBillListPage() {
       alert("Item name and quantity required");
       return;
     }
-    const amount = newItem.quantity * newItem.rate;
-    setInvoiceItems([...invoiceItems, { ...newItem, description: "", amount }]);
+    const rate = Number(newItem.salePrice || newItem.rate || 0);
+    const qty = Number(newItem.quantity || 1);
+    const amount = qty * rate;
+    setInvoiceItems([...invoiceItems, { ...newItem, rate, quantity: qty, description: "", amount }]);
     setIsItemModalOpen(false);
     setNewItem({
       categoryId: "",
@@ -266,7 +281,7 @@ export default function InvoiceBillListPage() {
     try {
       const res = await fetch(`${API_BASE}${API_PREFIX}/customer-account`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           customerCode: newCustomer.code,
           customerName: newCustomer.name,
@@ -291,43 +306,38 @@ export default function InvoiceBillListPage() {
 
   const handleCreateInvoice = async () => {
     try {
-      if (!formData.date || !formData.customerId || !formData.projectId) {
-        alert("Date, customer and project are required");
+      if (!formData.date || !formData.projectId) {
+        alert("Date and project are required");
         return;
       }
       setLoading(true);
       const payload = {
-        projectId: formData.projectId,
-        title: formData.code,
         code: formData.code,
-        recordDate: formData.date,
-        amount: grandTotal,
-        description: formData.contentBody || undefined,
-        status: "active",
-        details: {
-          customerId: formData.customerId,
-          projectTypeId: formData.projectTypeId || null,
-          paymentMethod: formData.paymentMethod,
-          paidAmount: formData.paidAmount,
-          dueAmount,
-          contentBody: formData.contentBody,
-          items: invoiceItems.map((i) => ({
-            itemId: i.itemId,
-            itemName: i.itemName,
-            description: i.description,
-            unit: i.unit,
-            quantity: i.quantity,
-            rate: i.rate,
-            amount: i.amount,
-          })),
-        },
+        date: formData.date,
+        customerId: formData.customerId || undefined,
+        projectId: formData.projectId || undefined,
+        projectTypeId: undefined,
+        grandTotal,
+        paidAmount: Number(formData.paidAmount) || 0,
+        dueAmount,
+        paymentMethod: formData.paymentMethod || "Cash",
+        contentBody: formData.contentBody || undefined,
+        items: invoiceItems.map((i) => ({
+          itemId: i.itemId || undefined,
+          itemName: i.itemName,
+          description: i.description || undefined,
+          unit: i.unit || "Nos",
+          quantity: Number(i.quantity) || 1,
+          rate: Number(i.rate) || 0,
+          amount: Number(i.amount) || 0,
+        })),
       };
 
       const res = await fetch(
-        `${API_BASE}${API_PREFIX}/project-billing/bill-invoices${editingInvoiceUuid ? `/${editingInvoiceUuid}` : ""}`,
+        `${API_BASE}${API_PREFIX}/bill-invoice${editingInvoiceUuid ? `/${editingInvoiceUuid}` : ""}`,
         {
           method: editingInvoiceUuid ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         },
       );
@@ -353,27 +363,27 @@ export default function InvoiceBillListPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `${API_BASE}${API_PREFIX}/project-billing/bill-invoices/${invoice.uuid}`,
+        `${API_BASE}${API_PREFIX}/bill-invoice/${invoice.uuid}`,
+        { headers: getAuthHeaders() },
       );
       const json = await response.json();
       if (!response.ok) {
         throw new Error(json?.message || "Failed to load invoice");
       }
       const record = json?.data?.data || json?.data || json;
-      const data = record.details || {};
       setEditingInvoiceUuid(invoice.uuid);
       setFormData({
-        date: record.recordDate ? String(record.recordDate).slice(0, 10) : "",
-        code: record.code || record.title || "",
-        customerId: data.customerId || "",
+        date: record.date ? String(record.date).slice(0, 10) : "",
+        code: record.code || "",
+        customerId: record.customerId || "",
         projectId: record.projectId || "",
-        projectTypeId: data.projectTypeId || "",
-        paymentMethod: data.paymentMethod || "Cash",
-        paidAmount: Number(data.paidAmount || 0),
-        contentBody: data.contentBody || record.description || "",
+        projectTypeId: record.projectTypeId || "",
+        paymentMethod: record.paymentMethod || "Cash",
+        paidAmount: Number(record.paidAmount || 0),
+        contentBody: record.contentBody || "",
       });
       setInvoiceItems(
-        (Array.isArray(data.items) ? data.items : []).map((item: any) => ({
+        (Array.isArray(record.items) ? record.items : []).map((item: any) => ({
           id: item.id,
           uuid: item.uuid,
           itemId: item.itemId,
@@ -398,8 +408,8 @@ export default function InvoiceBillListPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `${API_BASE}${API_PREFIX}/project-billing/bill-invoices/${invoice.uuid}`,
-        { method: "DELETE" },
+        `${API_BASE}${API_PREFIX}/bill-invoice/${invoice.uuid}`,
+        { method: "DELETE", headers: getAuthHeaders() },
       );
       const json = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -659,7 +669,7 @@ export default function InvoiceBillListPage() {
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                Customer <span className="text-rose-500">*</span>
+                Customer
               </label>
               <select
                 value={formData.customerId}

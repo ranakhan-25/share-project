@@ -143,6 +143,20 @@ const emptyBoqRow = (): MaterialBoqItem => ({
   stock: 0,
 });
 
+const getAuthHeaders = (): Record<string, string> => {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null;
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ==================== GENERIC OPTIONS FETCHER ====================
 async function fetchRelatedOptions(
   endpoint: string,
@@ -151,7 +165,7 @@ async function fetchRelatedOptions(
   const query = new URLSearchParams({ page: "1", limit: "100" });
   const res = await fetch(`${endpoint}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -205,7 +219,7 @@ async function fetchRequisitions(params?: {
 
   const res = await fetch(`${REQUISITION_API}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -270,7 +284,7 @@ async function fetchProjects(): Promise<ProjectOption[]> {
   const query = new URLSearchParams({ page: "1", limit: "100" });
   const res = await fetch(`${PROJECT_API}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -294,7 +308,7 @@ async function fetchProjects(): Promise<ProjectOption[]> {
 async function fetchRequisitionById(uuid: string) {
   const res = await fetch(`${REQUISITION_API}/${uuid}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -309,7 +323,7 @@ async function fetchRequisitionById(uuid: string) {
 async function createRequisition(payload: Record<string, any>) {
   const res = await fetch(REQUISITION_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -322,7 +336,7 @@ async function createRequisition(payload: Record<string, any>) {
 async function updateRequisition(uuid: string, payload: Record<string, any>) {
   const res = await fetch(`${REQUISITION_API}/${uuid}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -335,7 +349,7 @@ async function updateRequisition(uuid: string, payload: Record<string, any>) {
 async function softDeleteRequisition(uuid: string) {
   const res = await fetch(`${REQUISITION_API}/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

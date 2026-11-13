@@ -50,6 +50,21 @@ interface Supplier {
 // ==================== API HELPERS ====================
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // shared error reader: backend er asol message ber kore ane
 async function handleRes(res: Response, action: string) {
   const json = await res.json().catch(() => ({}));
@@ -73,10 +88,7 @@ async function fetchSuppliers(params?: {
 
   const res = await fetch(url, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      // Authorization: `Bearer ${token}`, // uncomment if needed
-    },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -111,7 +123,7 @@ async function fetchSuppliers(params?: {
 async function createSupplier(payload: Record<string, any>) {
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/supplier-accounts`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return handleRes(res, "create supplier");
@@ -123,7 +135,7 @@ async function updateSupplier(uuid: string, payload: Record<string, any>) {
     `${API_BASE}/realbizpro/api/v1/supplier-accounts/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
   );
@@ -136,7 +148,7 @@ async function softDeleteSupplier(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/supplier-accounts/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   return handleRes(res, "delete supplier");

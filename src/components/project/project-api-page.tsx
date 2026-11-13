@@ -57,7 +57,11 @@ function rowsFrom<T>(value: unknown): T[] {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token =
-    typeof window !== "undefined" ? window.localStorage.getItem("token") : null;
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("access_token") ||
+        window.localStorage.getItem("token") ||
+        window.localStorage.getItem("share-project:access-token")
+      : null;
   const response = await fetch(`${API_ROOT}${path}`, {
     ...init,
     headers: {

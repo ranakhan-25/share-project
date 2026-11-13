@@ -9,6 +9,20 @@ import toast from "react-hot-toast";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 
+const getAuthHeaders = (): Record<string, string> => {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null;
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ====================== TYPES ======================
 interface ProjectRoad {
   id: string;
@@ -47,10 +61,12 @@ export default function PropertyRoadPage() {
   const fetchRoads = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/land-infrastructure/roads`);
+      const res = await fetch(`${API_PATH}/land-infrastructure/roads`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
+        setDataList((json.data?.data || json.data || []).filter((item: any) => !item.deletedAt));
       }
     } catch (err) {
       toast.error("Failed to load roads");
@@ -62,9 +78,11 @@ export default function PropertyRoadPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, {
+        headers: getAuthHeaders(),
+      });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      if (jsonProj.success) setProjects(jsonProj.data?.data || jsonProj.data || []);
     } catch (err) {
       console.error("Error fetching dropdowns:", err);
     }
@@ -97,7 +115,7 @@ export default function PropertyRoadPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -123,6 +141,7 @@ export default function PropertyRoadPage() {
     try {
       const res = await fetch(`${API_PATH}/land-infrastructure/roads/${item.uuid}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         toast.success("Deleted successfully!");

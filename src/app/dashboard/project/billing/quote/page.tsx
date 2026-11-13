@@ -10,6 +10,21 @@ import { useReactToPrint } from "react-to-print";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // ✅ Default Units List
 const DEFAULT_UNITS = [
   "Kg", "Bag", "Cft", "Litre", "Pcs", "Sft", "Feet", "Lit.", "Tk.", "Goj.", "Drum", "Gallon", "Job", "Nos", "Rft", "RMT", "Pkt"
@@ -258,7 +273,9 @@ export default function QuotePage() {
   const fetchQuotes = async (page = 1) => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/project-billing/quotes?page=${page}&limit=${limit}`);
+      const res = await fetch(`${API_PATH}/project-billing/quotes?page=${page}&limit=${limit}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
         setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
@@ -277,39 +294,40 @@ export default function QuotePage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resCus = await fetch(`${API_PATH}/customer-account?status=active`);
+      const headers = getAuthHeaders();
+      const resCus = await fetch(`${API_PATH}/customer-account?status=active`, { headers });
       const jsonCus = await resCus.json();
       if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
 
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, { headers });
       const jsonProj = await resProj.json();
       if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites`, { headers });
       const jsonSite = await resSite.json();
       if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
 
-      const resType = await fetch(`${API_PATH}/project-type`);
+      const resType = await fetch(`${API_PATH}/project-type`, { headers });
       const jsonType = await resType.json();
       if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
 
-      const resCat = await fetch(`${API_PATH}/category`);
+      const resCat = await fetch(`${API_PATH}/category`, { headers });
       const jsonCat = await resCat.json();
       if (jsonCat.success) setCategories(jsonCat.data.data || jsonCat.data || []);
 
-      const resSubCat = await fetch(`${API_PATH}/billing-sub-category`);
+      const resSubCat = await fetch(`${API_PATH}/billing-sub-category`, { headers });
       const jsonSubCat = await resSubCat.json();
       if (jsonSubCat.success) setSubCategories(jsonSubCat.data.data || jsonSubCat.data || []);
 
-      const resItem = await fetch(`${API_PATH}/item`);
+      const resItem = await fetch(`${API_PATH}/item`, { headers });
       const jsonItem = await resItem.json();
       if (jsonItem.success) setItemsList(jsonItem.data.data || jsonItem.data || []);
 
-      const resBrand = await fetch(`${API_PATH}/procurement/brand`); 
+      const resBrand = await fetch(`${API_PATH}/procurement/brand`, { headers }); 
       const jsonBrand = await resBrand.json();
       if (jsonBrand.success) setBrands(jsonBrand.data.data || jsonBrand.data || []);
 
-      const resUnit = await fetch(`${API_PATH}/unit`);
+      const resUnit = await fetch(`${API_PATH}/unit`, { headers });
       const jsonUnit = await resUnit.json();
       if (jsonUnit.success) setUnitsList(jsonUnit.data.data || jsonUnit.data || []);
 
@@ -427,7 +445,7 @@ export default function QuotePage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -599,7 +617,10 @@ export default function QuotePage() {
   const handleDelete = async (item: Quote) => {
     if (!window.confirm(`Delete "${item.code}"?`)) return;
     try {
-      const res = await fetch(`${API_PATH}/project-billing/quotes/${item.uuid}`, { method: "DELETE" });
+      const res = await fetch(`${API_PATH}/project-billing/quotes/${item.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         toast.success("Deleted successfully!");
         fetchQuotes(currentPage); 

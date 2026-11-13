@@ -9,6 +9,25 @@ import toast from "react-hot-toast";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 
+function getStoredAccessToken(): string {
+  if (typeof window === "undefined") return "";
+  return (
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("share-project:access-token") ||
+    ""
+  );
+}
+
+function getAuthHeaders(extraHeaders: Record<string, string> = {}) {
+  const token = getStoredAccessToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extraHeaders,
+  };
+}
+
 // ====================== TYPES ======================
 interface Installment {
   id: string;
@@ -52,12 +71,13 @@ export default function FlatLandShareBookingPage() {
   
   // View States (1 = List, 2 = Step 1 Form, 3 = Step 2 Form)
   const [viewMode, setViewMode] = useState<1 | 2 | 3>(1);
-  const [, setEditingItem] = useState<Booking | null>(null);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
 
   // Dropdown Data
   const [customers, setCustomers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
+  const [flats, setFlats] = useState<any[]>([]);
   const [projectTypes, setProjectTypes] = useState<any[]>([]);
   const [salesPersons, setSalesPersons] = useState<any[]>([]);
   const [collectionOfficers, setCollectionOfficers] = useState<any[]>([]);
@@ -112,10 +132,12 @@ export default function FlatLandShareBookingPage() {
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/flat-land-offers`);
+      const res = await fetch(`${API_PATH}/flat-land-bookings?limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
+        setDataList((json.data?.data || json.data || []).filter((item: any) => !item.deletedAt));
       }
     } catch (err) {
       toast.error("Failed to load bookings");
@@ -126,21 +148,35 @@ export default function FlatLandShareBookingPage() {
 
   const fetchDropdowns = async () => {
     try {
-      const resCus = await fetch(`${API_PATH}/customer-account?status=active`);
+      const resCus = await fetch(`${API_PATH}/customer-account?status=active`, {
+        headers: getAuthHeaders(),
+      });
       const jsonCus = await resCus.json();
-      if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
+      if (jsonCus.success) setCustomers(jsonCus.data?.data || jsonCus.data || []);
 
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project?limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      if (jsonProj.success) setProjects(jsonProj.data?.data || jsonProj.data || []);
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites?limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonSite = await resSite.json();
-      if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
+      if (jsonSite.success) setSites(jsonSite.data?.data || jsonSite.data || []);
 
-      const resType = await fetch(`${API_PATH}/project-type`);
+      const resType = await fetch(`${API_PATH}/project-type?limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonType = await resType.json();
-      if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
+      if (jsonType.success) setProjectTypes(jsonType.data?.data || jsonType.data || []);
+
+      const resFlats = await fetch(`${API_PATH}/flat-land/flats?limit=100`, {
+        headers: getAuthHeaders(),
+      });
+      const jsonFlats = await resFlats.json();
+      if (jsonFlats.success) setFlats(jsonFlats.data?.data || jsonFlats.data || []);
 
       setSalesPersons([{ uuid: "1", name: "Md.Nayon" }, { uuid: "2", name: "Md.Kawsar" }]);
       setCollectionOfficers([
@@ -170,7 +206,7 @@ export default function FlatLandShareBookingPage() {
   // ====================== STEP 1 SAVE & NEXT ======================
   const handleSaveAndNext = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.projectId || !formData.customerId) {
+    if (!formData.projectId || (!formData.customerId && !formData.customerName)) {
       toast.error("Project and Customer are required");
       return;
     }
@@ -181,54 +217,99 @@ export default function FlatLandShareBookingPage() {
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const isEdit = !!editingItem;
+    const url = isEdit
+      ? `${API_PATH}/flat-land-bookings/${editingItem.uuid}`
+      : `${API_PATH}/flat-land-bookings`;
+    const method = isEdit ? "PATCH" : "POST";
+
+    const matchedFlat = flats.find(f => f.flatLandNo === formData.flatLandNo || f.uuid === formData.flatLandNo);
+
     const payload = {
-      projectId: formData.projectId,
-      title: `Booking for ${formData.flatLandNo}`,
-      code: formData.bookingNo,
-      recordDate: formData.date,
-      amount: formData.grandTotal,
-      status: "active",
-      description: formData.termsAndConditions || "",
-      details: {
-        customerId: formData.customerId,
-        customerName: formData.customerName,
-        flatLandNo: formData.flatLandNo,
-        projectType: formData.projectType,
-        siteName: formData.siteName,
-        salesBy: formData.salesBy,
-        collectionOfficer: formData.collectionOfficer,
-        attachment: formData.attachment,
-        rate: formData.rate,
-        parkingCost: formData.parkingCost,
-        otherCost: formData.otherCost,
-        utilityCharge: formData.utilityCharge,
-        discount: formData.discount,
-        subtotal: formData.subtotal,
-        grandTotal: formData.grandTotal,
-        dueAmount: formData.dueAmount,
-        bookingMoney: formData.bookingMoney,
-        paymentMethod: formData.paymentMethod,
-        chequeNo: formData.chequeNo,
-        installments: formData.installments,
-      }
+      projectId: formData.projectId || undefined,
+      flatLandId: isEdit ? (matchedFlat?.uuid || editingItem?.flatLandId || undefined) : (matchedFlat?.uuid || undefined),
+      code: isEdit ? formData.bookingNo : `Booking-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      bookingDate: formData.date,
+      customerName: formData.customerName,
+      salesBy: formData.salesBy || "Md.Nayon",
+      rate: Number(formData.rate) || 0,
+      parking: Number(formData.parkingCost) || 0,
+      utilityCharge: Number(formData.utilityCharge) || 0,
+      otherCost: Number(formData.otherCost) || 0,
+      discount: Number(formData.discount) || 0,
+      subtotal: Number(formData.subtotal) || 0,
+      grandTotal: Number(formData.grandTotal) || 0,
+      paid: Number(formData.bookingMoney) || 0,
+      due: Number(formData.dueAmount) || 0,
+      status: "Booked",
     };
 
     try {
-      const res = await fetch(`${API_PATH}/flat-land-offers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        toast.success("Booking Created Successfully!");
+        toast.success(isEdit ? "Booking Updated Successfully!" : "Booking Created Successfully!");
         setViewMode(1);
         setEditingItem(null);
         fetchBookings();
       } else {
-        toast.error("Failed to create booking");
+        const json = await res.json().catch(() => ({}));
+        toast.error(json.message || "Failed to save booking");
       }
     } catch (err) {
       toast.error("Network Error");
+    }
+  };
+
+  const handleEdit = (item: any) => {
+    setEditingItem(item);
+    setFormData({
+      date: item.bookingDate || item.date || new Date().toISOString().split("T")[0],
+      bookingNo: item.code,
+      projectId: item.projectId || "",
+      customerId: item.customerId || "temp-cus",
+      customerName: item.customerName || "",
+      flatLandNo: item.flatLandId || item.flatLand?.flatLandNo || item.flatLandNo || "",
+      projectType: item.projectType || "",
+      siteName: item.siteName || "",
+      salesBy: item.salesBy || "Md.Nayon",
+      collectionOfficer: item.collectionOfficer || "",
+      attachment: item.attachment || "",
+      rate: Number(item.rate) || 0,
+      parkingCost: Number(item.parking) || 0,
+      otherCost: Number(item.otherCost) || 0,
+      utilityCharge: Number(item.utilityCharge) || 0,
+      discount: Number(item.discount) || 0,
+      subtotal: Number(item.subtotal) || 0,
+      grandTotal: Number(item.grandTotal) || 0,
+      dueAmount: Number(item.due) || 0,
+      bookingMoney: Number(item.paid) || 0,
+      paymentMethod: item.paymentMethod || "Cash",
+      chequeNo: item.chequeNo || "",
+      termsAndConditions: item.termsAndConditions || "",
+      installments: item.installments || [],
+    });
+    setViewMode(2);
+  };
+
+  const handleDelete = async (item: any) => {
+    if (!window.confirm(`Delete Booking "${item.code}"?`)) return;
+    try {
+      const res = await fetch(`${API_PATH}/flat-land-bookings/${item.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        toast.success("Deleted successfully!");
+        setDataList((prev) => prev.filter((row) => row.uuid !== item.uuid));
+      } else {
+        toast.error("Failed to delete booking");
+      }
+    } catch (err) {
+      toast.error("Error deleting");
     }
   };
 
@@ -290,7 +371,7 @@ export default function FlatLandShareBookingPage() {
       };
       const res = await fetch(`${API_PATH}/customer-account`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -430,30 +511,32 @@ export default function FlatLandShareBookingPage() {
                         </td>
                       </tr>
                     ) : (
-                      dataList.map((item, index) => (
+                      dataList.map((item: any, index: number) => (
                         <tr key={item.uuid} className="hover:bg-indigo-50/40 transition-colors">
                           <td className="px-3.5 py-3 text-center font-medium text-slate-500">{index + 1}</td>
-                          <td className="px-3.5 py-3 text-slate-600">{item.date}</td>
+                          <td className="px-3.5 py-3 text-slate-600">{item.bookingDate || item.date}</td>
                           <td className="px-3.5 py-3 font-semibold text-slate-800">{item.code}</td>
                           <td className="px-3.5 py-3 font-medium text-slate-700">{item.project?.name || "N/A"}</td>
-                          <td className="px-3.5 py-3 font-semibold text-indigo-600">{item.flatLandNo}</td>
+                          <td className="px-3.5 py-3 font-semibold text-indigo-600">{item.flatLand?.flatLandNo || item.flatLandNo || "—"}</td>
                           <td className="px-3.5 py-3 font-medium text-slate-900">{item.customerName}</td>
-                          <td className="px-3.5 py-3 text-slate-700">{item.totalAmount}</td>
-                          <td className="px-3.5 py-3 text-slate-700">{item.paid}</td>
-                          <td className="px-3.5 py-3 text-slate-700">{item.due}</td>
-                          <td className="px-3.5 py-3 font-bold text-slate-900">{item.totalAmount}</td>
-                          <td className="px-3.5 py-3 text-emerald-600 font-semibold">{item.paid}</td>
-                          <td className="px-3.5 py-3 text-rose-600 font-semibold">{item.due}</td>
-                          <td className="px-3.5 py-3 text-slate-600">{item.salesBy}</td>
+                          <td className="px-3.5 py-3 text-slate-700">{item.rate || item.totalAmount || 0}</td>
+                          <td className="px-3.5 py-3 text-slate-700">{item.parking || 0}</td>
+                          <td className="px-3.5 py-3 text-slate-700">{item.utilityCharge || 0}</td>
+                          <td className="px-3.5 py-3 font-bold text-slate-900">{item.grandTotal || item.totalAmount || 0}</td>
+                          <td className="px-3.5 py-3 text-emerald-600 font-semibold">{item.paid || 0}</td>
+                          <td className="px-3.5 py-3 text-rose-600 font-semibold">{item.due || 0}</td>
+                          <td className="px-3.5 py-3 text-slate-600">{item.salesBy || "—"}</td>
                           <td className="px-3.5 py-3 text-center">
                             <div className="inline-flex items-center gap-1.5">
                               <button 
+                                onClick={() => handleEdit(item)}
                                 className="rounded-lg p-1.5 text-teal-600 hover:bg-teal-50 transition-colors"
                                 title="Edit"
                               >
                                 <Edit3 className="w-4 h-4" />
                               </button>
                               <button 
+                                onClick={() => handleDelete(item)}
                                 className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50 transition-colors"
                                 title="Delete"
                               >
@@ -544,18 +627,29 @@ export default function FlatLandShareBookingPage() {
                       Customer <span className="text-rose-500">*</span>
                     </label>
                     <div className="flex gap-1.5">
-                      <select 
-                        required 
-                        value={formData.customerId} 
-                        onChange={e => {
-                          const cus = customers.find(c => c.uuid === e.target.value);
-                          setFormData({ ...formData, customerId: e.target.value, customerName: cus?.customerName || "" });
-                        }} 
-                        className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      >
-                        <option value="">Select One Option</option>
-                        {customers.map(c => <option key={c.uuid} value={c.uuid}>{c.customerName}</option>)}
-                      </select>
+                      {customers.length > 0 ? (
+                        <select 
+                          required 
+                          value={formData.customerId} 
+                          onChange={e => {
+                            const cus = customers.find(c => c.uuid === e.target.value);
+                            setFormData({ ...formData, customerId: e.target.value, customerName: cus?.customerName || "" });
+                          }} 
+                          className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        >
+                          <option value="">Select Customer</option>
+                          {customers.map(c => <option key={c.uuid} value={c.uuid}>{c.customerName}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          required
+                          placeholder="Customer Name"
+                          value={formData.customerName}
+                          onChange={e => setFormData({ ...formData, customerName: e.target.value, customerId: "manual-cus" })}
+                          className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        />
+                      )}
                       <button 
                         type="button" 
                         onClick={() => setIsCustomerModalOpen(true)} 
@@ -568,13 +662,37 @@ export default function FlatLandShareBookingPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Flat/Land/Share No</label>
-                    <input 
-                      type="text" 
-                      value={formData.flatLandNo} 
-                      onChange={e => setFormData({ ...formData, flatLandNo: e.target.value })} 
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100" 
-                      placeholder="Select Flat/Land/Share No" 
-                    />
+                    {flats.length > 0 ? (
+                      <select
+                        value={formData.flatLandNo}
+                        onChange={e => {
+                          const f = flats.find(item => item.flatLandNo === e.target.value);
+                          setFormData({
+                            ...formData,
+                            flatLandNo: e.target.value,
+                            rate: f?.pricePerUnit ? Number(f.pricePerUnit) : formData.rate,
+                            parkingCost: f?.parkingCost ? Number(f.parkingCost) : formData.parkingCost,
+                            utilityCharge: f?.utilityCharge ? Number(f.utilityCharge) : formData.utilityCharge,
+                          });
+                        }}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      >
+                        <option value="">Select Flat</option>
+                        {flats.map(f => (
+                          <option key={f.uuid} value={f.flatLandNo}>
+                            {f.flatLandNo} ({f.projectName || 'Flat'})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={formData.flatLandNo} 
+                        onChange={e => setFormData({ ...formData, flatLandNo: e.target.value })} 
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100" 
+                        placeholder="Select Flat/Land/Share No" 
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Project Type</label>

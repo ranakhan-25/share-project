@@ -56,7 +56,7 @@ export default function LeadCategoryPage() {
       
       if (json.success) {
         // ✅ ফ্রন্টএন্ডেও ডিলিট হওয়া ডাটা ফিল্টার করা হচ্ছে
-        const activeData = (json.data.data || []).filter((item: any) => !item.deletedAt);
+        const activeData = (json.data.data || []).filter((item: any) => !item.deletedAt && !item.deleted_at);
         setCategories(activeData);
         setTotalPages(json.data.meta?.totalPages || 1);
         setTotalEntries(activeData.length || 0);

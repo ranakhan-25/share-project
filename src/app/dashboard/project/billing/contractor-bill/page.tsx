@@ -34,6 +34,21 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export default function ContractorSupplierBillPage() {
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -113,6 +128,7 @@ export default function ContractorSupplierBillPage() {
     try {
       const res = await fetch(
         `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) return [];
       const json = await res.json();
@@ -176,6 +192,7 @@ export default function ContractorSupplierBillPage() {
       setError(null);
       const res = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/contractor-bills?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -260,7 +277,10 @@ export default function ContractorSupplierBillPage() {
     if (!confirm(`Are you sure you want to delete bill ${bill.code}?`)) return;
     try {
       setActiveDropdown(null);
-      const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/contractor-bills/${bill.uuid}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/contractor-bills/${bill.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to delete bill");
       await loadBills();
     } catch (err: any) {
@@ -306,7 +326,7 @@ export default function ContractorSupplierBillPage() {
       setError(null);
       const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/contractor-bills${editingBillUuid ? `/${editingBillUuid}` : ""}`, {
         method: editingBillUuid ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const body = await res.json().catch(() => ({}));

@@ -9,6 +9,25 @@ import toast from "react-hot-toast";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 
+function getStoredAccessToken(): string {
+  if (typeof window === "undefined") return "";
+  return (
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("share-project:access-token") ||
+    ""
+  );
+}
+
+function getAuthHeaders(extraHeaders: Record<string, string> = {}) {
+  const token = getStoredAccessToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extraHeaders,
+  };
+}
+
 // ====================== TYPES ======================
 interface Flat {
   id: string;
@@ -78,10 +97,12 @@ export default function FlatPage() {
   const fetchFlats = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/flat-land/flats`);
+      const res = await fetch(`${API_PATH}/flat-land/flats?limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
+        setDataList((json.data?.data || json.data || []).filter((item: any) => !item.deletedAt));
       }
     } catch (err) {
       toast.error("Failed to load flats");
@@ -93,13 +114,17 @@ export default function FlatPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project?limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      if (jsonProj.success) setProjects(jsonProj.data?.data || jsonProj.data || []);
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites?limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonSite = await resSite.json();
-      if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
+      if (jsonSite.success) setSites(jsonSite.data?.data || jsonSite.data || []);
     } catch (err) {
       console.error("Error fetching dropdowns:", err);
     }
@@ -110,8 +135,8 @@ export default function FlatPage() {
     fetchDropdowns();
   }, []);
 
-  const filteredSites = formData.projectId 
-    ? sites.filter(s => String(s.projectId).toLowerCase() === String(formData.projectId).toLowerCase()) 
+  const filteredSites = formData.projectId && sites.some(s => String(s.projectId || s.projectUuid).toLowerCase() === String(formData.projectId).toLowerCase()) 
+    ? sites.filter(s => String(s.projectId || s.projectUuid).toLowerCase() === String(formData.projectId).toLowerCase()) 
     : sites;
 
   // ====================== SUBMIT ======================
@@ -119,37 +144,32 @@ export default function FlatPage() {
     e.preventDefault();
     setSubmitting(true);
 
+    const proj = projects.find(p => p.uuid === formData.projectId);
     const payload = {
-      projectId: formData.projectId,
-      projectName: projects.find(p => p.uuid === formData.projectId)?.name || "",
+      projectId: formData.projectId || undefined,
+      projectName: proj?.name || proj?.projectName || "Project",
       propertyType: "flat",
-      uid: "string",
       flatLandNo: formData.flatLandNo,
-      siteBlock: formData.siteName || "string",
-      siteName: formData.siteName,
-      blockName: "string",
-      roadNo: "string",
-      roadSize: "string",
-      plotLocation: "string",
-      unit: formData.unit,
-      bedroom: Number(formData.bedroom),
-      bathroom: Number(formData.bathroom),
-      size: formData.size,
-      pricePerUnit: Number(formData.pricePerUnit),
-      parkingCost: Number(formData.parkingCost),
-      utilityCharge: Number(formData.utilityCharge),
-      customerName: formData.customerName,
-      facing: formData.facing,
-      amenities: formData.amenities,
-      drawing: formData.drawing,
-      dining: formData.dining,
-      kitchen: formData.kitchen,
-      balcony: formData.balcony,
-      parking: formData.parking,
-      basement: formData.basement,
-      subtotal: Number(formData.pricePerUnit),
-      grandTotal: Number(formData.pricePerUnit) + Number(formData.parkingCost) + Number(formData.utilityCharge),
-      status: formData.status,
+      siteName: formData.siteName || undefined,
+      unit: formData.unit || undefined,
+      bedroom: Number(formData.bedroom) || 0,
+      bathroom: Number(formData.bathroom) || 0,
+      size: formData.size || undefined,
+      pricePerUnit: Number(formData.pricePerUnit) || 0,
+      parkingCost: Number(formData.parkingCost) || 0,
+      utilityCharge: Number(formData.utilityCharge) || 0,
+      customerName: formData.customerName || undefined,
+      facing: formData.facing || undefined,
+      amenities: formData.amenities || undefined,
+      drawing: formData.drawing || undefined,
+      dining: formData.dining || undefined,
+      kitchen: formData.kitchen || undefined,
+      balcony: formData.balcony || undefined,
+      parking: formData.parking || undefined,
+      basement: formData.basement || undefined,
+      subtotal: Number(formData.pricePerUnit) || 0,
+      grandTotal: (Number(formData.pricePerUnit) || 0) + (Number(formData.parkingCost) || 0) + (Number(formData.utilityCharge) || 0),
+      status: formData.status || "Available",
     };
 
     try {
@@ -161,11 +181,12 @@ export default function FlatPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
       const json = await res.json();
+      console.log("Flat save response:", res.status, json, "Payload:", payload);
       if (res.ok || json.success) {
         toast.success(isEdit ? "Updated successfully!" : "Created successfully!");
         setIsModalOpen(false);
@@ -187,6 +208,7 @@ export default function FlatPage() {
     try {
       const res = await fetch(`${API_PATH}/flat-land/flats/${item.uuid}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         toast.success("Deleted successfully!");

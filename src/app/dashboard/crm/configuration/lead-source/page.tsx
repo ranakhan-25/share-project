@@ -54,7 +54,7 @@ export default function LeadSourcePage() {
       
       if (json.success) {
         // ফ্রন্টএন্ড ফিল্টার
-        const activeData = (json.data.data || []).filter((item: any) => showDeleted || !item.deletedAt);
+        const activeData = (json.data.data || []).filter((item: any) => showDeleted || (!item.deletedAt && !item.deleted_at));
         
         setSources(activeData);
         setTotalPages(json.data.meta?.totalPages || 1);
