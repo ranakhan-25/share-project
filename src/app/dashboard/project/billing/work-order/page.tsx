@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-useless-catch */
+/* eslint-disable no-useless-catch */
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
@@ -16,12 +16,28 @@ import {
   Mail,
   Pencil,
   Trash2,
+  ChevronRight,
 } from "lucide-react";
 
 // ==================== API CONFIG ====================
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 export default function WorkOrderPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -88,6 +104,7 @@ export default function WorkOrderPage() {
     try {
       const res = await fetch(
         `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) {
         throw new Error(`${endpoint} returned ${res.status}`);
@@ -171,6 +188,7 @@ export default function WorkOrderPage() {
       // ⚠️ Endpoint apnar backend onujayi change korte hobe
       const res = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/work-orders?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error("Failed to load work orders");
       const json = await res.json();
@@ -252,11 +270,28 @@ export default function WorkOrderPage() {
       setLoading(true);
       if (!formData.projectId) throw new Error("Select a project");
       const payload = {
-        projectId: formData.projectId,
         title: `Work Order ${formData.code}`,
-        code: formData.code,
+        date: formData.date,
         recordDate: formData.date,
-        amount: grandTotal,
+        code: formData.code,
+        projectId: formData.projectId,
+        customerId: formData.customerId || undefined,
+        projectTypeId: formData.projectTypeId || undefined,
+        siteId: formData.siteId || undefined,
+        clientOrderNo: formData.clientOrderNo || undefined,
+        poNo: formData.poNo || undefined,
+        categoryId: categoryId || undefined,
+        subCategoryId: subCategoryId || undefined,
+        items: orderItems.map(({ id, ...item }) => item),
+        subtotal: Number(subtotal) || 0,
+        vatPercent: Number(formData.vatPercent) || 0,
+        vatInclude: Boolean(formData.vatInclude),
+        vatAmount: Number(vatAmount) || 0,
+        aitPercent: Number(formData.aitPercent) || 0,
+        aitInclude: Boolean(formData.aitInclude),
+        aitAmount: Number(aitAmount) || 0,
+        grandTotal: Number(grandTotal) || 0,
+        amount: Number(grandTotal) || 0,
         details: {
           ...formData,
           categoryId,
@@ -278,7 +313,7 @@ export default function WorkOrderPage() {
         }`,
         {
           method: isEditing ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         },
       );
@@ -353,7 +388,7 @@ export default function WorkOrderPage() {
             setLoading(true);
             const res = await fetch(
               `${API_BASE}${API_PREFIX}/project-billing/work-orders/${order.uuid}`,
-              { method: "DELETE" },
+              { method: "DELETE", headers: getAuthHeaders() },
             );
             if (!res.ok) {
               const errorData = await res.json().catch(() => ({}));
@@ -379,105 +414,121 @@ export default function WorkOrderPage() {
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 font-sans text-slate-900">
       {/* ==================== LIST VIEW ==================== */}
       {!isAddOpen && (
-        <div className="max-w-[1600px] mx-auto space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs text-slate-500 mb-1">
-                Home / Billing / Work Order List
-              </div>
-              <h1 className="text-xl font-bold">Work Order List</h1>
+              <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+                <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Billing</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                  Work Order List
+                </span>
+              </nav>
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+                Work Order List
+              </h1>
             </div>
             <button
               onClick={openNewOrder}
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
             >
-              <Plus className="w-4 h-4" /> +New Work Order
+              <Plus className="w-4 h-4" />
+              <span>+New Work Order</span>
             </button>
           </div>
 
-          <div className="bg-white p-3 rounded-xl border grid grid-cols-1 md:grid-cols-2 gap-3 text-xs shadow-sm">
-            <div>
-              <label className="block font-semibold mb-1">Select Date</label>
-              <input
-                type="text"
-                value="1 October, 2026 - 31 October, 2026"
-                readOnly
-                className="w-full border rounded-lg px-3 py-2 bg-slate-50"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold mb-1">Project</label>
-              <select
-                value={selectedListProjectId}
-                onChange={(e) => setSelectedListProjectId(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">All projects</option>
-                {projects.map((project) => (
-                  <option key={project.uuid} value={project.uuid}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Select Date</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value="1 October, 2026 - 31 October, 2026"
+                    readOnly
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-9 text-xs sm:text-sm text-slate-700 outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Project</label>
+                <div className="relative">
+                  <select
+                    value={selectedListProjectId}
+                    onChange={(e) => setSelectedListProjectId(e.target.value)}
+                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
+                  >
+                    <option value="">All projects</option>
+                    {projects.map((project) => (
+                      <option key={project.uuid} value={project.uuid}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
             </div>
           </div>
 
           {dropdownError && (
-            <div className="bg-amber-50 text-amber-700 p-3 rounded-lg text-sm">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
               {dropdownError}
             </div>
           )}
 
           {loading && (
-            <div className="text-center py-10">
-              <Loader2 className="animate-spin inline mr-2" />
-              Loading...
+            <div className="rounded-2xl border border-slate-200 bg-white py-12 text-center text-slate-500 shadow-sm">
+              <Loader2 className="animate-spin inline w-5 h-5 text-indigo-600 mr-2" />
+              <span className="font-medium text-sm">Loading work orders...</span>
             </div>
           )}
           {error && (
-            <div className="bg-rose-50 text-rose-600 p-3 rounded-lg">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs sm:text-sm font-semibold text-rose-700">
               {error}
             </div>
           )}
 
-          <div className="bg-white border rounded-xl shadow-sm overflow-visible">
-            <div className="p-3 bg-slate-50 border-b flex justify-between items-center">
-              <div className="flex gap-2">
-                <button className="bg-emerald-600 text-white px-3 py-1.5 rounded text-xs font-semibold">
+          <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-visible">
+            <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-emerald-700 active:scale-95">
                   Excel
                 </button>
-                <button className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-semibold">
+                <button className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-rose-700 active:scale-95">
                   PDF
                 </button>
               </div>
-              <div className="relative w-64">
-                <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="border pl-9 pr-3 py-1.5 rounded-lg text-sm w-full"
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10"
                 />
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-indigo-600 text-white uppercase tracking-wider">
-                  <tr>
-                    <th className="py-2 px-3">ID</th>
-                    <th className="py-2 px-3">Customer Name</th>
-                    <th className="py-2 px-3">WO No</th>
-                    <th className="py-2 px-3">Ref/Invoice No</th>
-                    <th className="py-2 px-3">Date</th>
-                    <th className="py-2 px-3 text-right">Sub Total</th>
-                    <th className="py-2 px-3 text-right">VAT</th>
-                    <th className="py-2 px-3 text-right">Discount</th>
-                    <th className="py-2 px-3 text-right">Grand Total</th>
-                    <th className="py-2 px-3">Added By</th>
-                    <th className="py-2 px-3 text-center">Action</th>
+            <div className="overflow-x-auto min-h-[350px]">
+              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                    <th className="py-3 px-3 text-center w-12">ID</th>
+                    <th className="py-3 px-3 whitespace-nowrap">CUSTOMER NAME</th>
+                    <th className="py-3 px-3 whitespace-nowrap">WO NO</th>
+                    <th className="py-3 px-3 whitespace-nowrap">REF/INVOICE NO</th>
+                    <th className="py-3 px-3 whitespace-nowrap">DATE</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">SUB TOTAL</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">VAT</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">DISCOUNT</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">GRAND TOTAL</th>
+                    <th className="py-3 px-3 whitespace-nowrap">ADDED BY</th>
+                    <th className="py-3 px-3 text-center whitespace-nowrap w-24">ACTION</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 text-slate-700">
                   {orders
                     .filter(
                       (order) =>

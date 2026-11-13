@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Download, Eye, AlignLeft, Heart, Edit3, Trash2, Loader2, X, Save } from "lucide-react";
+import { Search, Plus, Download, Eye, AlignLeft, Heart, Edit3, Trash2, Loader2, X, Save, ChevronRight } from "lucide-react";
 import { API_BASE, formatDate, SearchableSelect, loadDropdown, EmployeeFormModal } from "../_shared";
 import { useRouter } from "next/navigation";
 
@@ -298,107 +298,241 @@ export default function EmployeeListPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 sm:p-6 space-y-4">
-      <div className="flex justify-between items-center border-b pb-3">
-        <div>
-          <div className="text-xs text-slate-500 mb-1">Home / Employee / Employee List</div>
-          <h1 className="text-xl font-bold">Employee Management</h1>
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Top Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Employee</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Employee List
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Employee Management
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsAddModalOpen(true)} 
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+            >
+              <Plus className="w-4 h-4" /> 
+              <span>Employee Add</span>
+            </button>
+            <button 
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 hover:shadow-sm active:scale-95"
+            >
+              <Download className="w-4 h-4" /> 
+              <span>Employee Import</span>
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setIsAddModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm transition-colors">
-            <Plus className="w-4 h-4" /> Employee Add
-          </button>
-          <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm transition-colors">
-            <Download className="w-4 h-4" /> Employee Import
-          </button>
+
+        {/* Filter Card */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Section</label>
+              <SearchableSelect options={sections} value={filterSection} onChange={setFilterSection} placeholder="Select Section" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Department</label>
+              <SearchableSelect options={departments} value={filterDepartment} onChange={setFilterDepartment} placeholder="Select Department" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Designation</label>
+              <SearchableSelect options={designations} value={filterDesignation} onChange={setFilterDesignation} placeholder="Select Designation" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Shift</label>
+              <SearchableSelect options={shifts} value={filterShift} onChange={setFilterShift} placeholder="Select Shift" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Employee Type</label>
+              <SearchableSelect options={employeeTypes} value={filterEmployeeType} onChange={setFilterEmployeeType} placeholder="Select Employee Type" />
+            </div>
+          </div>
+        </div>
+
+        {/* List Table Container */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center text-xs sm:text-sm text-slate-600 space-x-2">
+              <span>Show</span>
+              <select className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer">
+                <option>10</option>
+                <option>25</option>
+                <option>50</option>
+              </select>
+              <span>entries</span>
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+                placeholder="Search..." 
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" 
+              />
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto min-h-[300px]">
+              <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">SL</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">IMAGE</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">EMPLOYEE CODE</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">NAME</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">DEPARTMENT</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">DESIGNATION</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">JOINING DATE</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">STATUS</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">SALARY GRADE</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">GROSS SALARY</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">CV</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">UNDER</th>
+                    <th className="px-4 py-3.5 font-semibold text-white text-center tracking-wide">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={13} className="text-center py-16 text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <p className="text-sm font-medium">No data found</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((emp, i) => (
+                      <tr key={emp.uuid} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900">{i + 1}</td>
+                        <td className="px-4 py-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-semibold text-slate-700 overflow-hidden shadow-2xs">
+                            {emp.image ? <img src={`${API_BASE}${emp.image}`} className="w-full h-full object-cover" alt="" /> : (emp.name || "?").charAt(0).toUpperCase()}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-indigo-600">{emp.employeeCode || "—"}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{emp.name || "—"}</td>
+                        <td className="px-4 py-3 text-slate-700">{emp.department?.name || "—"}</td>
+                        <td className="px-4 py-3 text-slate-700">{emp.designation?.name || "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">{formatDate(emp.joiningDate) || "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            (emp.status || "").toLowerCase() === "active"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                              : "bg-slate-100 text-slate-600 border border-slate-200/60"
+                          }`}>
+                            {emp.status || "Active"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{emp.salaryGrade?.name || "—"}</td>
+                        <td className="px-4 py-3 font-bold text-emerald-600">{emp.grossSalary ? Number(emp.grossSalary).toLocaleString() : "0"}</td>
+                        <td className="px-4 py-3">
+                          {emp.cv ? (
+                            <a href={`${API_BASE}${emp.cv}`} target="_blank" className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition" rel="noreferrer">
+                              <Download className="w-3.5 h-3.5" /> CV
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{emp.under?.name || "—"}</td>
+                        
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button 
+                              onClick={() => window.location.href = `/dashboard/hrm/employee/salary-structure?employeeId=${emp.uuid}`} 
+                              className="rounded-lg bg-sky-50 p-1.5 text-sky-600 transition hover:bg-sky-100 active:scale-95" 
+                              title="Salary Structure"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button 
+                              onClick={() => alert(`Downloading profile for: ${emp.name}`)} 
+                              className="rounded-lg bg-slate-100 p-1.5 text-slate-600 transition hover:bg-slate-200 active:scale-95" 
+                              title="Download Profile"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button 
+                              onClick={() => setViewingAttendance(emp)} 
+                              className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600 transition hover:bg-indigo-100 active:scale-95" 
+                              title="Attendance"
+                            >
+                              <AlignLeft className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button 
+                              onClick={() => alert(`${emp.name} added to favourites`)} 
+                              className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95" 
+                              title="Favourite"
+                            >
+                              <Heart className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button 
+                              onClick={() => setEditingEmployee(emp)} 
+                              className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95" 
+                              title="Edit Employee"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <button 
+                              onClick={() => handleDelete(emp)} 
+                              className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95" 
+                              title="Delete Employee"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Table Footer / Pagination */}
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+            <div>
+              Showing {filtered.length > 0 ? 1 : 0} to {filtered.length} of {filtered.length} entries
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button disabled className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed">
+                Previous
+              </button>
+              <button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold shadow-2xs">
+                1
+              </button>
+              <button disabled className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed">
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div><label className="text-xs font-medium mb-1 block">Section</label><SearchableSelect options={sections} value={filterSection} onChange={setFilterSection} placeholder="Select Section" /></div>
-        <div><label className="text-xs font-medium mb-1 block">Department</label><SearchableSelect options={departments} value={filterDepartment} onChange={setFilterDepartment} placeholder="Select Department" /></div>
-        <div><label className="text-xs font-medium mb-1 block">Designation</label><SearchableSelect options={designations} value={filterDesignation} onChange={setFilterDesignation} placeholder="Select Designation" /></div>
-        <div><label className="text-xs font-medium mb-1 block">Shift</label><SearchableSelect options={shifts} value={filterShift} onChange={setFilterShift} placeholder="Select Shift" /></div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div><label className="text-xs font-medium mb-1 block">Employee Type</label><SearchableSelect options={employeeTypes} value={filterEmployeeType} onChange={setFilterEmployeeType} placeholder="Select Employee Type" /></div>
-      </div>
-
-      <div className="flex justify-between items-center bg-slate-50 p-3 rounded-md border">
-        <div className="text-sm flex items-center gap-2">Show <select className="border p-1 rounded"><option>10</option></select> entries</div>
-        <div className="flex items-center gap-2 text-sm">Search: <div className="relative"><Search className="absolute left-2 top-2 w-4 h-4 text-slate-400" /><input value={search} onChange={e => setSearch(e.target.value)} className="border pl-8 p-1.5 rounded w-64" /></div></div>
-      </div>
-
-      {loading ? <div className="text-center py-20"><Loader2 className="animate-spin mx-auto text-slate-400" /></div> : (
-        <div className="border rounded-md overflow-hidden">
-          <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead className="bg-indigo-500 text-white uppercase text-[10px]">
-              <tr>
-                <th className="p-2">SL</th><th className="p-2">Image</th><th className="p-2">Employee Code</th><th className="p-2">Name</th><th className="p-2">Department</th><th className="p-2">Designation</th><th className="p-2">Joining Date</th><th className="p-2">Status</th><th className="p-2">Salary Grade</th><th className="p-2">Gross Salary</th><th className="p-2">CV</th><th className="p-2">Under</th><th className="p-2 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((emp, i) => (
-                <tr key={emp.uuid} className="border-t hover:bg-slate-50">
-                  <td className="p-2">{i + 1}</td>
-                  <td className="p-2">
-                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] overflow-hidden">
-                      {emp.image ? <img src={`${API_BASE}${emp.image}`} className="w-full h-full object-cover" alt="" /> : (emp.name || "?").charAt(0)}
-                    </div>
-                  </td>
-                  <td className="p-2 text-indigo-600 font-medium">{emp.employeeCode || "—"}</td>
-                  <td className="p-2 text-indigo-600 font-medium">{emp.name || "—"}</td>
-                  <td className="p-2">{emp.department?.name || ""}</td>
-                  <td className="p-2">{emp.designation?.name || ""}</td>
-                  <td className="p-2">{formatDate(emp.joiningDate)}</td>
-                  <td className="p-2">{emp.status || "—"}</td>
-                  <td className="p-2">{emp.salaryGrade?.name || ""}</td>
-                  <td className="p-2">{emp.grossSalary || "0"}</td>
-                  <td className="p-2">{emp.cv ? <a href={`${API_BASE}${emp.cv}`} target="_blank" className="text-rose-500 flex justify-center" rel="noreferrer"><Download className="w-3 h-3" /></a> : null}</td>
-                  <td className="p-2">{emp.under?.name || ""}</td>
-                  
-                  <td className="p-2">
-                    <div className="flex justify-center gap-1">
-                      <button 
-                        onClick={() => window.location.href = `/dashboard/hrm/employee/salary-structure?employeeId=${emp.uuid}`} 
-                        className="p-1.5 bg-cyan-400 text-white rounded hover:bg-cyan-500" 
-                        title="Salary Structure"
-                      >
-                        <Eye className="w-3 h-3" />
-                      </button>
-                      
-                      <button onClick={() => alert(`Downloading profile for: ${emp.name}`)} className="p-1.5 bg-slate-400 text-white rounded hover:bg-slate-500" title="Download">
-                        <Download className="w-3 h-3" />
-                      </button>
-                      
-                      <button 
-                        onClick={() => setViewingAttendance(emp)} 
-                        className="p-1.5 bg-indigo-500 text-white rounded hover:bg-indigo-600" 
-                        title="Attendance"
-                      >
-                        <AlignLeft className="w-3 h-3" />
-                      </button>
-                      
-                      <button onClick={() => alert(`${emp.name} added to favourites`)} className="p-1.5 bg-rose-400 text-white rounded hover:bg-rose-500" title="Favourite">
-                        <Heart className="w-3 h-3" />
-                      </button>
-                      
-                      <button onClick={() => setEditingEmployee(emp)} className="p-1.5 bg-cyan-400 text-white rounded hover:bg-cyan-500" title="Edit">
-                        <Edit3 className="w-3 h-3" />
-                      </button>
-                      
-                      <button onClick={() => handleDelete(emp)} className="p-1.5 bg-rose-500 text-white rounded hover:bg-rose-600" title="Delete">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && <tr><td colSpan={13} className="p-10 text-center text-slate-400">No data found</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      )}
 
       <EmployeeFormModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSuccess={loadAll} />
       <EmployeeFormModal isOpen={!!editingEmployee} onClose={() => setEditingEmployee(null)} onSuccess={loadAll} initialData={editingEmployee} />

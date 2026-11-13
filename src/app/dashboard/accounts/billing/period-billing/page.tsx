@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, X, Loader2, Edit3, Trash2 } from "lucide-react";
+import { Plus, X, Loader2, Edit3, Trash2, ChevronRight, Search } from "lucide-react";
 import toast from "react-hot-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
@@ -258,71 +258,138 @@ export default function PeriodBillPage() {
 
   // ====================== RENDER ======================
   return (
-    <div className="min-h-screen bg-gray-50 p-6 font-sans text-gray-800">
-      
-      {/* Top Header */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="text-sm text-gray-500">Home &gt; Billing &gt; Period Bill List</div>
-        <button onClick={handleCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm flex items-center gap-1">
-          <Plus className="w-4 h-4" /> New Period Billing
-        </button>
-      </div>
-
-      {/* List Table */}
-      <div className="bg-white p-4 border rounded shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-2">
-            <button className="bg-green-600 text-white px-3 py-1 rounded text-xs">Excel</button>
-            <button className="bg-red-600 text-white px-3 py-1 rounded text-xs">PDF</button>
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Top Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Billing</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Period Bill List
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Period Bill List
+            </h1>
           </div>
-          <div className="flex gap-2 items-center text-sm">
-            <span>Search:</span>
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="border rounded px-2 py-1" />
-          </div>
+          <button 
+            onClick={handleCreate} 
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> 
+            <span>+ New Period Billing</span>
+          </button>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-indigo-600 text-white">
-                <tr>
-                  {["ID", "PROJECT TYPE", "PROJECT", "CUSTOMER NAME", "CODE", "REF", "DATE", "START DATE", "END DATE", "CONSTRUCTION COST", "SERVICE CHARGE", "ADDED BY", "ATTACHMENT", "ACTION"].map(h => (
-                    <th key={h} className="px-3 py-2 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredData.length === 0 ? (
-                  <tr><td colSpan={14} className="text-center py-8 text-gray-500">No data available in table</td></tr>
-                ) : (
-                  filteredData.map((item) => (
-                    <tr key={item.uuid} className="hover:bg-gray-50">
-                      <td className="px-3 py-2">{item.id}</td>
-                      <td className="px-3 py-2">{item.details?.projectType || "N/A"}</td>
-                      <td className="px-3 py-2 font-medium">{item.project?.name || "Unknown"}</td>
-                      <td className="px-3 py-2">{item.details?.customerName || "N/A"}</td>
-                      <td className="px-3 py-2">{item.code}</td>
-                      <td className="px-3 py-2">{item.details?.refWoNo || "-"}</td>
-                      <td className="px-3 py-2">{item.recordDate}</td>
-                      <td className="px-3 py-2">{item.details?.startDate || "-"}</td>
-                      <td className="px-3 py-2">{item.details?.endDate || "-"}</td>
-                      <td className="px-3 py-2">{item.details?.projectCost || "0"}</td>
-                      <td className="px-3 py-2 font-bold">{item.amount}</td>
-                      <td className="px-3 py-2">Admin</td>
-                      <td className="px-3 py-2">-</td>
-                      <td className="px-3 py-2 flex gap-1">
-                        <button onClick={() => handleEdit(item)} className="bg-teal-500 text-white p-1.5 rounded hover:bg-teal-600"><Edit3 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDelete(item)} className="bg-red-500 text-white p-1.5 rounded hover:bg-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+        {/* List Table Container */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-emerald-700 active:scale-95">
+                Excel
+              </button>
+              <button className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-rose-700 active:scale-95">
+                PDF
+              </button>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input 
+                type="text" 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                placeholder="Search..."
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" 
+              />
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+          ) : (
+            <div className="overflow-x-auto min-h-[300px]">
+              <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                    {["ID", "PROJECT TYPE", "PROJECT", "CUSTOMER NAME", "CODE", "REF", "DATE", "START DATE", "END DATE", "CONSTRUCTION COST", "SERVICE CHARGE", "ADDED BY", "ATTACHMENT", "ACTION"].map(h => (
+                      <th key={h} className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
+                  {filteredData.length === 0 ? (
+                    <tr>
+                      <td colSpan={14} className="text-center py-16 text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <p className="text-sm font-medium">No data available in table</p>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredData.map((item) => (
+                      <tr key={item.uuid} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900">{item.id}</td>
+                        <td className="px-4 py-3">{item.details?.projectType || "N/A"}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{item.project?.name || "Unknown"}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{item.details?.customerName || "N/A"}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{item.code}</td>
+                        <td className="px-4 py-3 text-slate-500">{item.details?.refWoNo || "-"}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.recordDate}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.details?.startDate || "-"}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.details?.endDate || "-"}</td>
+                        <td className="px-4 py-3 text-slate-800">{item.details?.projectCost || "0"}</td>
+                        <td className="px-4 py-3 font-bold text-emerald-600">{item.amount}</td>
+                        <td className="px-4 py-3 text-slate-500">Admin</td>
+                        <td className="px-4 py-3 text-slate-400">-</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <button 
+                              onClick={() => handleEdit(item)} 
+                              className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95" 
+                              title="Edit"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(item)} 
+                              className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95" 
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Table Footer / Pagination */}
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+            <div>
+              Showing {filteredData.length > 0 ? 1 : 0} to {filteredData.length} of {filteredData.length} entries
+            </div>
+            <div className="flex items-center gap-1">
+              <button disabled className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed">
+                Previous
+              </button>
+              <button className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-semibold">
+                1
+              </button>
+              <button disabled className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed">
+                Next
+              </button>
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ====================== ADD/EDIT MODAL ====================== */}

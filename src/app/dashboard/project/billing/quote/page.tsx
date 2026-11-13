@@ -3,12 +3,27 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, X, Loader2, Eye, Printer, Edit3, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, X, Loader2, Eye, Printer, Edit3, Trash2, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import { useReactToPrint } from "react-to-print";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 // ✅ Default Units List
 const DEFAULT_UNITS = [
@@ -258,7 +273,9 @@ export default function QuotePage() {
   const fetchQuotes = async (page = 1) => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/project-billing/quotes?page=${page}&limit=${limit}`);
+      const res = await fetch(`${API_PATH}/project-billing/quotes?page=${page}&limit=${limit}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
         setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
@@ -277,39 +294,40 @@ export default function QuotePage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resCus = await fetch(`${API_PATH}/customer-account?status=active`);
+      const headers = getAuthHeaders();
+      const resCus = await fetch(`${API_PATH}/customer-account?status=active`, { headers });
       const jsonCus = await resCus.json();
       if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
 
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, { headers });
       const jsonProj = await resProj.json();
       if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites`, { headers });
       const jsonSite = await resSite.json();
       if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
 
-      const resType = await fetch(`${API_PATH}/project-type`);
+      const resType = await fetch(`${API_PATH}/project-type`, { headers });
       const jsonType = await resType.json();
       if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
 
-      const resCat = await fetch(`${API_PATH}/category`);
+      const resCat = await fetch(`${API_PATH}/category`, { headers });
       const jsonCat = await resCat.json();
       if (jsonCat.success) setCategories(jsonCat.data.data || jsonCat.data || []);
 
-      const resSubCat = await fetch(`${API_PATH}/billing-sub-category`);
+      const resSubCat = await fetch(`${API_PATH}/billing-sub-category`, { headers });
       const jsonSubCat = await resSubCat.json();
       if (jsonSubCat.success) setSubCategories(jsonSubCat.data.data || jsonSubCat.data || []);
 
-      const resItem = await fetch(`${API_PATH}/item`);
+      const resItem = await fetch(`${API_PATH}/item`, { headers });
       const jsonItem = await resItem.json();
       if (jsonItem.success) setItemsList(jsonItem.data.data || jsonItem.data || []);
 
-      const resBrand = await fetch(`${API_PATH}/procurement/brand`); 
+      const resBrand = await fetch(`${API_PATH}/procurement/brand`, { headers }); 
       const jsonBrand = await resBrand.json();
       if (jsonBrand.success) setBrands(jsonBrand.data.data || jsonBrand.data || []);
 
-      const resUnit = await fetch(`${API_PATH}/unit`);
+      const resUnit = await fetch(`${API_PATH}/unit`, { headers });
       const jsonUnit = await resUnit.json();
       if (jsonUnit.success) setUnitsList(jsonUnit.data.data || jsonUnit.data || []);
 
@@ -427,7 +445,7 @@ export default function QuotePage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -599,7 +617,10 @@ export default function QuotePage() {
   const handleDelete = async (item: Quote) => {
     if (!window.confirm(`Delete "${item.code}"?`)) return;
     try {
-      const res = await fetch(`${API_PATH}/project-billing/quotes/${item.uuid}`, { method: "DELETE" });
+      const res = await fetch(`${API_PATH}/project-billing/quotes/${item.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         toast.success("Deleted successfully!");
         fetchQuotes(currentPage); 
@@ -678,142 +699,191 @@ export default function QuotePage() {
 
   // ====================== RENDER ======================
   return (
-    <div className="min-h-screen bg-gray-50 p-6 font-sans text-gray-800">
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
       
       <div style={{ display: "none" }}>
         <QuotePrintTemplate ref={printRef} quote={printData} />
       </div>
 
-      {/* Top Header */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="text-sm text-gray-500">Home &gt; Billing &gt; Quote List</div>
-        <button onClick={handleCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm flex items-center gap-1">
-          <Plus className="w-4 h-4" /> New Quote
-        </button>
-      </div>
-
-      {/* Filter Section */}
-      <div className="bg-white p-4 border rounded shadow-sm mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-xs text-gray-600 mb-1">Select Date</label>
-          <input type="text" placeholder="1 October, 2026 - 31 October, 2026" className="w-full border rounded px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-600 mb-1">Project</label>
-          <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
-            <option value="">All Projects</option>
-            {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-          <select value={filterProjectType} onChange={e => setFilterProjectType(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
-            <option value="">All Project Types</option>
-            {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* List Table */}
-      <div className="bg-white p-4 border rounded shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-2">
-            <button className="bg-green-600 text-white px-3 py-1 rounded text-xs">Excel</button>
-            <button className="bg-red-600 text-white px-3 py-1 rounded text-xs">PDF</button>
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        {/* Top Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Billing</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Quote List
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Quote List
+            </h1>
           </div>
-          <div className="flex gap-2 items-center text-sm">
-            <span>Search:</span>
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="border rounded px-2 py-1" />
+          <button 
+            onClick={handleCreate} 
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> 
+            <span>+ New Quote</span>
+          </button>
+        </div>
+
+        {/* Filter Section */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Select Date</label>
+            <input 
+              type="text" 
+              placeholder="1 October, 2026 - 31 October, 2026" 
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" 
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Project</label>
+            <select 
+              value={filterProject} 
+              onChange={e => setFilterProject(e.target.value)} 
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+            >
+              <option value="">All Projects</option>
+              {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Project Type</label>
+            <select 
+              value={filterProjectType} 
+              onChange={e => setFilterProjectType(e.target.value)} 
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+            >
+              <option value="">All Project Types</option>
+              {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
+            </select>
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-indigo-600 text-white">
-                <tr>
-                  {["ID", "ORDER CODE", "DATE", "PROJECT TYPE", "PROJECT", "CUSTOMER NAME", "GRAND TOTAL", "ADDED BY", "APPROVE", "ATTACHMENT", "ACTION"].map(h => (
-                    <th key={h} className="px-3 py-2 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredData.length === 0 ? (
-                  <tr><td colSpan={11} className="text-center py-8 text-gray-500">No data available in table</td></tr>
-                ) : (
-                  filteredData.map((item) => (
-                    <tr key={item.uuid} className="hover:bg-gray-50">
-                      <td className="px-3 py-2">{item.id}</td>
-                      <td className="px-3 py-2">{item.code}</td>
-                      <td className="px-3 py-2">{item.recordDate}</td>
-                      <td className="px-3 py-2">{item.details?.projectType || "N/A"}</td>
-                      <td className="px-3 py-2 font-medium">{item.project?.name || "Unknown"}</td>
-                      <td className="px-3 py-2">{item.details?.customerName || "N/A"}</td>
-                      <td className="px-3 py-2 font-bold text-green-700">{item.amount}</td>
-                      <td className="px-3 py-2">Admin</td>
-                      
-                      <td className="px-3 py-2 text-center">
-                        <div className="flex justify-center">
-                          <input 
-                            type="checkbox" 
-                            checked={item.status === "approved" || item.details?.isApproved === true} 
-                            readOnly 
-                            className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer"
-                          />
+        {/* List Table Container */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-emerald-700 active:scale-95">
+                Excel
+              </button>
+              <button className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-rose-700 active:scale-95">
+                PDF
+              </button>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input 
+                type="text" 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                placeholder="Search..."
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" 
+              />
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+          ) : (
+            <div className="overflow-x-auto min-h-[300px]">
+              <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                    {["ID", "ORDER CODE", "DATE", "PROJECT TYPE", "PROJECT", "CUSTOMER NAME", "GRAND TOTAL", "ADDED BY", "APPROVE", "ATTACHMENT", "ACTION"].map(h => (
+                      <th key={h} className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
+                  {filteredData.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="text-center py-16 text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <p className="text-sm font-medium">No data available in table</p>
                         </div>
                       </td>
-
-                      <td className="px-3 py-2">
-                        {item.details?.attachment ? (
-                          <a href={item.details.attachment} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
-                            View File
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-
-                      <td className="px-3 py-2 flex gap-1">
-                        <button onClick={() => handleView(item)} className="bg-indigo-500 text-white p-1.5 rounded hover:bg-indigo-600" title="View"><Eye className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handlePrintClick(item)} className="bg-indigo-500 text-white p-1.5 rounded hover:bg-indigo-600" title="Print"><Printer className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleEdit(item)} className="bg-indigo-500 text-white p-1.5 rounded hover:bg-indigo-600" title="Edit"><Edit3 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDelete(item)} className="bg-red-500 text-white p-1.5 rounded hover:bg-red-600" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  ) : (
+                    filteredData.map((item) => (
+                      <tr key={item.uuid} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900">{item.id}</td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{item.code}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.recordDate}</td>
+                        <td className="px-4 py-3">{item.details?.projectType || "N/A"}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{item.project?.name || "Unknown"}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{item.details?.customerName || "N/A"}</td>
+                        <td className="px-4 py-3 font-bold text-emerald-600">{item.amount}</td>
+                        <td className="px-4 py-3 text-slate-500">Admin</td>
+                        
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center">
+                            <input 
+                              type="checkbox" 
+                              checked={item.status === "approved" || item.details?.isApproved === true} 
+                              readOnly 
+                              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </div>
+                        </td>
 
-        {/* Pagination Section */}
-        <div className="flex justify-between items-center mt-4 text-sm text-gray-600">
-          <div>
-            Showing page {currentPage} of {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center gap-1"
-            >
-              <ChevronLeft className="w-4 h-4" /> Previous
-            </button>
-            
-            <button className="px-3 py-1 border rounded bg-indigo-600 text-white">
-              {currentPage}
-            </button>
+                        <td className="px-4 py-3">
+                          {item.details?.attachment ? (
+                            <a href={item.details.attachment} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
+                              View File
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
 
-            <button 
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="px-3 py-1 border rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center gap-1"
-            >
-              Next <ChevronRight className="w-4 h-4" />
-            </button>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => handleView(item)} className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600 transition hover:bg-indigo-100 active:scale-95" title="View"><Eye className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handlePrintClick(item)} className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600 transition hover:bg-indigo-100 active:scale-95" title="Print"><Printer className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleEdit(item)} className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95" title="Edit"><Edit3 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDelete(item)} className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination Section */}
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+            <div>
+              Showing page {currentPage} of {totalPages}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> Previous
+              </button>
+              
+              <button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold shadow-2xs">
+                {currentPage}
+              </button>
+
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

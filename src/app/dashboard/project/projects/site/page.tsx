@@ -10,6 +10,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002"
@@ -52,11 +53,13 @@ const EMPTY_FORM: SiteForm = {
 };
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== "undefined" ? getStoredAccessToken() : null;
   const response = await fetch(url, {
     ...options,
     headers: {
       Accept: "application/json",
       ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
@@ -253,56 +256,65 @@ export default function SitePage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-gray-50 font-sans text-gray-800">
-      <header className="flex flex-col items-start justify-between gap-3 border-b bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:px-6">
-        <div className="flex items-center space-x-2 text-sm text-gray-500">
-          <span className="shrink-0 font-medium text-purple-600">Home</span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-          <span className="flex shrink-0 items-center font-medium text-purple-600">
-            Project <ChevronDown className="ml-0.5 h-3 w-3" />
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
-          <span className="shrink-0 font-semibold text-gray-700">Site</span>
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Project</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Site
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Project Sites
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Create Site</span>
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="flex w-full items-center justify-center rounded-md bg-[#6B5BFF] px-4 py-2 text-sm font-medium text-white shadow transition-colors hover:bg-[#5848e0] sm:w-auto"
-        >
-          <Plus className="mr-1.5 h-4 w-4" /> Create Site
-        </button>
-      </header>
 
-      <main className="mx-auto w-full max-w-[98%] flex-1 px-3 py-4 sm:px-6 sm:py-8">
         {error && !isModalOpen && !deleteTarget && (
-          <div className="mb-4 flex items-center justify-between rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
             <span>{error}</span>
-            <button type="button" onClick={() => setError("")} aria-label="Dismiss error">
+            <button type="button" onClick={() => setError("")} aria-label="Dismiss error" className="text-rose-500 hover:text-rose-700">
               ×
             </button>
           </div>
         )}
 
-        <section className="mb-4 flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <span>Show</span>
-            <select
-              value={entriesCount}
-              onChange={(event) => {
-                setEntriesCount(Number(event.target.value));
-                setPage(1);
-              }}
-              className="rounded border bg-white px-2 py-1"
-            >
-              {[10, 25, 50, 100].map((count) => (
-                <option key={count} value={count}>{count}</option>
-              ))}
-            </select>
-            <span>entries</span>
-          </div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
-            Search:
-            <span className="relative w-full sm:w-64">
+        {/* ====================== TABLE CONTAINER ====================== */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center text-xs sm:text-sm text-slate-600 space-x-2">
+              <span>Show</span>
+              <select
+                value={entriesCount}
+                onChange={(event) => {
+                  setEntriesCount(Number(event.target.value));
+                  setPage(1);
+                }}
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+              >
+                {[10, 25, 50, 100].map((count) => (
+                  <option key={count} value={count}>{count}</option>
+                ))}
+              </select>
+              <span>entries</span>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
                 type="search"
                 value={searchTerm}
@@ -310,49 +322,55 @@ export default function SitePage() {
                   setSearchTerm(event.target.value);
                   setPage(1);
                 }}
-                className="w-full rounded-md border bg-white py-1.5 pl-3 pr-8 text-sm"
+                placeholder="Search..."
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10"
                 aria-label="Search sites"
               />
-              <Search className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            </span>
-          </label>
-        </section>
+            </div>
+          </div>
 
-        <div className="mb-4 overflow-hidden rounded-lg border bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] border-collapse text-left">
+          <div className="overflow-x-auto min-h-[300px]">
+            <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
               <thead>
-                <tr className="bg-[#6B5BFF] text-xs font-semibold uppercase tracking-wider text-white">
-                  <th className="px-4 py-3.5">ID</th>
-                  <th className="px-4 py-3.5">Code</th>
-                  <th className="px-4 py-3.5">Project</th>
-                  <th className="px-4 py-3.5">Name</th>
-                  <th className="px-4 py-3.5">Description</th>
-                  <th className="px-4 py-3.5">Location</th>
-                  <th className="px-4 py-3.5 text-right">Action</th>
+                <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">ID</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">CODE</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">PROJECT</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">NAME</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">DESCRIPTION</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">LOCATION</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-center tracking-wide">ACTION</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 text-sm">
+              <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
                 {loading ? (
-                  <tr><td colSpan={7} className="px-6 py-8 text-center">Loading sites...</td></tr>
+                  <tr><td colSpan={7} className="px-6 py-16 text-center text-slate-400">Loading sites...</td></tr>
                 ) : visibleSites.length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-400">No project sites found.</td></tr>
+                  <tr>
+                    <td colSpan={7} className="text-center py-16 text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <p className="text-sm font-medium">No project sites found.</p>
+                      </div>
+                    </td>
+                  </tr>
                 ) : (
                   visibleSites.map((site) => (
-                    <tr key={site.uuid} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 font-medium">{site.id}</td>
-                      <td className="px-4 py-4">{site.code}</td>
-                      <td className="px-4 py-4">{site.project?.name ?? "—"}</td>
-                      <td className="px-4 py-4">{site.name}</td>
-                      <td className="px-4 py-4">{site.description ?? "—"}</td>
-                      <td className="px-4 py-4">{site.location ?? "—"}</td>
-                      <td className="space-x-2 whitespace-nowrap px-4 py-4 text-right">
-                        <button type="button" onClick={() => openEdit(site)} className="inline-flex rounded bg-[#6B5BFF] p-2 text-white" title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button type="button" onClick={() => { setError(""); setDeleteTarget(site); }} className="inline-flex rounded bg-[#E5484D] p-2 text-white" title="Delete">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                    <tr key={site.uuid} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{site.id}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-600">{site.code}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{site.project?.name ?? "—"}</td>
+                      <td className="px-4 py-3 font-medium text-slate-800">{site.name}</td>
+                      <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{site.description ?? "—"}</td>
+                      <td className="px-4 py-3 text-slate-600">{site.location ?? "—"}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button type="button" onClick={() => openEdit(site)} className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95" title="Edit">
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => { setError(""); setDeleteTarget(site); }} className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95" title="Delete">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -360,61 +378,79 @@ export default function SitePage() {
               </tbody>
             </table>
           </div>
-          <div className="flex flex-col items-center justify-between gap-3 border-t px-4 py-4 text-sm text-gray-500 sm:flex-row">
+
+          {/* Table Footer */}
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
             <span>
               Showing {filteredSites.length ? (currentPage - 1) * entriesCount + 1 : 0} to{" "}
               {Math.min(currentPage * entriesCount, filteredSites.length)} of {filteredSites.length} entries
             </span>
-            <div className="flex gap-2">
-              <button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border px-3 py-1.5 disabled:opacity-40">Previous</button>
-              <span className="px-2 py-1.5">{currentPage} / {pageCount}</span>
-              <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((value) => value + 1)} className="rounded border px-3 py-1.5 disabled:opacity-40">Next</button>
+            <div className="flex items-center gap-1.5">
+              <button 
+                type="button" 
+                disabled={currentPage <= 1} 
+                onClick={() => setPage((value) => value - 1)} 
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold shadow-2xs">
+                {currentPage} / {pageCount}
+              </span>
+              <button 
+                type="button" 
+                disabled={currentPage >= pageCount} 
+                onClick={() => setPage((value) => value + 1)} 
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
-          <div className="my-auto w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-xs">
+          <div className="my-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-semibold">{editingSite ? "Site Edit" : "Site Add"}</h2>
-              <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="rounded-full p-1 text-gray-400 hover:bg-gray-100" aria-label="Close">
+              <h2 className="text-lg font-bold text-slate-900">{editingSite ? "Edit Site" : "Add Site"}</h2>
+              <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600" aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="max-h-[75vh] space-y-4 overflow-y-auto bg-gray-100 px-6 py-5">
-                {error && <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+              <div className="max-h-[75vh] space-y-4 overflow-y-auto px-6 py-5">
+                {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Code *
-                    <input required maxLength={50} value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} className="mt-1 w-full rounded-md border bg-white px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-medium text-gray-700">
-                    Project *
-                    <select required value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} className="mt-1 w-full rounded-md border bg-white px-3 py-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">Code *</label>
+                    <input required maxLength={50} value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">Project *</label>
+                    <select required value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer">
                       <option value="">Select Project</option>
                       {projects.map((project) => <option key={project.uuid} value={project.uuid}>{project.name}</option>)}
                     </select>
-                  </label>
-                  <label className="text-sm font-medium text-gray-700">
-                    Name *
-                    <input required maxLength={255} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="mt-1 w-full rounded-md border bg-white px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-medium text-gray-700">
-                    Location
-                    <input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} className="mt-1 w-full rounded-md border bg-white px-3 py-2" />
-                  </label>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">Name *</label>
+                    <input required maxLength={255} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">Location</label>
+                    <input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" />
+                  </div>
                 </div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Description
-                  <textarea rows={2} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 w-full resize-none rounded-md border bg-white px-3 py-2" />
-                </label>
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 mb-1 block">Description</label>
+                  <textarea rows={2} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" />
+                </div>
               </div>
-              <div className="flex justify-end gap-3 border-t px-6 py-4">
-                <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="rounded bg-gray-400 px-5 py-2 text-sm text-white">Close</button>
-                <button type="submit" disabled={saving} className="rounded bg-[#6B5BFF] px-6 py-2 text-sm text-white disabled:opacity-50">{saving ? "Saving..." : "Submit"}</button>
+              <div className="flex justify-end gap-2 border-t px-6 py-4">
+                <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 transition">Close</button>
+                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-6 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition disabled:opacity-50">{saving ? "Saving..." : "Submit"}</button>
               </div>
             </form>
           </div>
@@ -422,14 +458,14 @@ export default function SitePage() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-bold">Delete Site</h2>
-            <p className="mt-3 text-sm text-gray-600">Delete <strong>{deleteTarget.name}</strong>?</p>
-            {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" disabled={deleting} onClick={() => { setDeleteTarget(null); setError(""); }} className="rounded border px-4 py-2 text-sm">Cancel</button>
-              <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{deleting ? "Deleting..." : "Confirm Delete"}</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900">Delete Site</h2>
+            <p className="mt-2 text-sm text-slate-600">Are you sure you want to delete <strong>{deleteTarget.name}</strong>?</p>
+            {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={deleting} onClick={() => { setDeleteTarget(null); setError(""); }} className="rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 transition">Cancel</button>
+              <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs transition disabled:opacity-50">{deleting ? "Deleting..." : "Confirm Delete"}</button>
             </div>
           </div>
         </div>

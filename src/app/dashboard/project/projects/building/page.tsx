@@ -22,6 +22,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 // ======================================================
 // API CONFIGURATION
@@ -119,11 +120,13 @@ async function apiRequest<T>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
   const response = await fetch(url, {
     ...options,
     headers: {
       Accept: 'application/json',
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });

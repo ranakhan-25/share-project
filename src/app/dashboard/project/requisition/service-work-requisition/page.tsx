@@ -95,7 +95,7 @@ const ITEM_API = `${API_BASE_URL}${API_PREFIX}/service-work-requisition-item`;
 
 const PROJECT_API = `${API_BASE_URL}${API_PREFIX}/project`; // 👈 Screenshot onujayi correct
 const PROJECT_TYPE_API = `${API_BASE_URL}${API_PREFIX}/project-type`;
-const WORK_ORDER_API = `${API_BASE_URL}${API_PREFIX}/project-billing/service-work-names`; // 👈 Title/Name of Work
+const WORK_ORDER_API = `${API_BASE_URL}${API_PREFIX}/category`; // 👈 Billing category
 const SITE_API = `${API_BASE_URL}${API_PREFIX}/project-sites`;
 const SUB_CATEGORY_API = `${API_BASE_URL}${API_PREFIX}/billing-sub-category`;
 
@@ -136,6 +136,20 @@ const generateItemCode = () =>
     Math.floor(1000 + Math.random() * 9000),
   ).padStart(4, "0")}`;
 
+const getAuthHeaders = (): Record<string, string> => {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null;
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ==================== GENERIC OPTIONS FETCHER (FIXED) ====================
 
 async function fetchRelatedOptions(
@@ -146,7 +160,7 @@ async function fetchRelatedOptions(
     const query = new URLSearchParams({ page: "1", limit: "100" });
     const res = await fetch(`${endpoint}?${query}`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -211,7 +225,7 @@ async function fetchRequisitions(params?: {
 
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
@@ -273,7 +287,7 @@ async function fetchRequisitions(params?: {
 async function fetchRequisitionById(uuid: string) {
   const res = await fetch(`${REQUISITION_API}/${uuid}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -288,7 +302,7 @@ async function fetchRequisitionById(uuid: string) {
 async function createRequisition(payload: Record<string, any>) {
   const res = await fetch(REQUISITION_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -301,7 +315,7 @@ async function createRequisition(payload: Record<string, any>) {
 async function fetchRequisitionItemByUuid(uuid: string) {
   const res = await fetch(`${ITEM_API}/${encodeURIComponent(uuid)}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -328,7 +342,7 @@ async function fetchRequisitionItems(serviceWorkRequisitionId?: string) {
   const res = await fetch(`${ITEM_API}?${query.toString()}`,
     {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     },
   );
@@ -346,7 +360,7 @@ async function fetchRequisitionItems(serviceWorkRequisitionId?: string) {
 async function createRequisitionItem(payload: Record<string, any>) {
   const res = await fetch(ITEM_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -362,7 +376,7 @@ async function updateRequisitionItem(
 ) {
   const res = await fetch(`${ITEM_API}/${encodeURIComponent(uuid)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -377,7 +391,7 @@ async function updateRequisitionItem(
 async function deleteRequisitionItem(uuid: string) {
   const res = await fetch(`${ITEM_API}/${encodeURIComponent(uuid)}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -391,7 +405,7 @@ async function deleteRequisitionItem(uuid: string) {
 async function updateRequisition(uuid: string, payload: Record<string, any>) {
   const res = await fetch(`${REQUISITION_API}/${uuid}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -404,7 +418,7 @@ async function updateRequisition(uuid: string, payload: Record<string, any>) {
 async function softDeleteRequisition(uuid: string) {
   const res = await fetch(`${REQUISITION_API}/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -664,18 +678,15 @@ export default function ServiceRequisitionPage() {
         requisitionDate: toYMD(formData.requisitionDate),
         requisitionCode: formData.requisitionCode,
         projectType: formData.projectType,
-        targetProjectId: formData.targetProjectId,
-        titleOrWorkNameId:
-          workOrderOptions.find(
-            (option) => option.uuid === formData.titleOrWorkNameId,
-          )?.categoryId || formData.titleOrWorkNameId,
-        taskSubcategory: formData.taskSubcategory,
-        constructionSiteId: formData.constructionSiteId,
+        targetProjectId: formData.targetProjectId || null,
+        titleOrWorkNameId: formData.titleOrWorkNameId || null,
+        taskSubcategory: formData.taskSubcategory || null,
+        constructionSiteId: formData.constructionSiteId || null,
         subtotalAmount,
         grandTotalPayable,
         supportingAttachment: formData.supportingAttachment.trim() || null,
-        addedById: formData.addedById,
-        createdBy: formData.createdBy,
+        addedById: formData.addedById || null,
+        createdBy: formData.createdBy || null,
         status: "pending",
       };
 
@@ -853,18 +864,15 @@ export default function ServiceRequisitionPage() {
         requisitionDate: toYMD(formData.requisitionDate),
         requisitionCode: formData.requisitionCode,
         projectType: formData.projectType,
-        targetProjectId: formData.targetProjectId,
-        titleOrWorkNameId:
-          workOrderOptions.find(
-            (option) => option.uuid === formData.titleOrWorkNameId,
-          )?.categoryId || formData.titleOrWorkNameId,
-        taskSubcategory: formData.taskSubcategory,
-        constructionSiteId: formData.constructionSiteId,
+        targetProjectId: formData.targetProjectId || null,
+        titleOrWorkNameId: formData.titleOrWorkNameId || null,
+        taskSubcategory: formData.taskSubcategory || null,
+        constructionSiteId: formData.constructionSiteId || null,
         subtotalAmount,
         grandTotalPayable,
         supportingAttachment: formData.supportingAttachment.trim() || null,
-        addedById: formData.addedById,
-        updatedBy: formData.updatedBy,
+        addedById: formData.addedById || null,
+        updatedBy: formData.updatedBy || null,
       };
 
       await updateRequisition(selectedItem.uuid, parentPayload);
@@ -1512,10 +1520,9 @@ export default function ServiceRequisitionPage() {
                 {/* Title / Name of Work — DROPDOWN */}
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Title / Name of Work *
+                    Title / Name of Work
                   </label>
                   <select
-                    required
                     value={formData.titleOrWorkNameId}
                     onChange={(e) =>
                       setFormData({
@@ -1526,11 +1533,7 @@ export default function ServiceRequisitionPage() {
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     <option value="">Select Title/Name of Work</option>
-                    {workOrderOptions.length === 0 ? (
-                      <option value="" disabled>
-                        Loading work orders...
-                      </option>
-                    ) : (
+                    {workOrderOptions.length === 0 ? null : (
                       workOrderOptions.map((wo) => (
                         <option key={wo.uuid} value={wo.uuid}>
                           {wo.name}
@@ -1543,10 +1546,9 @@ export default function ServiceRequisitionPage() {
                 {/* Task Subcategory — DYNAMIC DROPDOWN */}
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Task Subcategory *
+                    Task Subcategory
                   </label>
                   <select
-                    required
                     value={formData.taskSubcategory}
                     onChange={(e) =>
                       setFormData({
@@ -1557,26 +1559,19 @@ export default function ServiceRequisitionPage() {
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     <option value="">Select Subcategory</option>
-                    {subCategoryOptions.length === 0 ? (
-                      <option value="" disabled>
-                        Loading subcategories...
+                    {subCategoryOptions.map((sc) => (
+                      <option key={sc.uuid} value={sc.uuid}>
+                        {sc.name}
                       </option>
-                    ) : (
-                      subCategoryOptions.map((sc) => (
-                        <option key={sc.uuid} value={sc.uuid}>
-                          {sc.name}
-                        </option>
-                      ))
-                    )}
+                    ))}
                   </select>
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Construction Site *
+                    Construction Site
                   </label>
                   <select
-                    required
                     value={formData.constructionSiteId}
                     onChange={(e) =>
                       setFormData({
@@ -1961,10 +1956,9 @@ export default function ServiceRequisitionPage() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Title / Name of Work *
+                    Title / Name of Work
                   </label>
                   <select
-                    required
                     value={formData.titleOrWorkNameId}
                     onChange={(e) =>
                       setFormData({
@@ -1986,10 +1980,9 @@ export default function ServiceRequisitionPage() {
                 {/* Task Subcategory — DYNAMIC DROPDOWN */}
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Task Subcategory *
+                    Task Subcategory
                   </label>
                   <select
-                    required
                     value={formData.taskSubcategory}
                     onChange={(e) =>
                       setFormData({
@@ -2010,10 +2003,9 @@ export default function ServiceRequisitionPage() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Construction Site *
+                    Construction Site
                   </label>
                   <select
-                    required
                     value={formData.constructionSiteId}
                     onChange={(e) =>
                       setFormData({

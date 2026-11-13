@@ -14,6 +14,7 @@ import {
   CheckCircle2, AlertTriangle, Ban, Eye, Edit, Trash2, RefreshCw, 
   Undo2, AlertCircle, Loader2, CalendarDays,
 } from "lucide-react";
+import { getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 /* ==========================================================================
    API CONFIG & TYPES
@@ -89,7 +90,7 @@ const emptyForm = (projectUuid = ""): AgreementForm => ({
    ========================================================================== */
 
 async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined" ? getStoredAccessToken() || localStorage.getItem("token") || localStorage.getItem("access_token") : null;
   try {
     const response = await fetch(`${API_URL}${path}`, {
       ...init,

@@ -1,0 +1,44 @@
+$ next dev "--port" "3002"
+RangeError: Failed to allocate memory
+    at new Promise (<anonymous>) {
+  code: 'ERR_MEMORY_ALLOCATION_FAILED'
+}
+ ⨯ unhandledRejection: RangeError: Failed to allocate memory
+    at new Promise (<anonymous>) {
+  code: 'ERR_MEMORY_ALLOCATION_FAILED'
+}
+ ⨯ unhandledRejection:  RangeError: Failed to allocate memory
+    at new Promise (<anonymous>) {
+  code: 'ERR_MEMORY_ALLOCATION_FAILED'
+}
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: RangeError: Failed to allocate memory
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: RangeError: Failed to allocate memory
+ ⨯ ./src/app/dashboard/project/projects/project/page.tsx
+Error:   [31mx[0m Expected a semicolon
+     ,-[[36;1;4mD:\realbiz\share_project_frontend\src\app\dashboard\project\projects\project\page.tsx[0m:290:1]
+ [2m287[0m |       setSubmitting(false);
+ [2m288[0m |     }
+ [2m289[0m |   };
+ [2m290[0m |     } catch (err) {
+     : [35;1m      ^^^^^[0m
+ [2m291[0m |       console.error(err);
+ [2m292[0m |       alert("Failed to save project");
+ [2m292[0m |     } finally {
+     `----
+  [31mx[0m Expression expected
+     ,-[[36;1;4mD:\realbiz\share_project_frontend\src\app\dashboard\project\projects\project\page.tsx[0m:296:1]
+ [2m293[0m |     } finally {
+ [2m294[0m |       setSubmitting(false);
+ [2m295[0m |     }
+ [2m296[0m |   };
+     : [35;1m  ^[0m
+ [2m297[0m | 
+ [2m298[0m |   // ====================== FILTERED DATA ======================
+ [2m298[0m |   const filtered = projects.filter((p) => {
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/dashboard/project/projects/project/page.tsx

@@ -16,14 +16,22 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   ShieldAlert,
-  Layers
+  Layers,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 
-// Backend API Response Types
+interface ProjectItem {
+  id: string | number;
+  uuid: string;
+  projectName?: string;
+  name?: string;
+}
+
 interface ApiControl {
   uuid: string;
-  uid: string;
-  id: string;
+  uid?: string;
+  id?: string;
   projectUuid: string;
   controlCode: string;
   controlType: 'Cost' | 'Schedule' | 'Quality';
@@ -35,7 +43,6 @@ interface ApiControl {
   createdAt: string;
 }
 
-// Frontend UI Type
 interface ProjectControl {
   uuid: string;
   code: string;
@@ -61,15 +68,27 @@ interface PaginationMeta {
   totalPages: number;
 }
 
+function getStoredAccessToken(): string {
+  if (typeof window === 'undefined') return '';
+  return (
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('token') ||
+    localStorage.getItem('share-project:access-token') ||
+    ''
+  );
+}
+
 export default function ProjectControlsPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
-  const DEFAULT_PROJECT_UUID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 
   // State
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
   const [controls, setControls] = useState<ProjectControl[]>([]);
   const [summary, setSummary] = useState<SummaryData>({ totalControls: 0, okCount: 0, warningCount: 0, breachCount: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -85,32 +104,75 @@ export default function ProjectControlsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    controlType: 'Cost' as string,
+    controlType: 'Cost',
     thresholdTarget: '',
     actualValue: '',
     actionStep: ''
   });
 
-  // 1. FETCH CONTROLS (GET List with Filters & Pagination)
-  const fetchControls = async (page = 1, limit = 10) => {
+  // Edit Modal State
+  const [editingControl, setEditingControl] = useState<ProjectControl | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    controlType: 'Cost',
+    thresholdTarget: '',
+    actualValue: '',
+    actionStep: ''
+  });
+
+  // Delete State
+  const [deletingControl, setDeletingControl] = useState<ProjectControl | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const authHeaders = () => {
+    const token = getStoredAccessToken();
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  };
+
+  // Load user projects
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/project?limit=100`, {
+          headers: authHeaders()
+        });
+        const json = await res.json();
+        const list: ProjectItem[] = json?.data?.data || json?.data || (Array.isArray(json) ? json : []);
+        setProjects(list);
+        if (list.length > 0 && !selectedProjectUuid) {
+          setSelectedProjectUuid(list[0].uuid);
+        }
+      } catch (err) {
+        console.error('Failed to load user projects:', err);
+      }
+    };
+    fetchProjects();
+  }, [API_BASE_URL]);
+
+  // 1. FETCH CONTROLS
+  const fetchControls = async (page = 1, limit = 10, projUuid = selectedProjectUuid) => {
+    if (!projUuid) {
+      setControls([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      let url = `${API_BASE_URL}/project-controls?projectUuid=${DEFAULT_PROJECT_UUID}&page=${page}&limit=${limit}`;
-      
+      let url = `${API_BASE_URL}/project-controls?projectUuid=${projUuid}&page=${page}&limit=${limit}`;
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
       if (selectedType !== 'All') url += `&controlType=${selectedType}`;
       if (selectedStatus !== 'All') url += `&status=${selectedStatus}`;
 
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: authHeaders() });
       const result = await response.json();
-      
-      console.log("Fetched Controls:", result); // ডিবাগ করার জন্য
       
       let rawControls: ApiControl[] = [];
       let metaData: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 };
       
-      // Robust Parsing
       if (result && result.success && Array.isArray(result.data)) {
         rawControls = result.data;
         metaData = result.meta || { total: result.data.length, page, limit, totalPages: Math.ceil(result.data.length / limit) };
@@ -140,7 +202,7 @@ export default function ProjectControlsPage() {
         }
 
         return {
-          uuid: c.uuid || c.id,
+          uuid: c.uuid || c.id || '',
           code: c.controlCode || 'N/A',
           controlType: c.controlType || 'Unknown',
           threshold: threshold,
@@ -156,7 +218,7 @@ export default function ProjectControlsPage() {
       setCurrentPage(page);
     } catch (error) {
       console.error("Error fetching controls:", error);
-      setErrorMsg("Failed to load control data. Please check your connection.");
+      setErrorMsg("Failed to load control data.");
       setControls([]);
     } finally {
       setIsLoading(false);
@@ -164,9 +226,12 @@ export default function ProjectControlsPage() {
   };
 
   // 2. FETCH SUMMARY
-  const fetchSummary = async () => {
+  const fetchSummary = async (projUuid = selectedProjectUuid) => {
+    if (!projUuid) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/project-controls/summary?projectUuid=${DEFAULT_PROJECT_UUID}`);
+      const response = await fetch(`${API_BASE_URL}/project-controls/summary?projectUuid=${projUuid}`, {
+        headers: authHeaders()
+      });
       const result = await response.json();
       if (result && result.success && result.data) {
         setSummary(result.data);
@@ -180,39 +245,43 @@ export default function ProjectControlsPage() {
     }
   };
 
-  // Trigger fetch on filter/page changes
+  // Trigger fetch on project / filter / page changes
   useEffect(() => {
-    fetchControls(currentPage, pageLimit);
-  }, [currentPage, pageLimit, searchQuery, selectedType, selectedStatus]);
-
-  useEffect(() => {
-    fetchSummary();
-  }, []);
+    if (selectedProjectUuid) {
+      fetchControls(currentPage, pageLimit, selectedProjectUuid);
+      fetchSummary(selectedProjectUuid);
+    }
+  }, [selectedProjectUuid, currentPage, pageLimit, searchQuery, selectedType, selectedStatus]);
 
   // 3. CREATE CONTROL (POST)
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProjectUuid) {
+      setErrorMsg('Please select a project first.');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg(null);
+    setSuccessMsg(null);
 
     const thresholdNum = parseFloat(formData.thresholdTarget) || 0;
     const actualNum = parseFloat(formData.actualValue) || 0;
 
     const payload = {
-      projectUuid: DEFAULT_PROJECT_UUID,
+      projectUuid: selectedProjectUuid,
       controlCode: `CTRL-${Math.floor(1000 + Math.random() * 9000)}`,
       controlType: formData.controlType,
       thresholdTarget: thresholdNum,
       actualValue: actualNum,
       actionStep: formData.actionStep,
-      addedBy: 'Admin',
-      addedById: 'admin-uuid'
+      addedBy: 'Share User',
+      addedById: 'share-user'
     };
 
     try {
       const response = await fetch(`${API_BASE_URL}/project-controls`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -222,9 +291,9 @@ export default function ProjectControlsPage() {
         throw new Error(responseData.message || 'Failed to create control entry');
       }
 
-      // Refresh data
-      await fetchControls(1, pageLimit);
-      await fetchSummary();
+      setSuccessMsg('Control metric created successfully!');
+      await fetchControls(1, pageLimit, selectedProjectUuid);
+      await fetchSummary(selectedProjectUuid);
       setIsModalOpen(false);
       
       setFormData({
@@ -233,6 +302,90 @@ export default function ProjectControlsPage() {
         actualValue: '',
         actionStep: ''
       });
+    } catch (error: any) {
+      setErrorMsg(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 4. UPDATE CONTROL (PATCH)
+  const openEditModal = (ctrl: ProjectControl) => {
+    setEditingControl(ctrl);
+    setEditFormData({
+      controlType: ctrl.controlType,
+      thresholdTarget: String(ctrl.threshold),
+      actualValue: String(ctrl.actual),
+      actionStep: ctrl.action
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingControl) return;
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const thresholdNum = parseFloat(editFormData.thresholdTarget) || 0;
+    const actualNum = parseFloat(editFormData.actualValue) || 0;
+
+    const payload = {
+      controlType: editFormData.controlType,
+      thresholdTarget: thresholdNum,
+      actualValue: actualNum,
+      actionStep: editFormData.actionStep,
+      updatedBy: 'Share User'
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-controls/${editingControl.uuid}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to update control entry');
+      }
+
+      setSuccessMsg('Control metric updated successfully!');
+      await fetchControls(currentPage, pageLimit, selectedProjectUuid);
+      await fetchSummary(selectedProjectUuid);
+      setIsEditModalOpen(false);
+      setEditingControl(null);
+    } catch (error: any) {
+      setErrorMsg(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 5. DELETE CONTROL (DELETE)
+  const handleDelete = async () => {
+    if (!deletingControl) return;
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/project-controls/${deletingControl.uuid}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to delete control entry');
+      }
+
+      setSuccessMsg('Control metric deleted successfully!');
+      await fetchControls(currentPage, pageLimit, selectedProjectUuid);
+      await fetchSummary(selectedProjectUuid);
+      setIsDeleteModalOpen(false);
+      setDeletingControl(null);
     } catch (error: any) {
       setErrorMsg(error.message);
     } finally {
@@ -259,18 +412,34 @@ export default function ProjectControlsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <nav className="flex items-center text-sm text-slate-500 space-x-2 mb-1">
-            <Link href="/projects" className="flex items-center hover:text-blue-600 transition-colors">
-              <Home className="w-4 h-4 mr-1 text-slate-600" /> Projects
+            <Link href="/dashboard" className="flex items-center hover:text-blue-600 transition-colors">
+              <Home className="w-4 h-4 mr-1 text-slate-600" /> Dashboard
             </Link>
             <ChevronRight className="w-4 h-4 text-slate-400" />
-            <span className="hover:text-blue-600 cursor-pointer">proj-skyline-001</span>
+            <span className="hover:text-blue-600 cursor-pointer">Projects</span>
             <ChevronRight className="w-4 h-4 text-slate-400" />
             <span className="font-semibold text-slate-900">Controls</span>
           </nav>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Project Control Management</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Project Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-600">Project:</span>
+            <select
+              value={selectedProjectUuid}
+              onChange={(e) => { setSelectedProjectUuid(e.target.value); setCurrentPage(1); }}
+              className="bg-white border border-slate-300 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-blue-600"
+            >
+              {projects.map((p) => (
+                <option key={p.uuid} value={p.uuid}>
+                  {p.projectName || p.name || `Project ${p.id}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={() => setIsModalOpen(true)}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl shadow-sm transition-all"
@@ -280,10 +449,29 @@ export default function ProjectControlsPage() {
         </div>
       </div>
 
+      {/* Success Alert */}
+      {successMsg && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg(null)} className="text-emerald-700 hover:text-emerald-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Error Alert */}
       {errorMsg && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
-          <AlertCircle className="w-5 h-5" /> {errorMsg}
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-red-700 hover:text-red-900">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -397,6 +585,7 @@ export default function ProjectControlsPage() {
                     <th className="py-3.5 px-4">Variance</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4">Corrective Action</th>
+                    <th className="py-3.5 px-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
@@ -440,12 +629,30 @@ export default function ProjectControlsPage() {
                         <td className="py-3.5 px-4 text-slate-600 max-w-sm">
                           {ctrl.action}
                         </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => openEditModal(ctrl)}
+                              title="Edit Metric"
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeletingControl(ctrl); setIsDeleteModalOpen(true); }}
+                              title="Delete Metric"
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
-                        No control records available.
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        No control records available for this project.
                       </td>
                     </tr>
                   )}
@@ -510,31 +717,30 @@ export default function ProjectControlsPage() {
               <ChevronRightIcon className="w-4 h-4" />
             </button>
           </div>
-
-          <span>Project Controls Engine v03.09</span>
         </div>
       </div>
 
       {/* CREATE MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900">Add Control Metric</h2>
-              <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900">Add Control Metric</h3>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
-              
+            <form onSubmit={handleFormSubmit} className="p-4 space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Control Type *</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Control Type *</label>
                 <select
                   value={formData.controlType}
                   onChange={(e) => setFormData({ ...formData, controlType: e.target.value })}
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
                 >
                   <option value="Cost">Cost</option>
                   <option value="Schedule">Schedule</option>
@@ -543,62 +749,180 @@ export default function ProjectControlsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Threshold Target *</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Threshold Target *</label>
                 <input
                   type="number"
-                  step="0.01"
+                  name="thresholdTarget"
+                  step="any"
                   required
                   placeholder="e.g. 500000"
                   value={formData.thresholdTarget}
                   onChange={(e) => setFormData({ ...formData, thresholdTarget: e.target.value })}
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Actual Value *</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Actual Value *</label>
                 <input
                   type="number"
-                  step="0.01"
+                  name="actualValue"
+                  step="any"
                   required
-                  placeholder="e.g. 520000"
+                  placeholder="e.g. 480000"
                   value={formData.actualValue}
                   onChange={(e) => setFormData({ ...formData, actualValue: e.target.value })}
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Action Step / Note</label>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Corrective Action / Notes</label>
                 <textarea
+                  name="actionStep"
                   rows={3}
-                  placeholder="Describe required action if variance occurs..."
+                  placeholder="Steps taken or mitigation plan..."
                   value={formData.actionStep}
                   onChange={(e) => setFormData({ ...formData, actionStep: e.target.value })}
-                  className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                  className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-sm transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-sm disabled:opacity-50"
                 >
-                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {isSubmitting ? 'Saving...' : 'Save Control'}
+                  {isSubmitting ? 'Saving...' : 'Save Metric'}
                 </button>
               </div>
-
             </form>
+          </div>
+        </div>
+      )}
 
+      {/* EDIT MODAL */}
+      {isEditModalOpen && editingControl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900">Edit Control Metric ({editingControl.code})</h3>
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Control Type *</label>
+                <select
+                  value={editFormData.controlType}
+                  onChange={(e) => setEditFormData({ ...editFormData, controlType: e.target.value })}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                >
+                  <option value="Cost">Cost</option>
+                  <option value="Schedule">Schedule</option>
+                  <option value="Quality">Quality</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Threshold Target *</label>
+                <input
+                  type="number"
+                  name="editThresholdTarget"
+                  step="any"
+                  required
+                  value={editFormData.thresholdTarget}
+                  onChange={(e) => setEditFormData({ ...editFormData, thresholdTarget: e.target.value })}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Actual Value *</label>
+                <input
+                  type="number"
+                  name="editActualValue"
+                  step="any"
+                  required
+                  value={editFormData.actualValue}
+                  onChange={(e) => setEditFormData({ ...editFormData, actualValue: e.target.value })}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Corrective Action / Notes</label>
+                <textarea
+                  name="editActionStep"
+                  rows={3}
+                  value={editFormData.actionStep}
+                  onChange={(e) => setEditFormData({ ...editFormData, actionStep: e.target.value })}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-sm disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Updating...' : 'Update Metric'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {isDeleteModalOpen && deletingControl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-center text-slate-900 text-lg mb-1">Delete Control Metric?</h3>
+            <p className="text-slate-500 text-center text-sm mb-6">
+              Are you sure you want to delete <span className="font-semibold text-slate-800">{deletingControl.code}</span> ({deletingControl.controlType})?
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-xl shadow-sm disabled:opacity-50 transition-colors"
+              >
+                {isSubmitting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

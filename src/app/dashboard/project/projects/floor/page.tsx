@@ -7,6 +7,7 @@ import {
   Home, ChevronRight, Plus, Search, Layers, Grid, X, Eye, Edit, Trash2,
   Building2, RefreshCw, Undo2, AlertCircle, CheckCircle2, Loader2, ArrowUpDown,
 } from 'lucide-react';
+import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 /* ----------------------------------------------------------------------------
  * API LAYER
@@ -29,7 +30,7 @@ interface BuildingItem {
 }
 
 async function request<T = any>(path: string, init?: RequestInit): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
@@ -288,91 +289,112 @@ function FloorsListInner() {
   }, [floors, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 p-6 font-sans text-slate-800 lg:p-10">
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <nav className="mb-2 flex items-center space-x-2 text-sm text-slate-500">
-            <Link href="/projects" className="flex items-center hover:text-indigo-600">
-              <Home className="mr-1 h-4 w-4" /> Projects
-            </Link>
-            <ChevronRight className="h-4 w-4 text-slate-300" />
-            <Link href="/projects/sites" className="hover:text-indigo-600">Buildings</Link>
-            <ChevronRight className="h-4 w-4 text-slate-300" />
-            <span className="font-semibold text-slate-900">Floors</span>
-          </nav>
-          <h1 className="bg-gradient-to-r from-slate-900 to-indigo-700 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent">
-            Building Floors Directory
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">Manage every level, its units and availability in one place.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={load} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </button>
-          <button onClick={() => setIsModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 hover:-translate-y-0.5">
-            <Plus className="h-4 w-4" /> Add Floor
-          </button>
-        </div>
-      </div>
-
-      {/* Table card */}
-      <div className="overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
-        <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <Link href="/projects" className="hover:text-emerald-700 font-medium transition">Projects</Link>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <Link href="/projects/sites" className="hover:text-emerald-700 font-medium transition">Buildings</Link>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Floors
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Building Floors Directory
+            </h1>
+          </div>
           <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-indigo-600" />
-            <p className="text-sm font-bold text-slate-900">
-              {buildingUuidFromUrl ? <>Building <span className="font-mono text-indigo-600">{buildingUuidFromUrl.slice(0, 8)}...</span></> : 'All Buildings'}
-            </p>
-          </div>
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-            <input type="text" placeholder="Search floor name, number..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`${inputCls} pl-10`} />
+            <button 
+              onClick={load} 
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+            <button 
+              onClick={() => setIsModalOpen(true)} 
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+            >
+              <Plus className="h-4 w-4" /> Add Floor
+            </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <th className="px-5 py-3.5">Floor Code</th>
-                <th className="px-5 py-3.5">Floor Name</th>
-                <th className="px-5 py-3.5">Level</th>
-                <th className="px-5 py-3.5">Units</th>
-                <th className="px-5 py-3.5 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}><td colSpan={5} className="px-5 py-4"><div className="h-4 animate-pulse rounded bg-slate-100" /></td></tr>
-                ))
-              ) : filteredFloors.length > 0 ? (
-                filteredFloors.map((floor) => (
-                  <tr key={floor.uuid} className="hover:bg-indigo-50/40">
-                    <td className="px-5 py-4 font-mono text-xs font-semibold text-indigo-600">{floor.floorCode || floor.uuid.slice(0, 8)}</td>
-                    <td className="px-5 py-4 font-bold text-slate-900">{floor.name}</td>
-                    <td className="px-5 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Level {floor.number}</span></td>
-                    <td className="px-5 py-4 font-bold text-slate-900">{floor.units_count} Units</td>
-                    <td className="px-5 py-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setEditFloor({ ...floor })} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"><Edit className="h-4 w-4" /></button>
-                        <button onClick={() => setDeleteTarget(floor)} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button>
+        {/* Table card */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-indigo-600" />
+              <p className="text-xs sm:text-sm font-bold text-slate-800">
+                {buildingUuidFromUrl ? <>Building <span className="font-mono text-indigo-600">{buildingUuidFromUrl.slice(0, 8)}...</span></> : 'All Buildings'}
+              </p>
+            </div>
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search floor name, number..." 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" 
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto min-h-[300px]">
+            <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
+              <thead>
+                <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">Floor Code</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">Floor Name</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">Level</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">Units</th>
+                  <th className="px-4 py-3.5 font-semibold text-white text-center tracking-wide">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}><td colSpan={5} className="px-5 py-4"><div className="h-4 animate-pulse rounded bg-slate-100" /></td></tr>
+                  ))
+                ) : filteredFloors.length > 0 ? (
+                  filteredFloors.map((floor) => (
+                    <tr key={floor.uuid} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-indigo-600">{floor.floorCode || floor.uuid.slice(0, 8)}</td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{floor.name}</td>
+                      <td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">Level {floor.number}</span></td>
+                      <td className="px-4 py-3 font-bold text-slate-900">{floor.units_count} Units</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button onClick={() => setEditFloor({ ...floor })} className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95" title="Edit Floor"><Edit className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => setDeleteTarget(floor)} className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95" title="Delete Floor"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-16 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Layers className="h-8 w-8 text-slate-300" />
+                        <p className="text-sm font-medium">No floors found.</p>
                       </div>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr><td colSpan={5} className="py-16 text-center text-slate-400"><Layers className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p>No floors found.</p></td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {!loading && (
-          <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs text-slate-500">
-            Showing <b>{filteredFloors.length}</b> of <b>{floors.length}</b> floors
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+          {!loading && (
+            <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500 font-medium">
+              Showing <b>{filteredFloors.length}</b> of <b>{floors.length}</b> floors
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Add Floor Modal */}

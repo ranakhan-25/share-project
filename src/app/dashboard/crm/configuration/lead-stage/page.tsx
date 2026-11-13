@@ -64,7 +64,7 @@ export default function LeadStagePage() {
       if (json.success) {
         const activeStages = (json.data.data || []).filter((item: any) => {
           if (showDeleted) return true;
-          return !item.deletedAt;
+          return !item.deletedAt && !item.deleted_at;
         });
         
         setStages(activeStages);

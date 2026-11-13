@@ -16,10 +16,11 @@ export const API_ORIGIN =
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
   return (
-    localStorage.getItem("admin_access_token") ||
-    localStorage.getItem("access_token") ||
     localStorage.getItem("token") ||
     localStorage.getItem("accessToken") ||
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("admin_access_token") ||
     null
   );
 }

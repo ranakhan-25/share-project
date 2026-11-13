@@ -49,6 +49,21 @@ interface LedgerEntry {
 // ---------- API helpers ----------
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 async function fetchContractors(): Promise<{
   data: Contractor[];
   meta: any;
@@ -57,10 +72,7 @@ async function fetchContractors(): Promise<{
     `${API_BASE}/realbizpro/api/v1/contractor?page=1&limit=100&skip=0&sortBy=createdAt&sortOrder=DESC&withDeleted=false&status=active`,
     {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        // Authorization: `Bearer ${token}`  // add if needed
-      },
+      headers: getAuthHeaders(),
       cache: "no-store",
     },
   );
@@ -93,7 +105,7 @@ async function fetchContractors(): Promise<{
 async function createContractor(payload: Record<string, any>) {
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/contractor`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -114,7 +126,7 @@ async function updateContractor(uuid: string, payload: Record<string, any>) {
     `${API_BASE}/realbizpro/api/v1/contractor/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
   );
@@ -136,7 +148,7 @@ async function softDeleteContractor(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/contractor/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   if (!res.ok) throw new Error("Delete failed");

@@ -70,6 +70,21 @@ const SITE_API = `${API_BASE_URL}${API_PREFIX}/project-sites`;
 const USER_API = `${API_BASE_URL}${API_PREFIX}/users`;
 const REFERENCE_API = `${API_BASE_URL}${API_PREFIX}/fund-requisition`;
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // ==================== GENERIC OPTIONS FETCHER ====================
 async function fetchRelatedOptions(
   endpoint: string,
@@ -78,7 +93,7 @@ async function fetchRelatedOptions(
   const query = new URLSearchParams({ page: "1", limit: "100" });
   const res = await fetch(`${endpoint}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -227,7 +242,7 @@ export default function FundRequisitionModule() {
         `${FUND_REQUISITION_ENDPOINT}?${params.toString()}`,
         {
           method: "GET",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
         },
       );
 
@@ -266,25 +281,25 @@ export default function FundRequisitionModule() {
       const payload = {
         date: formData.date,
         projectType: formData.projectType,
-        projectId: formData.projectId,
-        taskId: formData.taskId,
-        siteId: formData.siteId,
-        fromUserId: formData.fromUserId,
+        projectId: formData.projectId || null,
+        taskId: formData.taskId || null,
+        siteId: formData.siteId || null,
+        fromUserId: formData.fromUserId || null,
         amount: Number(formData.amount) || 0,
         approvedAmount: Number(formData.approvedAmount) || 0,
         paidAmount: Number(formData.paidAmount) || 0,
         purpose: formData.purpose,
-        reference: formData.reference,
-        approveStatus: formData.approveStatus,
-        paymentStatus: formData.paymentStatus,
-        addedById: formData.addedById,
-        createdBy: formData.createdBy,
-        updatedBy: formData.updatedBy,
+        reference: formData.reference || null,
+        approveStatus: formData.approveStatus || "Pending",
+        paymentStatus: formData.paymentStatus || "Payment Left",
+        addedById: formData.addedById || null,
+        createdBy: formData.createdBy || null,
+        updatedBy: formData.updatedBy || null,
       };
 
       const response = await fetch(FUND_REQUISITION_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -322,26 +337,26 @@ export default function FundRequisitionModule() {
       const payload = {
         date: formData.date,
         projectType: formData.projectType,
-        projectId: formData.projectId,
-        taskId: formData.taskId,
-        siteId: formData.siteId,
-        fromUserId: formData.fromUserId,
+        projectId: formData.projectId || null,
+        taskId: formData.taskId || null,
+        siteId: formData.siteId || null,
+        fromUserId: formData.fromUserId || null,
         amount: Number(formData.amount) || 0,
         approvedAmount: Number(formData.approvedAmount) || 0,
         paidAmount: Number(formData.paidAmount) || 0,
         purpose: formData.purpose,
-        reference: formData.reference,
+        reference: formData.reference || null,
         approveStatus: formData.approveStatus,
         paymentStatus: formData.paymentStatus,
-        addedById: formData.addedById,
-        updatedBy: formData.updatedBy,
+        addedById: formData.addedById || null,
+        updatedBy: formData.updatedBy || null,
       };
 
       const response = await fetch(
         `${FUND_REQUISITION_ENDPOINT}/${selectedItem.uuid}`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         },
       );
@@ -379,7 +394,7 @@ export default function FundRequisitionModule() {
 
       const response = await fetch(`${FUND_REQUISITION_ENDPOINT}/${uuid}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
       });
 
       const body = await response.json();

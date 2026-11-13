@@ -51,6 +51,21 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("share-project:access-token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 const SHARE_CONFIG_API = `${API_BASE}${API_PREFIX}/project-share-configurations`;
 const PROJECT_API = `${API_BASE}${API_PREFIX}/project`;
 const PROJECT_TYPE_API = `${API_BASE}${API_PREFIX}/project-type`;
@@ -99,7 +114,7 @@ async function fetchShareConfigs(params?: {
   const url = `${SHARE_CONFIG_API}?${query.toString()}`;
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   const json = await handleRes(res, "fetch share configurations");
@@ -148,7 +163,7 @@ async function fetchProjects(): Promise<OptionItem[]> {
     const url = `${PROJECT_API}?page=1&limit=100`;
     const res = await fetch(url, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
     const json = await res.json().catch(() => ({}));
@@ -171,7 +186,7 @@ async function fetchProjectTypes(): Promise<OptionItem[]> {
     const url = `${PROJECT_TYPE_API}?page=1&limit=100`;
     const res = await fetch(url, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
     const json = await res.json().catch(() => ({}));
@@ -193,7 +208,7 @@ async function createShareConfig(payload: Record<string, any>) {
   console.log("📤 POST payload →", payload);
   const res = await fetch(SHARE_CONFIG_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleRes(res, "create share configuration");
@@ -205,7 +220,7 @@ async function updateShareConfig(uuid: string, payload: Record<string, any>) {
   console.log("📤 PATCH", uuid, "→", payload);
   const res = await fetch(`${SHARE_CONFIG_API}/${uuid}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleRes(res, "update share configuration");
@@ -216,7 +231,7 @@ async function updateShareConfig(uuid: string, payload: Record<string, any>) {
 async function softDeleteShareConfig(uuid: string) {
   const res = await fetch(`${SHARE_CONFIG_API}/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   return handleRes(res, "delete share configuration");
 }
