@@ -48,10 +48,24 @@ export default function ChequeRangePage() {
     return [];
   };
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
   const requestJson = async (url: string, method = "GET", payload?: unknown) => {
     const response = await fetch(url, {
       method,
-      headers: payload ? { "Content-Type": "application/json", Accept: "application/json" } : { Accept: "application/json" },
+      headers: {
+        ...getAuthHeaders(),
+        ...(payload ? { "Content-Type": "application/json" } : {}),
+      },
       body: payload ? JSON.stringify(payload) : undefined,
       cache: "no-store",
     });

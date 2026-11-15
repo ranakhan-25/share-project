@@ -53,7 +53,9 @@ export default function PriceRangePage() {
       const json = await res.json();
       
       if (json.success) {
-        const activeData = (json.data.data || []).filter((item: any) => showDeleted || !item.deletedAt);
+        const activeData = (json.data.data || []).filter(
+          (item: any) => showDeleted || (!item.deletedAt && !item.deleted_at)
+        );
         setPriceRanges(activeData);
         setTotalPages(json.data.meta?.totalPages || 1);
         setTotalEntries(json.data.meta?.total || 0);

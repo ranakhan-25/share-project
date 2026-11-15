@@ -19,6 +19,17 @@ import {
 import Link from "next/link";
 import toast from "react-hot-toast";
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 interface ExpenseRow {
   id: number;
   uuid: string;
@@ -95,7 +106,7 @@ export default function ExpenseListPage() {
   const fetchExpenses = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/backend/expenses", { headers: { accept: "application/json" } });
+      const response = await fetch("/api/backend/expenses", { headers: getAuthHeaders() });
       const result = await response.json();
       const payload = result.data?.data ?? result.data?.items ?? result.data ?? [];
       const rows = (Array.isArray(payload) ? payload : []).map((expense: Record<string, unknown>, index: number) => ({
@@ -138,7 +149,10 @@ export default function ExpenseListPage() {
       window.open(`/api/backend/expenses/${encodeURIComponent(row.uuid)}`, "_blank");
     } else if (key === "delete" && window.confirm("Delete this expense?")) {
       try {
-        const response = await fetch(`/api/backend/expenses/${encodeURIComponent(row.uuid)}`, { method: "DELETE" });
+        const response = await fetch(`/api/backend/expenses/${encodeURIComponent(row.uuid)}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
         if (!response.ok) throw new Error("Expense could not be deleted.");
         await fetchExpenses();
         toast.success("Expense deleted successfully.");

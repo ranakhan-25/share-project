@@ -4,6 +4,17 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
+
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 import {
   Plus,
   ArrowLeft,
@@ -133,7 +144,10 @@ export default function JournalVoucherListPage() {
   const fetchVouchers = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/backend/journal-vouchers", { cache: "no-store" });
+      const response = await fetch("/api/backend/journal-vouchers", {
+        headers: getAuthHeaders(),
+        cache: "no-store",
+      });
       const result = await response.json();
       if (!response.ok || result.success === false) {
         throw new Error(result.message || "Journal vouchers could not be loaded.");

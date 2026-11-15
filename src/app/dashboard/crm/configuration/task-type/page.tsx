@@ -56,7 +56,7 @@ export default function TaskTypePage() {
       
       if (json.success) {
         // ✅ deletedAt ফিল্টার করা হচ্ছে
-        const activeData = (json.data.data || []).filter((item: any) => !item.deletedAt);
+        const activeData = (json.data.data || []).filter((item: any) => !item.deletedAt && !item.deleted_at);
         setDataList(activeData);
         setTotalPages(json.data.meta?.totalPages || 1);
         setTotalEntries(json.data.meta?.total || 0);

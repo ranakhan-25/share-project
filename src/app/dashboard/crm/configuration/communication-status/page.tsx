@@ -53,7 +53,7 @@ export default function CommunicationStatusPage() {
       const res = await crmFetch(`${API_PATH}/crm/configuration/communication-status?page=1&limit=${entriesLimit}&skip=0&search=${search}`);
       const json = await res.json();
       if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
+        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt && !item.deleted_at));
       }
     } catch (err) {
       toast.error("Failed to load data");

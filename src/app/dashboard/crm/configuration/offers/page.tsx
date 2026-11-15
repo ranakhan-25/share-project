@@ -58,7 +58,9 @@ export default function OffersPage() {
       const json = await res.json();
       
       if (json.success) {
-        const activeData = (json.data.data || []).filter((item: any) => showDeleted || !item.deletedAt);
+        const activeData = (json.data.data || []).filter(
+          (item: any) => showDeleted || (!item.deletedAt && !item.deleted_at)
+        );
         
         setOffers(activeData);
         setTotalPages(json.data.meta?.totalPages || 1);
@@ -136,6 +138,7 @@ export default function OffersPage() {
         ? `${API_PATH}/crm/configuration/offers/${editingRecord!.uuid}`
         : `${API_PATH}/crm/configuration/offers`;
       const method = isEdit ? "PATCH" : "POST";
+      console.log("OFFER SUBMIT:", method, url, editingRecord);
 
       const res = await crmFetch(url, {
         method,

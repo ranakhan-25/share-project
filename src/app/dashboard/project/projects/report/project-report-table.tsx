@@ -2,9 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002"
-).replace(/\/+$/, "");
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 
 function extractRows(value: unknown): Record<string, unknown>[] {
   if (Array.isArray(value)) {
@@ -54,8 +61,8 @@ export default function ProjectReportTable({
       setError("");
       try {
         const response = await fetch(
-          `${API_BASE}/realbizpro/api/v1/project/reports/${endpoint}`,
-          { cache: "no-store" },
+          `/api/backend/project/reports/${endpoint}`,
+          { headers: getAuthHeaders(), cache: "no-store" },
         );
         const payload: unknown = await response.json().catch(() => null);
         if (!response.ok) {

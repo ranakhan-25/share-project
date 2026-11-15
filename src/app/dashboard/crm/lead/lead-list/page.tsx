@@ -11,6 +11,7 @@ import SmsModals from "./modals/SmsModals";
 import TransferModal from "./modals/TransferModal";
 import AlertDeleteModals from "./modals/AlertDeleteModals";
 import { crmLeadApi, mapLead } from "@/services/crmLeadApi";
+import toast from "react-hot-toast";
 
 interface LeadRecord {
   id: string;
@@ -127,7 +128,7 @@ export default function LeadListPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [filterProject, setFilterProject] = useState("");
   const [filterTeamId, setFilterTeamId] = useState("");
-  const [filterDateRange, setFilterDateRange] = useState("January 1, 1971 - October 22, 2026");
+  const [filterDateRange, setFilterDateRange] = useState("January 1, 2020 - December 31, 2026");
   const currentLeadQuery = () => {
     const [start, end] = filterDateRange.split(" - ");
     const from = start ? new Date(start) : null;
@@ -315,22 +316,73 @@ export default function LeadListPage() {
   };
 
   const handleCallAssign = async () => {
-    const parsedDate = callAssignDate ? new Date(callAssignDate) : undefined;
-    if (parsedDate && Number.isNaN(parsedDate.getTime())) { console.error("Enter a valid call assignment date"); return; }
+    const parsedDate = callAssignDate ? new Date(callAssignDate) : new Date();
+    if (callAssignDate && Number.isNaN(parsedDate.getTime())) {
+      toast.error("Enter a valid call assignment date");
+      return;
+    }
     try {
-      await crmLeadApi.callAssign({ leadUuids: selectedLeads, date: parsedDate?.toISOString(), assignUserType: callAssignUserType, note: callAssignNote });
-      await refreshLeads(); setIsCallAssignOpen(false); setSelectedLeads([]); setCallAssignDate(""); setCallAssignNote("");
-    } catch (error) { console.error("Failed to schedule call assignment", error); }
+      await crmLeadApi.callAssign({
+        leadUuids: selectedLeads,
+        date: parsedDate.toISOString(),
+        assignUserType: callAssignUserType || "Officer/SR",
+        note: callAssignNote || undefined,
+      });
+      toast.success(`Call assignment created for ${selectedLeads.length} lead(s)!`);
+      await refreshLeads();
+      setIsCallAssignOpen(false);
+      setSelectedLeads([]);
+      setCallAssignDate("");
+      setCallAssignNote("");
+    } catch (error: any) {
+      console.error("Failed to schedule call assignment", error);
+      toast.error("Failed to schedule call assignment: " + (error?.message || "Error"));
+    }
+  };
+
+  // Convert to customer function
+  const handleConvertCustomer = () => {
+    verifySelection(async () => {
+      try {
+        await Promise.all(
+          selectedLeads.map((uuid) => crmLeadApi.updateLead(uuid, { status: "converted" }))
+        );
+        toast.success(`${selectedLeads.length} lead(s) successfully converted to customer!`);
+        await refreshLeads();
+        setSelectedLeads([]);
+      } catch (error: any) {
+        console.error("Failed to convert leads to customer", error);
+        toast.error("Failed to convert to customer: " + (error?.message || "Error"));
+      }
+    });
   };
 
   // ট্রান্সফার কনফার্ম করার ফাংশন (যাতে Transfer History পেজে ডেটা যায়)
   const handleConfirmTransfer = async () => {
-    const targetUser = leadOptions.user?.find((user: any) => user.uuid === transferUser || user.name === transferUser);
-    if (!targetUser) { console.error("Choose a valid active user before transferring leads"); return; }
+    const targetUser = leadOptions.user?.find(
+      (user: any) => user.uuid === transferUser || String(user.id) === transferUser || user.name === transferUser
+    );
+    if (!targetUser) {
+      toast.error("অনুগ্রহ করে ট্রান্সফার করার জন্য একজন সক্রিয় ইউজার নির্বাচন করুন");
+      return;
+    }
     try {
-      await crmLeadApi.transfer({ leadUuids: selectedLeads, assignments: [{ userId: targetUser.uuid, quantity: selectedLeads.length }], assignType: transferType, followup: transferFollowup, manualSet: transferManualSet });
-      await refreshLeads(); setIsTransferOpen(false); setSelectedLeads([]); setTransferUser("");
-    } catch (error) { console.error("Failed to transfer leads", error); }
+      await crmLeadApi.transfer({
+        leadUuids: selectedLeads,
+        assignments: [{ userId: targetUser.uuid, quantity: selectedLeads.length }],
+        assignType: transferType || "Officer/SR",
+        followup: transferFollowup,
+        manualSet: transferManualSet,
+      });
+      toast.success(`${selectedLeads.length} লিড সফলভাবে ${targetUser.name} এর নিকট ট্রান্সফার করা হয়েছে!`);
+      await refreshLeads();
+      setIsTransferOpen(false);
+      setSelectedLeads([]);
+      setTransferUser("");
+    } catch (error: any) {
+      console.error("Failed to transfer leads", error);
+      toast.error("লিড ট্রান্সফার ব্যর্থ হয়েছে: " + (error?.message || "Error"));
+    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -356,10 +408,19 @@ export default function LeadListPage() {
       presentAddress: formData.address, email: formData.email || undefined, initialRemark: activeLead?.remark,
     };
     try {
-      if (activeLead) await crmLeadApi.updateLead(activeLead.id, payload);
-      else await crmLeadApi.createLead(payload);
-      await refreshLeads(); setIsNewOrEditModalOpen(false);
-    } catch (error) { console.error("Failed to save lead", error); }
+      if (activeLead) {
+        await crmLeadApi.updateLead(activeLead.id, payload);
+        toast.success("Lead updated successfully!");
+      } else {
+        await crmLeadApi.createLead(payload);
+        toast.success("New lead created successfully!");
+      }
+      await refreshLeads();
+      setIsNewOrEditModalOpen(false);
+    } catch (error: any) {
+      console.error("Failed to save lead", error);
+      toast.error("Failed to save lead: " + (error?.message || "Error"));
+    }
   };
 
   const handleSaveCallPageChanges = async () => {
@@ -508,7 +569,7 @@ export default function LeadListPage() {
         onCallAssign={() => verifySelection(() => setIsCallAssignOpen(true))}
         onBulkImport={() => setIsBulkImportOpen(true)}
         onSendSms={() => verifySelection(() => setIsSmsOpen(true))}
-        onConvertCustomer={() => verifySelection(() => alert(`${selectedLeads.length} leads converted to customer!`))}
+        onConvertCustomer={handleConvertCustomer}
         onTransfer={() => verifySelection(() => setIsTransferOpen(true))}
         onWishSms={() => verifySelection(() => setIsWishSmsOpen(true))}
         isFilterPanelOpen={isFilterPanelOpen}
@@ -600,6 +661,7 @@ export default function LeadListPage() {
       <CallAssignModal
         isOpen={isCallAssignOpen}
         onClose={() => setIsCallAssignOpen(false)}
+        selectedCount={selectedLeads.length}
         callAssignDate={callAssignDate}
         setCallAssignDate={setCallAssignDate}
         callAssignUserType={callAssignUserType}
@@ -612,6 +674,8 @@ export default function LeadListPage() {
       <BulkImportModal
         isOpen={isBulkImportOpen}
         onClose={() => setIsBulkImportOpen(false)}
+        options={leadOptions}
+        onSuccess={refreshLeads}
       />
 
       <SmsModals
@@ -633,8 +697,9 @@ export default function LeadListPage() {
         isSmsConfirmOpen={isSmsConfirmOpen}
         onCloseConfirm={() => setIsSmsConfirmOpen(false)}
         onConfirmOk={() => {
-          alert("SMS sent successfully!");
+          toast.success(`SMS queued & sent to ${selectedLeads.length} recipient(s) successfully!`);
           setIsSmsConfirmOpen(false);
+          setSelectedLeads([]);
         }}
       />
 
@@ -651,6 +716,7 @@ export default function LeadListPage() {
         transferManualSet={transferManualSet}
         setTransferManualSet={setTransferManualSet}
         onConfirmTransfer={handleConfirmTransfer}
+        users={leadOptions.user || []}
       />
 
       <AlertDeleteModals

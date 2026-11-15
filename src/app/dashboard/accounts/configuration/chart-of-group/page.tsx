@@ -1,284 +1,440 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  ChevronDown,
-  Search,
   Plus,
-  RefreshCcw,
-  X,
   Pencil,
   Trash2,
-} from 'lucide-react';
+  ChevronDown,
+  X,
+  Copy,
+  FileSpreadsheet,
+  FileText,
+  FileCode,
+  ArrowRightToLine,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCcw,
+  Search,
+} from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 
+// API Base URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
 
-// ডামি ডেটা (বেশি ডেটা দিয়ে টেস্ট করার জন্য)
-const initialDummyData = [
-  { id: 1, code: 'AST-001', name: 'Office Laptop', category: 'Electronics', unit: 'Pcs', brand: 'Global Link', price: 1200, group: 'Fixed Asset' },
-  { id: 2, code: 'AST-002', name: 'AC Machine', category: 'Electronics', unit: 'Pcs', brand: 'Samsung', price: 800, group: 'Current Asset' },
-  { id: 3, code: 'AST-003', name: 'Office Printer', category: 'Stationery', unit: 'Pcs', brand: 'HP', price: 350, group: 'Fixed Asset' },
-  { id: 4, code: 'AST-004', name: 'Conference Table', category: 'Furniture', unit: 'Pcs', brand: 'Local', price: 500, group: 'Fixed Asset' },
-  { id: 5, code: 'AST-005', name: 'Desktop Computer', category: 'Electronics', unit: 'Pcs', brand: 'Dell', price: 1500, group: 'Fixed Asset' },
-  { id: 6, code: 'AST-006', name: 'Whiteboard', category: 'Stationery', unit: 'Pcs', brand: 'Local', price: 100, group: 'Expense' },
-  { id: 7, code: 'AST-007', name: 'Ergonomic Chair', category: 'Furniture', unit: 'Pcs', brand: 'Global Link', price: 300, group: 'Fixed Asset' },
-  { id: 8, code: 'AST-008', name: 'Projector', category: 'Electronics', unit: 'Pcs', brand: 'Epson', price: 950, group: 'Fixed Asset' },
-  { id: 9, code: 'AST-009', name: 'Water Dispenser', category: 'Electronics', unit: 'Pcs', brand: 'WALTON', price: 200, group: 'Asset' },
-  { id: 10, code: 'AST-010', name: 'Reception Sofa', category: 'Furniture', unit: 'Pcs', brand: 'Local', price: 750, group: 'Fixed Asset' },
-  { id: 11, code: 'AST-011', name: 'Router', category: 'Electronics', unit: 'Pcs', brand: 'TP-Link', price: 80, group: 'Asset' },
-];
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 
-export default function AssetItemList() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
-  const [assets, setAssets] = useState(initialDummyData);
+export interface ChartOfGroupItem {
+  id: number;
+  uuid: string;
+  code: string;
+  name: string;
+  under: string;
+  chartOfSection?: string;
+  reportSection?: string;
+  hasDelete?: boolean;
+}
 
-  // Search & Pagination States
-  const [searchQuery, setSearchQuery] = useState('');
+export interface GroupFormData {
+  code: string;
+  name: string;
+  under: string;
+  chartOfSection: string;
+  reportSection: string;
+}
+
+const UNDER_OPTIONS = ["Assets", "Liabilities", "Equity", "Income", "Expenses"];
+const SECTION_OPTIONS = ["Balance Sheet", "Profit & Loss", "Cash Flow"];
+
+export default function ChartOfGroupPage() {
+  const [groups, setGroups] = useState<ChartOfGroupItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filters & Pagination
+  const [underFilter, setUnderFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(5);
 
-  // Chart of Groups State
-  const [chartGroups, setChartGroups] = useState<{ id: string; name: string }[]>([]);
-  const [isGroupsLoading, setIsGroupsLoading] = useState(false);
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"add" | "edit">("add");
+  const [editUuid, setEditUuid] = useState<string | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({
-    id: 0,
-    code: '',
-    category: '',
-    brand: '',
-    name: '',
-    unit: '',
-    price: '',
-    group: ''
+  const [formData, setFormData] = useState<GroupFormData>({
+    code: "",
+    name: "",
+    under: "Assets",
+    chartOfSection: "Balance Sheet",
+    reportSection: "",
   });
 
-  // ১. API থেকে Chart of Groups ফেচ করা
-  const fetchChartOfGroups = async () => {
-    setIsGroupsLoading(true);
+  // Helper: Auto-generate Group Code (e.g. COG-101, COG-102, ...)
+  const generateGroupCode = (existingList: ChartOfGroupItem[] = groups) => {
+    let maxNum = 100;
+    if (Array.isArray(existingList)) {
+      existingList.forEach((item) => {
+        if (item.code) {
+          const match = item.code.match(/(\d+)$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+          }
+        }
+      });
+    }
+    return `COG-${maxNum + 1}`;
+  };
+
+  // Fetch groups
+  const fetchGroups = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/chart-of-groups`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json', 'accept': 'application/json' }
+      const response = await fetch(`${API_BASE}/chart-of-groups?limit=100`, {
+        method: "GET",
+        headers: getAuthHeaders(),
       });
       const result = await response.json();
-      
-      if (result.success && result.data) {
-        let extractedData = [];
-        if (Array.isArray(result.data)) extractedData = result.data;
-        else if (Array.isArray(result.data.items)) extractedData = result.data.items;
-        else if (Array.isArray(result.data.data)) extractedData = result.data.data;
-
-        const formattedGroups = extractedData.map((item: any) => ({
-          id: item.uuid || item.id || Math.random().toString(),
-          name: item.name || item.groupName || item.title || item.accountName || 'Unknown Group'
-        }));
-
-        setChartGroups(formattedGroups);
+      const list = result.data?.data || result.data || [];
+      if (Array.isArray(list)) {
+        setGroups(list);
       }
-    } catch (error) {
-      console.error("Failed to fetch chart groups:", error);
+    } catch (err) {
+      console.error("Failed to fetch groups", err);
+      toast.error("Failed to fetch chart of groups.");
     } finally {
-      setIsGroupsLoading(false);
+      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchChartOfGroups();
   }, []);
 
-  // ==========================================
-  // ২. SEARCH LOGIC (সার্চ কুয়েরি ফিল্টার)
-  // ==========================================
-  const filteredAssets = useMemo(() => {
-    if (!searchQuery.trim()) return assets;
-    const query = searchQuery.toLowerCase();
-    
-    return assets.filter(
-      (item) =>
-        item.name.toLowerCase().includes(query) ||
-        item.category.toLowerCase().includes(query) ||
-        item.brand.toLowerCase().includes(query) ||
-        item.code.toLowerCase().includes(query) ||
-        item.group.toLowerCase().includes(query)
-    );
-  }, [assets, searchQuery]);
-
-  // ==========================================
-  // ৩. PAGINATION LOGIC (পেজিনেশন)
-  // ==========================================
-  const totalEntries = filteredAssets.length;
-  const totalPages = Math.ceil(totalEntries / entriesPerPage);
-
-  // কারেন্ট পেজের ডেটা স্লাইস করা
-  const indexOfLastEntry = currentPage * entriesPerPage;
-  const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
-  const currentEntries = filteredAssets.slice(indexOfFirstEntry, indexOfLastEntry);
-
-  // সার্চ করলে বা এন্ট্রি পার পেজ চেঞ্জ হলে পেজ ১ এ রিসেট হবে
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, entriesPerPage]);
+    fetchGroups();
+  }, [fetchGroups]);
 
-  // Handlers
-  const handleAddClick = () => {
-    setModalMode('add');
-    setFormData({ id: 0, code: '', category: '', brand: '', name: '', unit: '', price: '', group: '' });
-    setIsModalOpen(true);
-  };
-
-  const handleEditClick = (item: any) => {
-    setModalMode('edit');
+  // Modal Handlers
+  const openAddModal = () => {
+    setModalMode("add");
+    setEditUuid(null);
+    const newCode = generateGroupCode(groups);
     setFormData({
-      id: item.id,
-      code: item.code,
-      category: item.category,
-      brand: item.brand,
-      name: item.name,
-      unit: item.unit,
-      price: item.price.toString(),
-      group: item.group,
+      code: newCode,
+      name: "",
+      under: "Assets",
+      chartOfSection: "Balance Sheet",
+      reportSection: "",
     });
     setIsModalOpen(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const openEditModal = (item: ChartOfGroupItem) => {
+    setModalMode("edit");
+    setEditUuid(item.uuid);
+    setFormData({
+      code: item.code,
+      name: item.name,
+      under: item.under || "Assets",
+      chartOfSection: item.chartOfSection || "Balance Sheet",
+      reportSection: item.reportSection || "",
+    });
+    setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (modalMode === 'edit') {
-      setAssets((prev) =>
-        prev.map((item) =>
-          item.id === formData.id ? { ...item, ...formData, price: Number(formData.price) } : item
-        )
-      );
-    } else {
-      const newId = assets.length > 0 ? Math.max(...assets.map(a => a.id)) + 1 : 1;
-      const newAsset = {
-        ...formData,
-        id: newId,
-        code: `AST-00${newId}`,
-        price: Number(formData.price) || 0,
-      };
-      setAssets([...assets, newAsset]);
-    }
+  const closeModal = () => {
     setIsModalOpen(false);
+    setEditUuid(null);
   };
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
-      setAssets(assets.filter(asset => asset.id !== id));
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      if (name === "under") {
+        if (value === "Assets" || value === "Liabilities" || value === "Equity") {
+          updated.chartOfSection = "Balance Sheet";
+        } else {
+          updated.chartOfSection = "Profit & Loss";
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      let url = `${API_BASE}/chart-of-groups`;
+      let method = "POST";
+      let payload: any = {};
+
+      if (modalMode === "add") {
+        payload = {
+          code: formData.code,
+          name: formData.name,
+          under: formData.under,
+          chartOfSection: formData.chartOfSection,
+          reportSection: formData.reportSection || `${formData.name} Section`,
+          hasDelete: true,
+        };
+      } else {
+        url = `${API_BASE}/chart-of-groups/${editUuid}`;
+        method = "PATCH";
+        payload = {
+          name: formData.name,
+          under: formData.under,
+          chartOfSection: formData.chartOfSection,
+          reportSection: formData.reportSection,
+        };
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (result.success || response.ok) {
+        toast.success(
+          modalMode === "add"
+            ? "Chart of Group created successfully!"
+            : "Chart of Group updated successfully!"
+        );
+        await fetchGroups();
+        closeModal();
+      } else {
+        const errorMsg =
+          result.message ||
+          (result.errors && result.errors[0]?.errors?.[0]) ||
+          "Failed to save group.";
+        toast.error(errorMsg);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("An error occurred while saving.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const handleDelete = async (uuid: string) => {
+    if (!window.confirm("Are you sure you want to delete this group?")) return;
+    const toastId = toast.loading("Deleting group...");
+
+    try {
+      const response = await fetch(`${API_BASE}/chart-of-groups/${uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const result = await response.json();
+      if (result.success || response.ok) {
+        toast.success("Group deleted successfully!", { id: toastId });
+        await fetchGroups();
+      } else {
+        toast.error(result.message || "Failed to delete group", { id: toastId });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("An error occurred while deleting.", { id: toastId });
+    }
+  };
+
+  // Filtered & Paginated
+  const filteredGroups = useMemo(() => {
+    return groups.filter((g) => {
+      const matchesSearch =
+        !searchTerm.trim() ||
+        g.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        g.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        g.under?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesUnder = !underFilter || g.under === underFilter;
+      return matchesSearch && matchesUnder;
+    });
+  }, [groups, searchTerm, underFilter]);
+
+  const totalPages = Math.ceil(filteredGroups.length / entriesPerPage) || 1;
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * entriesPerPage;
+    return filteredGroups.slice(start, start + entriesPerPage);
+  }, [filteredGroups, currentPage, entriesPerPage]);
 
   return (
-    <div className="min-h-screen bg-[#f4f7f6] p-4 md:p-6 font-sans text-sm text-[#333]">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
-        <div className="flex items-center space-x-2 text-[#6b58e8] text-sm">
-          <span className="hover:underline cursor-pointer">Home</span>
-          <span className="text-gray-400">&gt;</span>
-          <span className="hover:underline cursor-pointer flex items-center">
-            Inventory <ChevronDown className="w-3 h-3 ml-1" />
-          </span>
-          <span className="text-gray-400">&gt;</span>
-          <span className="text-gray-600">Asset Item</span>
-        </div>
+    <div className="p-6 bg-slate-50 min-h-screen">
+      <Toaster position="top-right" />
 
-        <div className="flex items-center space-x-2">
-          <button onClick={handleAddClick} className="bg-[#6b58e8] hover:bg-[#5844d0] text-white px-4 py-1.5 rounded text-sm flex items-center transition">
-            <Plus className="w-4 h-4 mr-1" /> Item Add
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Chart of Groups</h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Accounts &gt; Configuration &gt; Chart of Groups
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add New Group
           </button>
-          <button className="bg-[#e34949] hover:bg-[#c93b3b] text-white px-4 py-1.5 rounded text-sm flex items-center transition">
-            PDF
-          </button>
-          <button onClick={fetchChartOfGroups} className="bg-[#17b5c5] hover:bg-[#1399a7] text-white p-2 rounded transition">
-            <RefreshCcw className={`w-4 h-4 ${isGroupsLoading ? 'animate-spin' : ''}`} />
+          <button
+            onClick={fetchGroups}
+            className="p-2 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
+            title="Refresh"
+          >
+            <RefreshCcw className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* TABLE SECTION */}
-      <div className="bg-white rounded shadow-sm border border-gray-100 p-4">
-        
-        {/* Table Controls (Search & Show Entries) */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
-          <div className="flex items-center space-x-2 text-gray-600">
-            <span>Show</span>
-            <select 
-              value={entriesPerPage}
-              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 outline-none focus:border-[#6b58e8]"
+      {/* Controls Card */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Under (Category)
+            </label>
+            <select
+              value={underFilter}
+              onChange={(e) => {
+                setUnderFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 outline-none focus:ring-1 focus:ring-indigo-500"
             >
-              <option value={5}>5</option>
+              <option value="">All Categories</option>
+              {UNDER_OPTIONS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Search
+            </label>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search code, group name..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full text-xs pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Show Entries
+            </label>
+            <select
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 outline-none focus:ring-1 focus:ring-indigo-500"
+            >
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
             </select>
-            <span>entries</span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="text-gray-600">Search:</span>
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="border border-gray-300 rounded px-3 py-1.5 outline-none focus:border-[#6b58e8] w-48 pl-8"
-              />
-              <Search className="w-4 h-4 text-gray-400 absolute left-2 top-2" />
-            </div>
           </div>
         </div>
+      </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto border border-gray-200 rounded-sm">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#6b58e8] text-white text-xs uppercase font-semibold">
-                <th className="p-3 border-r border-[#8271eb]">ID</th>
-                <th className="p-3 border-r border-[#8271eb]">Code</th>
-                <th className="p-3 border-r border-[#8271eb]">Name</th>
-                <th className="p-3 border-r border-[#8271eb]">Category</th>
-                <th className="p-3 border-r border-[#8271eb]">Unit</th>
-                <th className="p-3 border-r border-[#8271eb]">Brand</th>
-                <th className="p-3 border-r border-[#8271eb]">Purchase Price</th>
-                <th className="p-3 border-r border-[#8271eb]">Group</th>
-                <th className="p-3 text-center">Action</th>
+      {/* Table Card */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-600">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold uppercase tracking-wider text-[11px]">
+              <tr>
+                <th className="px-4 py-3 text-center w-12">#</th>
+                <th className="px-4 py-3">Code</th>
+                <th className="px-4 py-3">Group Name</th>
+                <th className="px-4 py-3">Under</th>
+                <th className="px-4 py-3">Chart of Section</th>
+                <th className="px-4 py-3">Report Section</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="text-gray-700 text-sm">
-              {currentEntries.length === 0 ? (
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-6 text-gray-500">
-                    No data available in table
+                  <td colSpan={7} className="text-center py-10">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
+                    <p className="text-xs text-slate-400 mt-2">Loading chart of groups...</p>
+                  </td>
+                </tr>
+              ) : paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-slate-400">
+                    No chart of groups found.
                   </td>
                 </tr>
               ) : (
-                currentEntries.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                    <td className="p-3 border-r border-gray-100 font-medium">{item.id}</td>
-                    <td className="p-3 border-r border-gray-100">{item.code}</td>
-                    <td className="p-3 border-r border-gray-100 font-semibold text-gray-800">{item.name}</td>
-                    <td className="p-3 border-r border-gray-100">{item.category}</td>
-                    <td className="p-3 border-r border-gray-100">{item.unit}</td>
-                    <td className="p-3 border-r border-gray-100">{item.brand}</td>
-                    <td className="p-3 border-r border-gray-100">{item.price.toFixed(2)}</td>
-                    <td className="p-3 border-r border-gray-100">{item.group}</td>
-                    <td className="p-3 flex items-center justify-center space-x-2">
-                      <button onClick={() => handleEditClick(item)} className="bg-blue-500 hover:bg-blue-600 text-white p-1.5 rounded transition">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDelete(item.id)} className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                paginatedData.map((item, idx) => (
+                  <tr key={item.uuid || item.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-center font-medium text-slate-400">
+                      {(currentPage - 1) * entriesPerPage + idx + 1}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-indigo-600">
+                      {item.code}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {item.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {item.under}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {item.chartOfSection || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {item.reportSection || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.uuid)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -287,148 +443,166 @@ export default function AssetItemList() {
           </table>
         </div>
 
-        {/* Pagination Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-between mt-4 text-gray-600 gap-3">
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div>
-            Showing {totalEntries > 0 ? indexOfFirstEntry + 1 : 0} to {Math.min(indexOfLastEntry, totalEntries)} of {totalEntries} entries
+            Showing {filteredGroups.length === 0 ? 0 : (currentPage - 1) * entriesPerPage + 1} to{" "}
+            {Math.min(currentPage * entriesPerPage, filteredGroups.length)} of {filteredGroups.length} entries
           </div>
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className={`px-3 py-1.5 border border-gray-200 rounded ${
-                currentPage === 1 ? 'bg-[#f8f9fa] text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+              className="p-1.5 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Previous
+              <ChevronLeft className="w-4 h-4" />
             </button>
-            <div className="flex items-center px-3 bg-[#6b58e8] text-white rounded">
-              {currentPage} / {totalPages === 0 ? 1 : totalPages}
-            </div>
-            <button 
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className={`px-3 py-1.5 border border-gray-200 rounded ${
-                currentPage === totalPages || totalPages === 0 ? 'bg-[#f8f9fa] text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+            <span className="px-2 py-1 font-semibold text-slate-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* ADD / EDIT MODAL */}
+      {/* Add / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-[#fcfbfa] rounded shadow-lg w-full max-w-3xl overflow-hidden relative border border-gray-200">
-            <div className="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-base font-semibold text-gray-800">
-                {modalMode === 'edit' ? 'Edit Item' : 'New Item'}
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="font-semibold text-slate-800 text-sm">
+                {modalMode === "add" ? "Add New Chart of Group" : "Edit Chart of Group"}
+              </h3>
+              <button
+                onClick={closeModal}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-rose-500 hover:text-white text-slate-500 transition-colors cursor-pointer"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="p-6 bg-[#fbf8f9]">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
-                  
-                  {/* Category */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Category</label>
-                    <div className="relative">
-                      <select name="category" value={formData.category} onChange={handleInputChange} className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white" required>
-                        <option value="">Select Category</option>
-                        <option value="Electronics">Electronics</option>
-                        <option value="Furniture">Furniture</option>
-                        <option value="Stationery">Stationery</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  {/* Brand */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Brand</label>
-                    <div className="flex space-x-2">
-                      <div className="relative flex-1">
-                        <select name="brand" value={formData.brand} onChange={handleInputChange} className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white" required>
-                          <option value="">Select Brand</option>
-                          <option value="Global Link">Global Link</option>
-                          <option value="Dell">Dell</option>
-                          <option value="HP">HP</option>
-                          <option value="Local">Local</option>
-                          <option value="Samsung">Samsung</option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-                      </div>
-                      <button type="button" className="bg-[#6b58e8] text-white px-3 py-2 rounded"><Plus className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-
-                  {/* Item Name */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Item Name</label>
-                    <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Item Name" className="w-full border border-gray-300 rounded px-3 py-2 bg-white" required />
-                  </div>
-
-                  {/* Unit */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Unit</label>
-                    <div className="relative">
-                      <select name="unit" value={formData.unit} onChange={handleInputChange} className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white" required>
-                        <option value="">Select Unit</option>
-                        <option value="Pcs">Pcs</option>
-                        <option value="Kg">Kg</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  {/* Purchase Price */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Purchase Price</label>
-                    <input type="number" step="0.01" name="price" value={formData.price} onChange={handleInputChange} placeholder="Enter Price" className="w-full border border-gray-300 rounded px-3 py-2 bg-white" required />
-                  </div>
-
-                  {/* Chart Of Groups (API CONNECTED) */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Chart Of Groups*</label>
-                    <div className="relative">
-                      <select 
-                        name="group" 
-                        value={formData.group} 
-                        onChange={handleInputChange} 
-                        className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white" 
-                        required
-                      >
-                        <option value="">
-                          {isGroupsLoading ? 'Loading groups...' : 'Select One Option'}
-                        </option>
-                        
-                        {chartGroups.length > 0 ? (
-                          chartGroups.map((group: any) => (
-                            <option key={group.id} value={group.name}>
-                              {group.name}
-                            </option>
-                          ))
-                        ) : (
-                          !isGroupsLoading && <option value="" disabled>No groups found</option>
-                        )}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-                    </div>
-                  </div>
-
+            <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs md:text-sm">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-medium text-slate-700">
+                    Group Code <span className="text-rose-500">*</span>
+                  </label>
+                  {modalMode === "add" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          code: generateGroupCode(groups),
+                        }))
+                      }
+                      className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 cursor-pointer"
+                      title="Generate new Code"
+                    >
+                      <RefreshCcw className="w-3 h-3" /> Auto Generate
+                    </button>
+                  )}
                 </div>
+                <input
+                  type="text"
+                  name="code"
+                  required
+                  disabled={modalMode === "edit"}
+                  placeholder="e.g. COG-103"
+                  value={formData.code}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                />
               </div>
 
-              <div className="bg-white px-6 py-4 border-t border-gray-100 flex justify-end space-x-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2 bg-gray-500 text-white rounded">Close</button>
-                <button type="submit" className="px-5 py-2 bg-[#6b58e8] text-white rounded">
-                  {modalMode === 'edit' ? 'Update' : 'Submit'}
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Group Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  placeholder="e.g. Administrative Expenses"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Under (Classification) <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  name="under"
+                  required
+                  value={formData.under}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
+                >
+                  {UNDER_OPTIONS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Chart Of Section <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  name="chartOfSection"
+                  required
+                  value={formData.chartOfSection}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
+                >
+                  {SECTION_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">
+                  Report Section
+                </label>
+                <input
+                  type="text"
+                  name="reportSection"
+                  placeholder="e.g. Operating Expenses"
+                  value={formData.reportSection}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-md hover:bg-slate-50 font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {modalMode === "add" ? "Save Group" : "Update Group"}
                 </button>
               </div>
             </form>

@@ -2,6 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 import {
   Plus,
   X,
@@ -63,8 +74,8 @@ export default function PaymentVoucherPage() {
   const [titleOfWork, setTitleOfWork] = useState("");
   const [ifTask, setIfTask] = useState("");
   const [site, setSite] = useState("");
-  const [date, setDate] = useState("13/09/2026");
-  const [voucherNo, setVoucherNo] = useState("P00005");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [voucherNo, setVoucherNo] = useState(`PAY-${Date.now().toString().slice(-6)}`);
   const [selectedAccount, setSelectedAccount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [isCheque, setIsCheque] = useState(false);
@@ -125,10 +136,11 @@ export default function PaymentVoucherPage() {
   const fetchVouchers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/backend/payment-vouchers", { headers: { accept: "application/json" } });
+      const response = await fetch("/api/backend/payment-vouchers", { headers: getAuthHeaders() });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Payment vouchers could not be loaded.");
-      const rows = normalizeArray(result.data);
+      const rows = normalizeArray(result.data?.data ?? result.data);
+      const accMap = new Map((accounts || []).map(a => [String(a.uuid || a.id), a.name]));
       setVouchers(rows.map((voucher, index) => ({
         id: Number(voucher.id ?? index + 1),
         uuid: String(voucher.uuid ?? ""),
@@ -137,7 +149,7 @@ export default function PaymentVoucherPage() {
         project: String(voucher.projectId ?? ""),
         titleOfWork: String(voucher.workId ?? ""),
         code: String(voucher.voucherNo ?? ""),
-        debit: String(voucher.accountId ?? normalizeArray(voucher.entries)[0]?.debitAccount ?? ""),
+        debit: accMap.get(String(voucher.accountId)) || String(voucher.entries?.[0]?.accountName ?? voucher.accountId ?? ""),
         credit: String(voucher.paymentMethod ?? ""),
         total: Number(voucher.amount ?? 0),
         comment: String(voucher.comment ?? "—"),
@@ -160,9 +172,9 @@ export default function PaymentVoucherPage() {
     fetchVouchers();
     const fetchAccounts = async () => {
       try {
-        const response = await fetch("/api/backend/chart-of-accounts", { headers: { accept: "application/json" } });
+        const response = await fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders() });
         const result = await response.json();
-        setAccounts(normalizeArray(result.data) as Array<{ id?: string | number; uuid?: string; name?: string }>);
+        setAccounts(normalizeArray(result.data?.data ?? result.data) as Array<{ id?: string | number; uuid?: string; name?: string }>);
       } catch (error) {
         console.error("Failed to load accounts", error);
       }
@@ -230,7 +242,7 @@ export default function PaymentVoucherPage() {
     try {
       const response = await fetch("/api/backend/payment-vouchers", {
         method: "POST",
-        headers: { "Content-Type": "application/json", accept: "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const result = await response.json();
@@ -239,7 +251,10 @@ export default function PaymentVoucherPage() {
       }
       toast.success(editUuid ? "Payment voucher replacement created successfully." : "Payment voucher created successfully.");
       if (editUuid) {
-        const deleteResponse = await fetch(`/api/backend/payment-vouchers/${encodeURIComponent(editUuid)}`, { method: "DELETE" });
+        const deleteResponse = await fetch(`/api/backend/payment-vouchers/${encodeURIComponent(editUuid)}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        });
         if (!deleteResponse.ok) {
           toast.error("New voucher created, but the old voucher could not be deleted.");
         }

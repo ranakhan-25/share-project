@@ -2,6 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 import {
   Plus,
   X,
@@ -60,8 +71,8 @@ export default function ReceiptVoucherPage() {
   const [projectType, setProjectType] = useState("");
   const [project, setProject] = useState("");
   const [titleOfWork, setTitleOfWork] = useState("");
-  const [date, setDate] = useState("13/09/2026");
-  const [voucherNo, setVoucherNo] = useState("R00015");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [voucherNo, setVoucherNo] = useState(`RCT-${Date.now().toString().slice(-6)}`);
 
   const [selectedAccount, setSelectedAccount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -123,9 +134,10 @@ export default function ReceiptVoucherPage() {
   const fetchVouchers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/backend/vouchers", { headers: { accept: "application/json" } });
+      const response = await fetch("/api/backend/vouchers", { headers: getAuthHeaders() });
       const result = await response.json();
-      const rows = normalizeArray(result.data);
+      const rows = normalizeArray(result.data?.data ?? result.data);
+      const accMap = new Map((accounts || []).map(a => [String(a.uuid || a.id), a.name]));
       setVouchers(rows.map((voucher, index) => ({
         id: Number(voucher.id ?? index + 1),
         uuid: String(voucher.uuid ?? ""),
@@ -133,7 +145,7 @@ export default function ReceiptVoucherPage() {
         date: String(voucher.date ?? "").slice(0, 10),
         project: String(voucher.projectId ?? ""),
         code: String(voucher.voucherNo ?? ""),
-        credit: String(voucher.accountId ?? ""),
+        credit: accMap.get(String(voucher.accountId)) || String(voucher.entries?.[0]?.accountName ?? voucher.accountId ?? ""),
         debit: String(voucher.paymentMethod ?? ""),
         total: Number(voucher.amount ?? 0),
         ref: "N/A",
@@ -157,7 +169,7 @@ export default function ReceiptVoucherPage() {
     fetchVouchers();
     const fetchAccounts = async () => {
       try {
-        const response = await fetch("/api/backend/chart-of-accounts", { headers: { accept: "application/json" } });
+        const response = await fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders() });
         const result = await response.json();
         setAccounts(normalizeArray(result.data) as Array<{ id?: string | number; uuid?: string; name?: string }>);
       } catch (error) {
@@ -231,7 +243,7 @@ export default function ReceiptVoucherPage() {
     try {
       const response = await fetch(`/api/backend/vouchers${editUuid ? `/${encodeURIComponent(editUuid)}` : ""}`, {
         method: editUuid ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json", accept: "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const result = await response.json();
@@ -277,6 +289,7 @@ export default function ReceiptVoucherPage() {
                 try {
                   const response = await fetch(`/api/backend/vouchers/${encodeURIComponent(row.uuid)}`, {
                     method: "DELETE",
+                    headers: getAuthHeaders(),
                   });
                   if (!response.ok) throw new Error("Voucher could not be deleted.");
                   toast.success("Voucher deleted successfully.", { id: loadingToast });
@@ -304,7 +317,9 @@ export default function ReceiptVoucherPage() {
       );
     } else if (key === "view" && row.uuid) {
       try {
-        const response = await fetch(`/api/backend/vouchers/${encodeURIComponent(row.uuid)}`);
+        const response = await fetch(`/api/backend/vouchers/${encodeURIComponent(row.uuid)}`, {
+          headers: getAuthHeaders(),
+        });
         const result = await response.json();
         if (!response.ok) throw new Error(result.message || "Voucher could not be loaded.");
         const detail = result.data?.data ?? result.data ?? result;
@@ -314,7 +329,9 @@ export default function ReceiptVoucherPage() {
       }
     } else if (key === "edit" && row.uuid) {
       try {
-        const response = await fetch(`/api/backend/vouchers/${encodeURIComponent(row.uuid)}`);
+        const response = await fetch(`/api/backend/vouchers/${encodeURIComponent(row.uuid)}`, {
+          headers: getAuthHeaders(),
+        });
         const result = await response.json();
         if (!response.ok) throw new Error(result.message || "Voucher could not be loaded.");
         const detail = result.data?.data ?? result.data ?? result;

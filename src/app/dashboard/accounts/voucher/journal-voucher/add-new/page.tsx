@@ -4,6 +4,17 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
+
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 import {
   ArrowLeft,
   Plus,
@@ -68,8 +79,8 @@ export default function JournalVoucherCreatePage() {
 
   // Header state
   const [headerState, setHeaderState] = useState({
-    voucherNo: "P00005",
-    date: "2026-11-03",
+    voucherNo: `JV-${Date.now().toString().slice(-6)}`,
+    date: new Date().toISOString().slice(0, 10),
     projectType: "",
     titleOfWork: "",
     project: "",
@@ -117,6 +128,7 @@ export default function JournalVoucherCreatePage() {
     void (async () => {
       try {
         const response = await fetch("/api/backend/chart-of-accounts", {
+          headers: getAuthHeaders(),
           cache: "no-store",
         });
         const result = await response.json();
@@ -436,7 +448,7 @@ export default function JournalVoucherCreatePage() {
       // Create = POST, Update = PATCH, fail হলে PUT
       let response = await fetch(url, {
         method: editingUuid ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 

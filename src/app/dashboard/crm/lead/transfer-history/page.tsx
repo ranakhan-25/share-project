@@ -28,12 +28,14 @@ const mockTransferLeads: TransferLeadRecord[] = [
 
 export default function TransferLeadListPage() {
   const [transferLeads, setTransferLeads] = useState<TransferLeadRecord[]>([]);
+  const [userOptions, setUserOptions] = useState<any[]>([]);
   useEffect(() => {
     void crmLeadApi.listAllTransfers().then((result) => setTransferLeads(result.data.map((row: any) => ({
       id: row.uuid, leadCode: row.leadCode ?? "", name: row.name ?? "", mobile: row.mobile ?? "",
       from: row.sourceUser?.name ?? row.from ?? "", to: row.targetUser?.name ?? row.to ?? "",
       date: row.date ?? row.transferDate ?? "", lastActivity: row.lastActivity?.summary ?? row.lastActivity ?? "",
     })))).catch((error) => { console.error("Failed to load transfer history", error); setTransferLeads([]); });
+    void crmLeadApi.dropdown("user").then(setUserOptions).catch(() => {});
   }, []);
 
   const [selectedDateRange, setSelectedDateRange] = useState("September 23, 2026 - October 22, 2026");
@@ -128,8 +130,11 @@ export default function TransferLeadListPage() {
             className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border text-sm font-extrabold cursor-pointer"
           >
             <option value="">Select One Option</option>
-            <option value="Admin">Admin</option>
-            <option value="Mohin">Mohin</option>
+            {userOptions.map((u) => (
+              <option key={u.uuid || u.name} value={u.name}>
+                {u.name} {u.designationName ? `(${u.designationName})` : ""}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -144,8 +149,11 @@ export default function TransferLeadListPage() {
             className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border text-sm font-extrabold cursor-pointer"
           >
             <option value="">Select One Option</option>
-            <option value="Rowza">Rowza</option>
-            <option value="Sarna11">Sarna11</option>
+            {userOptions.map((u) => (
+              <option key={u.uuid || u.name} value={u.name}>
+                {u.name} {u.designationName ? `(${u.designationName})` : ""}
+              </option>
+            ))}
           </select>
         </div>
       </div>

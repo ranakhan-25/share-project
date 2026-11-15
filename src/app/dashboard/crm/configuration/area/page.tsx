@@ -83,7 +83,7 @@ export default function AreaPage() {
         const dataWithStatus = (json.data.data || []).map((item: any) => ({
           ...item,
           status: localStatuses[item.uuid] || item.status || "active",
-        })).filter((item: any) => showDeleted || !item.deletedAt);
+        })).filter((item: any) => showDeleted || (!item.deletedAt && !item.deleted_at));
         
         setAreas(dataWithStatus);
         setTotalPages(json.data.meta?.totalPages || 1);

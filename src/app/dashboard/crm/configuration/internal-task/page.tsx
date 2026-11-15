@@ -93,7 +93,7 @@ export default function TaskPage() {
         }
 
         // ✅ soft-deleted বাদ দেওয়া (deletedAt null/undefined থাকলে রাখা হবে)
-        const cleanList = list.filter((item: any) => !item.deletedAt);
+        const cleanList = list.filter((item: any) => !item.deletedAt && !item.deleted_at);
 
         console.log("✅ Parsed list length:", cleanList.length);
 

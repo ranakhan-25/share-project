@@ -80,9 +80,9 @@ export default function QuotationsPage() {
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       rows = rows.filter((r) => {
-        const no = r.quotationNo || "";
-        const client = r.clientName || "";
-        const project = r.projectName || "";
+        const no = r.quotationNo || r.code || "";
+        const client = r.clientName || r.customer || "";
+        const project = r.projectName || r.project || "";
         return no.toLowerCase().includes(q) || client.toLowerCase().includes(q) || project.toLowerCase().includes(q);
       });
     }
@@ -208,7 +208,12 @@ export default function QuotationsPage() {
                 paginatedRows.map((row, idx) => {
                   const sl = (currentPage - 1) * entriesPerPage + idx + 1;
                   const dateStr = row.date || row.createdAt ? String(row.date || row.createdAt).slice(0, 10) : "—";
-                  const amount = row.totalAmount ? `৳${Number(row.totalAmount).toLocaleString()}` : "—";
+                  const rawAmount = row.totalAmount ?? row.grandTotal;
+                  const amount = rawAmount ? `৳${Number(rawAmount).toLocaleString()}` : "—";
+                  const qCode = row.quotationNo || row.code || "QT-N/A";
+                  const qClient = row.clientName || row.customer || "—";
+                  const qProject = row.projectName || row.project || "—";
+                  const qStatus = row.approveStatus || row.status || "Active";
 
                   return (
                     <tr
@@ -216,13 +221,13 @@ export default function QuotationsPage() {
                       className="border-b border-gray-100 hover:bg-gray-50/80 transition-colors"
                     >
                       <td className="p-3 text-center text-gray-500">{sl}</td>
-                      <td className="p-3 font-mono font-medium text-indigo-600">{row.quotationNo || "QT-N/A"}</td>
-                      <td className="p-3 font-medium text-gray-800">{row.clientName || "—"}</td>
-                      <td className="p-3 text-gray-700">{row.projectName || "—"}</td>
+                      <td className="p-3 font-mono font-medium text-indigo-600">{qCode}</td>
+                      <td className="p-3 font-medium text-gray-800">{qClient}</td>
+                      <td className="p-3 text-gray-700">{qProject}</td>
                       <td className="p-3 text-right font-mono text-emerald-700 font-semibold">{amount}</td>
                       <td className="p-3">
                         <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {row.status || "Active"}
+                          {qStatus}
                         </span>
                       </td>
                       <td className="p-3 text-gray-600">{dateStr}</td>

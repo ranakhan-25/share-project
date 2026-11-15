@@ -147,7 +147,7 @@ export default function EmployeeKpiPage() {
     setIsFetching(true);
     try {
       const json = await safeFetch(
-        `${API_BASE_URL}?page=1&limit=10&withDeleted=false`,
+        `${API_BASE_URL}?page=1&limit=10`,
       );
       if (json.success) setKpiData(json.data.data);
     } catch (error: any) {
