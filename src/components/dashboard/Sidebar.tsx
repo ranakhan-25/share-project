@@ -9,14 +9,27 @@ import { useLang } from "@/lib/i18n";
 import { Logo, LogoMark } from "@/components/site/Logo";
 import { sidebarMenu, type MenuItem, type SubMenuItem } from "./sidebar-data";
 
+const isPathActive = (pathname: string, href?: string) => {
+  if (!href) return false;
+  // Dashboard roots require EXACT match so they don't light up on every subpage
+  const exactOnlyRoutes = [
+    "/dashboard",
+    "/dashboard/accounts",
+    "/dashboard/crm",
+    "/dashboard/project",
+  ];
+  if (exactOnlyRoutes.includes(href)) {
+    return pathname === href;
+  }
+  return pathname === href || pathname.startsWith(href + "/");
+};
+
 function SubItem({ item, onNavigate }: { item: SubMenuItem; onNavigate: () => void }) {
   const pathname = usePathname();
   const { t } = useLang();
   const hasGrandChildren = !!item.children?.length;
   const isGrandChildActive =
-    item.children?.some(
-      (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
-    ) ?? false;
+    item.children?.some((gc) => isPathActive(pathname, gc.href)) ?? false;
   const [open, setOpen] = useState(isGrandChildActive);
 
   useEffect(() => {
@@ -24,9 +37,7 @@ function SubItem({ item, onNavigate }: { item: SubMenuItem; onNavigate: () => vo
   }, [isGrandChildActive]);
 
   if (!hasGrandChildren) {
-    const on = item.href
-      ? pathname === item.href || pathname.startsWith(item.href + "/")
-      : false;
+    const on = isPathActive(pathname, item.href);
     return (
       <li>
         <Link
@@ -49,15 +60,11 @@ function SubItem({ item, onNavigate }: { item: SubMenuItem; onNavigate: () => vo
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition ${
-          isGrandChildActive
-            ? "text-emerald-700 font-semibold bg-emerald-50/50"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-        }`}
+        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition"
       >
         <span className="truncate text-left">{t(item.label)}</span>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+          className={`h-3.5 w-3.5 shrink-0 transition-transform text-slate-400 ${
             open ? "rotate-180" : ""
           }`}
         />
@@ -72,8 +79,7 @@ function SubItem({ item, onNavigate }: { item: SubMenuItem; onNavigate: () => vo
             className="ml-3 mt-0.5 space-y-0.5 overflow-hidden border-l border-slate-200 pl-2.5"
           >
             {item.children!.map((c) => {
-              const on =
-                pathname === c.href || pathname.startsWith(c.href + "/");
+              const on = isPathActive(pathname, c.href);
               return (
                 <li key={c.href}>
                   <Link
@@ -104,14 +110,12 @@ function Item({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: bool
   const childActive =
     item.children?.some((c) => {
       if (c.children?.length) {
-        return c.children.some(
-          (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
-        );
+        return c.children.some((gc) => isPathActive(pathname, gc.href));
       }
-      return c.href ? pathname === c.href || pathname.startsWith(c.href + "/") : false;
+      return isPathActive(pathname, c.href);
     }) ?? false;
-  const selfActive = item.href ? (item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href)) : false;
-  const active = selfActive || childActive;
+
+  const isLeafSelected = !hasChildren && isPathActive(pathname, item.href);
   const [open, setOpen] = useState(childActive);
 
   useEffect(() => {
@@ -119,18 +123,43 @@ function Item({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: bool
   }, [childActive]);
 
   const base = `group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-    active ? "bg-emerald-50 text-emerald-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+    isLeafSelected
+      ? "bg-emerald-50 text-emerald-700"
+      : collapsed && childActive
+      ? "text-emerald-700 bg-emerald-50"
+      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
   } ${collapsed ? "justify-center" : ""}`;
 
   const inner = (
     <>
-      {active && <motion.span layoutId="side-active" className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-emerald-500" />}
-      <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-emerald-600" : ""}`} />
+      {isLeafSelected && (
+        <motion.span
+          layoutId="side-active"
+          className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-emerald-500"
+        />
+      )}
+      <item.icon
+        className={`h-[18px] w-[18px] shrink-0 ${
+          isLeafSelected || (collapsed && childActive)
+            ? "text-emerald-600"
+            : "text-slate-500 group-hover:text-slate-800"
+        }`}
+      />
       {!collapsed && (
         <>
           <span className="flex-1 truncate text-left">{t(item.label)}</span>
-          {item.badge && <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-700">{item.badge}</span>}
-          {hasChildren && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />}
+          {item.badge && (
+            <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-emerald-700">
+              {item.badge}
+            </span>
+          )}
+          {hasChildren && (
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          )}
         </>
       )}
       {collapsed && (

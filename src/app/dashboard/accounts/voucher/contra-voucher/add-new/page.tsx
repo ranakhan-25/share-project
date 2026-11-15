@@ -31,6 +31,17 @@ export interface ChartOfAccountOption {
   group: string;
 }
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 export default function ContraVoucherCreatePage() {
   const router = useRouter();
   const [editingUuid, setEditingUuid] = useState("");
@@ -39,8 +50,8 @@ export default function ContraVoucherCreatePage() {
   const [loadingVoucher, setLoadingVoucher] = useState(false);
   // --- Form Header State ---
   const [headerState, setHeaderState] = useState({
-    voucherNo: "CON00001",
-    date: "13/09/2026",
+    voucherNo: `CON-${Date.now().toString().slice(-6)}`,
+    date: new Date().toISOString().slice(0, 10),
     projectType: "",
     titleOfWork: "",
     project: "",
@@ -49,12 +60,7 @@ export default function ContraVoucherCreatePage() {
   });
 
   // --- Dynamic Chart of Accounts Options State ---
-  const [accountOptions, setAccountOptions] = useState<ChartOfAccountOption[]>([
-    { id: "1", code: "1001", name: "Cash in Hand", group: "Assets" },
-    { id: "2", code: "1002", name: "Bank Account (DBBL)", group: "Assets" },
-    { id: "3", code: "1003", name: "Petty Cash", group: "Assets" },
-    { id: "4", code: "2001", name: "Sundry Creditors", group: "Liabilities" },
-  ]);
+  const [accountOptions, setAccountOptions] = useState<ChartOfAccountOption[]>([]);
 
   // --- Entry Form Inputs State ---
   const [entryType, setEntryType] = useState<"DEBIT" | "CREDIT">("DEBIT");
@@ -86,7 +92,10 @@ export default function ContraVoucherCreatePage() {
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetch("/api/backend/chart-of-accounts", { cache: "no-store" });
+        const response = await fetch("/api/backend/chart-of-accounts", {
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        });
         const result = await response.json();
         const records = Array.isArray(result.data)
           ? result.data
@@ -284,13 +293,13 @@ export default function ContraVoucherCreatePage() {
         : "/api/backend/contra-vouchers";
       let response = await fetch(url, {
         method: editingUuid ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       if (editingUuid && !response.ok) {
         response = await fetch(url, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
       }

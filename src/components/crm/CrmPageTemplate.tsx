@@ -33,6 +33,7 @@ export interface CrmPageData {
   restoreEndpoint?: string;
   transformData?: (rawData: any[]) => Record<string, string | number>[];
   createFields?: CreateFieldDef[];
+  beforeSubmit?: (formData: Record<string, any>, isEdit: boolean) => Record<string, any>;
 }
 
 export function extractApiItems(resData: any): any[] {
@@ -124,6 +125,7 @@ export function CrmPageTemplate({
   restoreEndpoint,
   transformData,
   createFields,
+  beforeSubmit,
 }: CrmPageData) {
   const [query, setQuery] = useState("");
   const [dataRows, setDataRows] = useState<Record<string, string | number>[]>(rows);
@@ -346,12 +348,21 @@ export function CrmPageTemplate({
     setSubmitting(true);
     try {
       if (apiEndpoint) {
+        const payload = beforeSubmit ? beforeSubmit(formData, !!editingItem) : formData;
         if (editingItem && (editingItem.id || editingItem.uuid)) {
           const targetId = editingItem.id || editingItem.uuid;
-          await api.put(`${apiEndpoint}/${targetId}`, formData);
+          try {
+            await api.patch(`${apiEndpoint}/${targetId}`, payload);
+          } catch (patchErr: any) {
+            if (patchErr?.response?.status === 404 || patchErr?.response?.status === 405) {
+              await api.put(`${apiEndpoint}/${targetId}`, payload);
+            } else {
+              throw patchErr;
+            }
+          }
           showAlert.success("Updated Successfully", `${title} has been updated.`);
         } else {
-          await api.post(apiEndpoint, formData);
+          await api.post(apiEndpoint, payload);
           showAlert.success("Created Successfully", `${title} created successfully!`);
         }
         setIsModalOpen(false);

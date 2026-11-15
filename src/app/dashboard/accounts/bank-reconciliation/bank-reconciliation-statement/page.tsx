@@ -4,7 +4,18 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { ChevronDown, X, ArrowUpDown, Loader2 } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/realbizpro/api/v1";
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
+const API_BASE = "/api/backend";
 
 export interface ReconciliationItem {
   uuid: string;
@@ -74,7 +85,7 @@ export default function BankReconciliationPage() {
     try {
       const res = await fetch(`${API_BASE}/bank-reconciliations`, {
         method: "GET",
-        headers: { Accept: "application/json" },
+        headers: getAuthHeaders(),
         cache: "no-store",
       });
       if (!res.ok) throw new Error(`Failed to load data (${res.status})`);
@@ -121,10 +132,7 @@ export default function BankReconciliationPage() {
 
       const res = await fetch(`${API_BASE}/bank-reconciliations/${selectedItem.uuid}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 

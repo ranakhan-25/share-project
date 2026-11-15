@@ -60,7 +60,7 @@ export default function ProfessionPage() {
       
       if (json.success) {
         // ✅ ফ্রন্টএন্ডেও ফিল্টার করা হচ্ছে যাতে deleted ডাটা না আসে
-        const activeData = (json.data.data || []).filter((item: any) => !item.deletedAt);
+        const activeData = (json.data.data || []).filter((item: any) => showDeleted || (!item.deletedAt && !item.deleted_at));
         
         setProfessions(activeData);
         setTotalPages(json.data.meta?.totalPages || 1);

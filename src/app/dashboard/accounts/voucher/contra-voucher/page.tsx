@@ -68,10 +68,24 @@ export default function ContraVoucherListPage() {
     return [];
   };
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
   const requestJson = async (url: string, method = "GET", payload?: unknown) => {
     const response = await fetch(url, {
       method,
-      headers: payload ? { "Content-Type": "application/json" } : undefined,
+      headers: {
+        ...getAuthHeaders(),
+        ...(payload ? { "Content-Type": "application/json" } : {}),
+      },
       body: payload ? JSON.stringify(payload) : undefined,
     });
     const result = await response.json().catch(() => ({}));

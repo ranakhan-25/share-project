@@ -38,8 +38,12 @@ const API_DROPDOWN_URL = `${API_REPORT_URL}/dropdowns`;
 // ==========================================
 export default function EmployeeKpiCallReportPage() {
   // Filters
-  const [dateFrom, setDateFrom] = useState("2026-07-01");
-  const [dateTo, setDateTo] = useState("2026-07-31");
+  const [dateFrom, setDateFrom] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+  );
+  const [dateTo, setDateTo] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10)
+  );
   const [selectedUser, setSelectedUser] = useState("");
 
   // Data States
@@ -92,6 +96,10 @@ export default function EmployeeKpiCallReportPage() {
     };
     fetchDropdowns();
   }, []);
+
+  useEffect(() => {
+    handleSearch();
+  }, [dateFrom, dateTo]);
 
   // Fetch Report Data
   const handleSearch = async (e?: React.FormEvent) => {

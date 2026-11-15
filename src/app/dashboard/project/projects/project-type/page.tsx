@@ -24,11 +24,18 @@ type ProjectTypeItem = {
 };
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("admin_access_token")
+      : null;
   const response = await fetch(url, {
     ...options,
     headers: {
       Accept: "application/json",
       ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });

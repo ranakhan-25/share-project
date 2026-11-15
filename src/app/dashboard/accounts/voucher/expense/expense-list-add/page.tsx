@@ -5,6 +5,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, X, ChevronsLeft, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 interface AccountItem {
   id: string;
   accountId: string;
@@ -31,7 +42,7 @@ export default function ExpenseAddPage() {
   const [task, setTask] = useState("");
   const [site, setSite] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [voucherNo, setVoucherNo] = useState("EXP00003");
+  const [voucherNo, setVoucherNo] = useState(`EXP-${Date.now().toString().slice(-6)}`);
   const [selectedAccount, setSelectedAccount] = useState("");
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState<string>("");
@@ -57,7 +68,7 @@ export default function ExpenseAddPage() {
       setIsLoadingAccounts(true);
       try {
         const response = await fetch(`${API_BASE}/chart-of-accounts`, {
-          headers: { accept: "application/json" },
+          headers: getAuthHeaders(),
         });
         const result = await response.json();
         if (!response.ok || result.success === false) {
@@ -194,7 +205,7 @@ export default function ExpenseAddPage() {
     try {
       const response = await fetch(`${API_BASE}/expenses${editUuid ? `/${editUuid}` : ""}`, {
         method: editUuid ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json", accept: "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const result = await response.json();

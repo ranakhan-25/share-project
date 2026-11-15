@@ -93,7 +93,7 @@ export default function ProjectPage() {
       const json = await res.json();
       
       if (json.success) {
-        setProjects((json.data.data || []).filter((item: any) => !item.deletedAt));
+        setProjects((json.data.data || []).filter((item: any) => !item.deletedAt && !item.deleted_at));
         setTotalPages(json.data.meta?.totalPages || 1);
         setTotalEntries(json.data.meta?.total || 0);
       }
@@ -141,7 +141,7 @@ export default function ProjectPage() {
   const handleOpenAddModal = () => {
     setEditingRecord(null);
     setFormData({
-      code: "",
+      code: `P${Math.floor(100000 + Math.random() * 900000)}`,
       name: "",
       projectType: "",
       projectManager: "",
@@ -520,7 +520,8 @@ export default function ProjectPage() {
                     <option value="">Select Project Type</option>
                     {projectTypes.map((p, index) => {
                       const pName = typeof p === "string" ? p : p.name || p.label;
-                      return <option key={`ptype-modal-${index}`} value={pName}>{pName}</option>;
+                      const pVal = typeof p === "object" && p.uuid ? p.uuid : pName;
+                      return <option key={`ptype-modal-${index}`} value={pVal}>{pName}</option>;
                     })}
                   </select>
                 </div>
@@ -530,7 +531,8 @@ export default function ProjectPage() {
                     <option value="">Select Project Manager</option>
                     {managers.map((m, index) => {
                       const mName = typeof m === "string" ? m : m.name || m.label;
-                      return <option key={`manager-${index}`} value={mName}>{mName}</option>;
+                      const mVal = typeof m === "object" && m.uuid ? m.uuid : mName;
+                      return <option key={`manager-${index}`} value={mVal}>{mName}</option>;
                     })}
                   </select>
                 </div>
@@ -576,7 +578,8 @@ export default function ProjectPage() {
                     <option value="">Select Area</option>
                     {areas.map((a, index) => {
                       const aName = typeof a === "string" ? a : a.name || a.label;
-                      return <option key={`area-modal-${index}`} value={aName}>{aName}</option>;
+                      const aVal = typeof a === "object" && a.uuid ? a.uuid : aName;
+                      return <option key={`area-modal-${index}`} value={aVal}>{aName}</option>;
                     })}
                   </select>
                 </div>

@@ -15,11 +15,23 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  RefreshCcw,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
 // API Base URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
+
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 
 // Types
 export interface ChartOfAccountItem {
@@ -65,15 +77,33 @@ export default function ChartOfAccountsPage() {
     under: "",
   });
 
+  const [groups, setGroups] = useState<any[]>([]);
+
   // ==========================================
-  // 1. GET API: Fetch Accounts
+  // 1. GET API: Fetch Accounts & Groups
   // ==========================================
+  const fetchGroups = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/chart-of-groups`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      const result = await response.json();
+      const list = result.data?.data || result.data || [];
+      if (Array.isArray(list)) {
+        setGroups(list);
+      }
+    } catch (err) {
+      console.error("Failed to fetch groups", err);
+    }
+  }, []);
+
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/chart-of-accounts`, {
         method: "GET",
-        headers: { accept: "application/json" },
+        headers: getAuthHeaders(),
       });
       const result = await response.json();
 
@@ -95,7 +125,8 @@ export default function ChartOfAccountsPage() {
 
   useEffect(() => {
     fetchAccounts();
-  }, [fetchAccounts]);
+    fetchGroups();
+  }, [fetchAccounts, fetchGroups]);
 
   // ==========================================
   // 2. POST & PATCH API: Add or Edit
@@ -109,36 +140,33 @@ export default function ChartOfAccountsPage() {
       let method = "POST";
       let payload: any = {};
 
+      const matchedGroup = groups.find((g) => g.name === formData.under || g.uuid === formData.under);
+
       if (modalMode === "add") {
-        // POST Payload (সব ফিল্ড যাবে)
+        // POST Payload
         payload = {
-          chartOfGroupUuid: "248a4905-4ec7-4fc5-82f1-95d7d4482085", // Static UUID
+          chartOfGroupUuid: matchedGroup?.uuid || groups[0]?.uuid || undefined,
           code: formData.code,
           name: formData.name,
           openingBalance: Number(formData.openingBalance) || 0,
-          under: formData.under,
+          under: matchedGroup?.name || formData.under,
           hasDelete: true,
-          addedBy: "Admin",
-          addedById: "admin-uuid",
         };
       } else {
-        // PATCH Payload (শুধু অ্যালাউড ফিল্ডগুলো যাবে, code, addedBy বাদ যাবে)
+        // PATCH Payload
         url = `${API_BASE}/chart-of-accounts/${editUuid}`;
         method = "PATCH";
         payload = {
           name: formData.name,
           openingBalance: Number(formData.openingBalance) || 0,
-          under: formData.under,
-          // প্রয়োজনে chartOfGroupUuid এবং hasDelete যোগ করতে পারেন
+          under: matchedGroup?.name || formData.under,
+          chartOfGroupUuid: matchedGroup?.uuid || undefined,
         };
       }
 
       const response = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          accept: "application/json",
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -149,7 +177,6 @@ export default function ChartOfAccountsPage() {
         await fetchAccounts();
         closeModal();
       } else {
-        // API এরর মেসেজ সুন্দরভাবে দেখানো
         const errorMsg = result.message || (result.errors && result.errors[0]?.errors?.[0]) || "Failed to save account.";
         toast.error(errorMsg);
       }
@@ -172,7 +199,7 @@ export default function ChartOfAccountsPage() {
     try {
       const response = await fetch(`${API_BASE}/chart-of-accounts/${uuid}`, {
         method: "DELETE",
-        headers: { accept: "application/json" },
+        headers: getAuthHeaders(),
       });
       
       const result = await response.json();
@@ -190,12 +217,37 @@ export default function ChartOfAccountsPage() {
   };
 
   // ==========================================
+  // Helper: Auto Generate Account Code
+  // ==========================================
+  const generateAccountCode = (existingList: ChartOfAccountItem[] = accountsData) => {
+    let maxNum = 1000;
+    if (Array.isArray(existingList)) {
+      existingList.forEach((item) => {
+        if (item.code) {
+          const match = item.code.match(/(\d+)$/);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+          }
+        }
+      });
+    }
+    return `COA-${maxNum + 1}`;
+  };
+
+  // ==========================================
   // 4. Modal Handlers
   // ==========================================
   const openAddModal = () => {
     setModalMode("add");
     setEditUuid(null);
-    setFormData({ code: "", name: "", openingBalance: "0", under: "" });
+    const autoCode = generateAccountCode(accountsData);
+    setFormData({
+      code: autoCode,
+      name: "",
+      openingBalance: "0",
+      under: groups[0]?.name || ""
+    });
     setIsModalOpen(true);
   };
 
@@ -499,16 +551,30 @@ export default function ChartOfAccountsPage() {
 
             <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs md:text-sm">
               <div>
-                <label className="block font-medium text-slate-700 mb-1">Code <span className="text-rose-500">*</span></label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-medium text-slate-700">
+                    Code <span className="text-rose-500">*</span>
+                  </label>
+                  {modalMode === "add" && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, code: generateAccountCode(accountsData) }))}
+                      className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 cursor-pointer"
+                      title="Generate new Code"
+                    >
+                      <RefreshCcw className="w-3 h-3" /> Auto Generate
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   name="code"
                   required
                   disabled={modalMode === "edit"} // Edit এর সময় Code পরিবর্তন করা যাবে না (API Error ঠেকাতে)
-                  placeholder="Enter Code"
+                  placeholder="Auto-generated e.g. COA-1002"
                   value={formData.code}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 disabled:opacity-60 disabled:cursor-not-allowed font-medium text-slate-800"
                 />
               </div>
 
@@ -547,11 +613,18 @@ export default function ChartOfAccountsPage() {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
                 >
                   <option value="">Select Group</option>
-                  <option value="Sundry Creditors">Sundry Creditors</option>
-                  <option value="Cost of Goods Sold (COGS)">Cost of Goods Sold (COGS)</option>
-                  <option value="Closing Stock">Closing Stock</option>
-                  <option value="Direct Expense">Direct Expense</option>
-                  <option value="Current Liabilities">Current Liabilities</option>
+                  {groups.length > 0 ? (
+                    groups.map((g) => (
+                      <option key={g.uuid || g.id} value={g.name}>
+                        {g.name} ({g.under})
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Current Assets">Current Assets (Assets)</option>
+                      <option value="Direct Expenses">Direct Expenses (Expenses)</option>
+                    </>
+                  )}
                 </select>
               </div>
 
