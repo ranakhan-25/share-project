@@ -10,7 +10,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002"
@@ -428,11 +429,14 @@ export default function SitePage() {
                     <input required maxLength={50} value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10" />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 mb-1 block">Project *</label>
-                    <select required value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer">
-                      <option value="">Select Project</option>
-                      {projects.map((project) => <option key={project.uuid} value={project.uuid}>{project.name}</option>)}
-                    </select>
+                    <label className="text-xs font-semibold text-slate-700 mb-1 block">Project * (Predictive Search)</label>
+                    <PredictiveSearchSelect
+                      required
+                      placeholder="Search or select project..."
+                      options={projects.map((p) => ({ value: p.uuid, label: p.name, subLabel: p.code }))}
+                      value={form.projectId}
+                      onChange={(val) => setForm({ ...form, projectId: val })}
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-700 mb-1 block">Name *</label>

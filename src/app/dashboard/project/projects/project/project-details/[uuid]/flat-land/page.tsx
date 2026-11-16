@@ -1,13 +1,16 @@
+"use client";
+
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Loader2, X, Plus, Search, Edit3 } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
 // ====================== TYPES ======================
 export interface FlatLand {
@@ -61,16 +64,27 @@ export default function FlatLandPage() {
   const [editingItem, setEditingItem] = useState<FlatLand | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
 
   // ====================== FETCH DATA ======================
   const fetchFlatLands = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/realbizpro/api/v1/flat-land?page=1&limit=100`);
+      const res = await fetch(`${API_BASE}/realbizpro/api/v1/flat-land?page=1&limit=100`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) {
         // ✅ deletedAt ফিল্টার
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
+        const raw = (json.data.data || []).filter((item: any) => !item.deletedAt);
+        const filtered = userEmail
+          ? raw.filter((item: any) => {
+              const creator = String(item.createdBy || "").toLowerCase().trim();
+              const custEmail = String(item.clientEmail || item.customerEmail || item.email || "").toLowerCase().trim();
+              return creator === userEmail || custEmail === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+        setDataList(filtered);
       }
     } catch (err) {
       toast.error("Failed to load flat/land data");
@@ -81,7 +95,7 @@ export default function FlatLandPage() {
 
   const fetchSites = async () => {
     try {
-      const res = await fetch(`${API_BASE}/realbizpro/api/v1/project-sites`);
+      const res = await fetch(`${API_BASE}/realbizpro/api/v1/project-sites`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) setSites(json.data.data || []);
     } catch (err) {
@@ -91,7 +105,7 @@ export default function FlatLandPage() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${API_BASE}/realbizpro/api/v1/project`);
+      const res = await fetch(`${API_BASE}/realbizpro/api/v1/project`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) setProjects(json.data.data || []);
     } catch (err) {
@@ -99,11 +113,7 @@ export default function FlatLandPage() {
     }
   };
 
-  useEffect(() => {
-    fetchFlatLands();
-    fetchSites();
-    fetchProjects();
-  }, []);
+  useEffect(() => { fetchFlatLands(); fetchSites(); fetchProjects(); }, [userEmail]);
 
   // ====================== SUBMIT (POST / PUT) ======================
   const handleSubmit = async (formData: any) => {
@@ -307,10 +317,12 @@ function FlatLandAddModal({ initialData, sites, submitting, onClose, onSubmit }:
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-gray-600 mb-1">Site</label>
-              <select name="siteName" value={formData.siteName} onChange={handleChange} className="w-full border rounded px-3 py-2 text-sm">
-                <option value="">Select Site</option>
-                {sites.map((s: any) => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Site..."
+                options={sites.map((s: any) => ({ value: s.name, label: s.name, subLabel: s.location }))}
+                value={formData.siteName}
+                onChange={(val) => setFormData((prev: any) => ({ ...prev, siteName: val }))}
+              />
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Flat Land No</label>
@@ -374,14 +386,18 @@ function FlatLandAddModal({ initialData, sites, submitting, onClose, onSubmit }:
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Status *</label>
-              <select name="status" value={formData.status} onChange={handleChange} className="w-full border rounded px-3 py-2 text-sm">
-                <option value="Select Sale Status">Select Sale Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Available">Available</option>
-                <option value="Booked">Booked</option>
-                <option value="Sold">Sold</option>
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Sale Status..."
+                options={[
+                  { value: 'Active', label: 'Active' },
+                  { value: 'Inactive', label: 'Inactive' },
+                  { value: 'Available', label: 'Available' },
+                  { value: 'Booked', label: 'Booked' },
+                  { value: 'Sold', label: 'Sold' },
+                ]}
+                value={formData.status}
+                onChange={(val) => setFormData((prev: any) => ({ ...prev, status: val }))}
+              />
             </div>
           </div>
           

@@ -1,13 +1,16 @@
+"use client";
+
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Plus, X, Loader2, Download } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
 // ====================== TYPES ======================
 interface QuotationItem {
@@ -57,6 +60,9 @@ export default function QuotationPage() {
 
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
 
   // Dropdown Data
   const [customers, setCustomers] = useState<any[]>([]);
@@ -89,10 +95,18 @@ export default function QuotationPage() {
   const fetchQuotations = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/realbizpro/api/v1/quotation?sortOrder=DESC&withDeleted=false`);
+      const res = await fetch(`${API_BASE}/realbizpro/api/v1/quotation?sortOrder=DESC&withDeleted=false`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) {
-        setQuotations((json.data.data || []).filter((item: any) => !item.deletedAt));
+        const raw = (json.data.data || []).filter((item: any) => !item.deletedAt);
+        const filtered = userEmail
+          ? raw.filter((q: any) => {
+              const creator = String(q.createdBy || "").toLowerCase().trim();
+              const cust = String(q.customerEmail || q.clientEmail || q.email || "").toLowerCase().trim();
+              return creator === userEmail || cust === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+        setQuotations(filtered);
       }
     } catch (err) {
       toast.error("Failed to load quotations");
@@ -105,34 +119,34 @@ export default function QuotationPage() {
   const fetchDropdowns = async () => {
     try {
       // ১. কাস্টমার (সাপ্লায়ার API)
-      const resCust = await fetch(`${API_BASE}/realbizpro/api/v1/inventory/suppliers?page=1&limit=100`);
+      const resCust = await fetch(`${API_BASE}/realbizpro/api/v1/inventory/suppliers?page=1&limit=100`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const jsonCust = await resCust.json();
       if (jsonCust.success) {
         setCustomers(jsonCust.data.data || []);
       }
 
       // ২. প্রজেক্ট টাইপ
-      const resType = await fetch(`${API_BASE}/realbizpro/api/v1/project-type`);
+      const resType = await fetch(`${API_BASE}/realbizpro/api/v1/project-type`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const jsonType = await resType.json();
       if (jsonType.success) setProjectTypes(jsonType.data.data || []);
 
       // ৩. প্রজেক্ট
-      const resProj = await fetch(`${API_BASE}/realbizpro/api/v1/project`);
+      const resProj = await fetch(`${API_BASE}/realbizpro/api/v1/project`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const jsonProj = await resProj.json();
       if (jsonProj.success) setProjects(jsonProj.data.data || []);
 
       // ৪. সাইট
-      const resSite = await fetch(`${API_BASE}/realbizpro/api/v1/project-sites`);
+      const resSite = await fetch(`${API_BASE}/realbizpro/api/v1/project-sites`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const jsonSite = await resSite.json();
       if (jsonSite.success) setSites(jsonSite.data.data || []);
 
       // ৫. ক্যাটাগরি
-      const resCat = await fetch(`${API_BASE}/realbizpro/api/v1/category`);
+      const resCat = await fetch(`${API_BASE}/realbizpro/api/v1/category`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const jsonCat = await resCat.json();
       if (jsonCat.success) setCategories(jsonCat.data.data || []);
 
       // ✅ ৬. সব সাব-ক্যাটাগরি (limit=100 ফিক্স)
-      const resSubCat = await fetch(`${API_BASE}/realbizpro/api/v1/billing-sub-category?page=1&limit=100`);
+      const resSubCat = await fetch(`${API_BASE}/realbizpro/api/v1/billing-sub-category?page=1&limit=100`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const jsonSubCat = await resSubCat.json();
       if (jsonSubCat.success) {
         setAllSubCategories(jsonSubCat.data.data || []);
@@ -143,10 +157,7 @@ export default function QuotationPage() {
     }
   };
 
-  useEffect(() => {
-    fetchQuotations();
-    fetchDropdowns();
-  }, []);
+  useEffect(() => { fetchQuotations(); fetchDropdowns(); }, [userEmail]);
 
   // ====================== FORM LOGIC ======================
   const handleNewQuoteClick = () => {
@@ -277,16 +288,15 @@ export default function QuotationPage() {
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Customer (Supplier)</label>
-              <select value={form.customerId} onChange={(e) => {
-                const selectedId = e.target.value;
-                const selectedCust = customers.find(c => c.uuid === selectedId || c.id === selectedId);
-                setForm({ ...form, customerId: selectedId, customerName: selectedCust?.name || selectedCust?.companyName || "" });
-              }} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-                <option value="">Select Customer</option>
-                {customers.map(c => (
-                  <option key={c.uuid || c.id} value={c.uuid || c.id}>{c.name || c.companyName || "Unknown"}</option>
-                ))}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Customer..."
+                options={customers.map((c) => ({ value: c.uuid || c.id, label: c.name || c.companyName || "Unknown" }))}
+                value={form.customerId}
+                onChange={(val) => {
+                  const selectedCust = customers.find((c) => (c.uuid || c.id) === val);
+                  setForm({ ...form, customerId: val, customerName: selectedCust?.name || selectedCust?.companyName || "" });
+                }}
+              />
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Code</label>
@@ -294,24 +304,30 @@ export default function QuotationPage() {
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-              <select value={form.projectType} onChange={(e) => setForm({ ...form, projectType: e.target.value })} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-                <option value="">Select Project Type</option>
-                {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Project Type..."
+                options={projectTypes.map((p) => ({ value: p.name, label: p.name }))}
+                value={form.projectType}
+                onChange={(val) => setForm({ ...form, projectType: val })}
+              />
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Project</label>
-              <select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-                <option value="">Select Project</option>
-                {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Project..."
+                options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
+                value={form.projectId}
+                onChange={(val) => setForm({ ...form, projectId: val })}
+              />
             </div>
             <div>
               <label className="block text-xs text-gray-600 mb-1">Site</label>
-              <select value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-                <option value="">Select Site</option>
-                {sites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Site..."
+                options={sites.map((s) => ({ value: s.name, label: s.name }))}
+                value={form.site}
+                onChange={(val) => setForm({ ...form, site: val })}
+              />
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs text-gray-600 mb-1">Attachment</label>

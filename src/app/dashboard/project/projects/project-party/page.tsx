@@ -8,6 +8,8 @@ import {
   Building2, RefreshCw, Edit, Trash2, Eye, Loader2, FileText,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/realbizpro/api/v1"
@@ -65,7 +67,7 @@ const emptyForm = (): PartyForm => ({
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    typeof window !== "undefined" ? getStoredAccessToken() : null;
 
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
@@ -194,6 +196,10 @@ function ProjectPartiesContent() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const urlProjectUuid = searchParams.get("projectUuid")?.trim() || "";
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -215,7 +221,7 @@ function ProjectPartiesContent() {
   const [viewParty, setViewParty] = useState<ProjectParty | null>(null);
   const [deleteParty, setDeleteParty] = useState<ProjectParty | null>(null);
 
-  // Load projects for dropdown — sortBy/sortOrder বাদ
+  // Load projects for dropdown with strict user email scoping
   useEffect(() => {
     let cancelled = false;
     setProjectsLoading(true);
@@ -223,7 +229,15 @@ function ProjectPartiesContent() {
     apiRequest("/project?page=1&limit=100")
       .then((res: any) => {
         if (cancelled) return;
-        const mapped: ProjectOption[] = unwrapList(res)
+        const raw = unwrapList(res);
+        const userProjects = userEmail
+          ? raw.filter((p: any) => {
+              const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || "").toLowerCase().trim();
+              return creator === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+
+        const mapped: ProjectOption[] = userProjects
           .map((p: any) => {
             const uuid = String(p.uuid ?? p.projectUuid ?? p.id ?? "");
             return {
@@ -257,7 +271,7 @@ function ProjectPartiesContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userEmail]);
 
   // Sync URL with selected project
   useEffect(() => {
@@ -546,24 +560,21 @@ function ProjectPartiesContent() {
             ) : projects.length === 0 ? (
               <p className="text-sm text-slate-500">No projects found.</p>
             ) : (
-              <select
-                aria-label="Select project"
+              <PredictiveSearchSelect
+                placeholder="— Select a project —"
+                options={projects.map((p) => ({
+                  value: p.uuid,
+                  label: `${p.name}${p.code ? ` (${p.code})` : ""}`,
+                }))}
                 value={selectedProjectUuid}
-                onChange={(e) => {
-                  setSelectedProjectUuid(e.target.value);
+                onChange={(val) => {
+                  setSelectedProjectUuid(val);
                   setParties([]);
                   setSearchQuery("");
                   setSelectedType("All");
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:w-[340px]"
-              >
-                <option value="">— Select a project —</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}{p.code ? ` (${p.code})` : ""}
-                  </option>
-                ))}
-              </select>
+                className="sm:w-[340px]"
+              />
             )}
 
             {selectedProjectUuid && (
@@ -602,16 +613,17 @@ function ProjectPartiesContent() {
         <div className="flex flex-col items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/50 p-5 sm:flex-row">
           <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             <label className="text-xs font-semibold uppercase text-slate-500">Party Type:</label>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm capitalize shadow-sm outline-none focus:border-blue-600"
-            >
-              <option value="All">All Types</option>
-              {PARTY_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
+            <div className="w-36">
+              <PredictiveSearchSelect
+                placeholder="All Types"
+                options={[
+                  { value: "All", label: "All Types" },
+                  ...PARTY_TYPES.map((type) => ({ value: type, label: type })),
+                ]}
+                value={selectedType}
+                onChange={(val) => setSelectedType(val)}
+              />
+            </div>
           </div>
 
           <div className="relative w-full sm:w-80">
@@ -748,16 +760,12 @@ function ProjectPartiesContent() {
 
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Party Type *</label>
-                <select
-                  required
+                <PredictiveSearchSelect
+                  placeholder="Select Party Type..."
+                  options={PARTY_TYPES.map((type) => ({ value: type, label: type }))}
                   value={formData.party_type}
-                  onChange={(e) => setFormData({ ...formData, party_type: e.target.value as PartyType })}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-blue-600"
-                >
-                  {PARTY_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setFormData({ ...formData, party_type: val as PartyType })}
+                />
               </div>
 
               <div>

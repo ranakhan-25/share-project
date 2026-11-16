@@ -149,7 +149,7 @@ export default function PaymentVoucherPage() {
         project: String(voucher.projectId ?? ""),
         titleOfWork: String(voucher.workId ?? ""),
         code: String(voucher.voucherNo ?? ""),
-        debit: accMap.get(String(voucher.accountId)) || String(voucher.entries?.[0]?.accountName ?? voucher.accountId ?? ""),
+        debit: accMap.get(String(voucher.accountId)) || String((voucher.entries as any)?.[0]?.accountName ?? voucher.accountId ?? ""),
         credit: String(voucher.paymentMethod ?? ""),
         total: Number(voucher.amount ?? 0),
         comment: String(voucher.comment ?? "—"),

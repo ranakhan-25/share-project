@@ -145,7 +145,7 @@ export default function ReceiptVoucherPage() {
         date: String(voucher.date ?? "").slice(0, 10),
         project: String(voucher.projectId ?? ""),
         code: String(voucher.voucherNo ?? ""),
-        credit: accMap.get(String(voucher.accountId)) || String(voucher.entries?.[0]?.accountName ?? voucher.accountId ?? ""),
+        credit: accMap.get(String(voucher.accountId)) || String((voucher.entries as any)?.[0]?.accountName ?? voucher.accountId ?? ""),
         debit: String(voucher.paymentMethod ?? ""),
         total: Number(voucher.amount ?? 0),
         ref: "N/A",

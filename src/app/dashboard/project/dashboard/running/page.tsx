@@ -1,10 +1,15 @@
 /* eslint-disable prettier/prettier */
 // projects/project/page.tsx
-export default function ProjectsPage() {
-  // আপনার বাকি লজিক
+interface ProjectsPageProps {
+  params?: Promise<any>;
+  searchParams?: Promise<{ initialStatusFilter?: string; heading?: string }>;
+}
+
+export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
+  const resolved = await searchParams;
   return (
     <div>
-      {/* বাকি কোড */}
+      {resolved?.heading && <h1>{resolved.heading}</h1>}
     </div>
   );
 }

@@ -22,6 +22,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 // ======================================================
@@ -619,25 +620,20 @@ export default function BuildingsListPage() {
               ) : sites.length === 0 ? (
                 <p className="text-sm text-slate-500">No sites found. Create a site first.</p>
               ) : (
-                <select
-                  aria-label="Select site"
+                <PredictiveSearchSelect
+                  placeholder="Select site..."
+                  options={sites.map((s) => ({ value: s.uuid, label: s.name, subLabel: `${s.code || ''} — ${s.location || ''}` }))}
                   value={selectedSiteUuid}
-                  onChange={(e) => {
-                    setSelectedSiteUuid(e.target.value);
+                  onChange={(val) => {
+                    setSelectedSiteUuid(val);
                     setBuildings([]);
                     setSearchQuery('');
                     setStatusFilter('all');
                     setError('');
                     setSuccess('');
                   }}
-                  className={`${inputClass} sm:w-[320px]`}
-                >
-                  {sites.map((site) => (
-                    <option key={site.uuid} value={site.uuid}>
-                      {site.name}{site.code ? ` (${site.code})` : ''}{site.location ? ` — ${site.location}` : ''}
-                    </option>
-                  ))}
-                </select>
+                  className="sm:w-[320px]"
+                />
               )}
 
               {selectedSite && (
@@ -717,19 +713,13 @@ export default function BuildingsListPage() {
                 />
               </div>
 
-              <select
-                aria-label="Filter by status"
+              <PredictiveSearchSelect
+                placeholder="Filter by status..."
+                options={[{ value: 'all', label: 'All statuses' }, ...statusOptions]}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className={`${inputClass} sm:w-[190px]`}
-              >
-                <option value="all">All statuses</option>
-                {statusOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setStatusFilter(val)}
+                className="sm:w-[190px]"
+              />
             </div>
           </div>
 
@@ -966,19 +956,11 @@ export default function BuildingsListPage() {
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 Status
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={statusOptions}
                 value={formData.status}
-                onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value as BuildingStatus })
-                }
-                className={inputClass}
-              >
-                {statusOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, status: val as BuildingStatus })}
+              />
             </div>
 
             <ModalActions onCancel={closeAddModal} saving={saving} submitLabel="Create Building" />
@@ -1079,19 +1061,11 @@ export default function BuildingsListPage() {
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 Status
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={statusOptions}
                 value={editBuilding.status}
-                onChange={(e) =>
-                  setEditBuilding({ ...editBuilding, status: e.target.value as BuildingStatus })
-                }
-                className={inputClass}
-              >
-                {statusOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setEditBuilding({ ...editBuilding, status: val as BuildingStatus })}
+              />
             </div>
 
             <ModalActions

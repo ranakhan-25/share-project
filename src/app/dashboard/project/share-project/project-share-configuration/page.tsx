@@ -2,6 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 import {
   Search,
   Plus,
@@ -56,6 +58,7 @@ function getAuthHeaders(): Record<string, string> {
     return { "Content-Type": "application/json" };
   }
   const token =
+    getStoredAccessToken() ||
     localStorage.getItem("share-project:access-token") ||
     localStorage.getItem("token") ||
     localStorage.getItem("accessToken") ||
@@ -158,7 +161,7 @@ async function fetchShareConfigs(params?: {
 }
 
 // ---------- PROJECT dropdown ----------
-async function fetchProjects(): Promise<OptionItem[]> {
+async function fetchProjects(userEmail?: string): Promise<OptionItem[]> {
   try {
     const url = `${PROJECT_API}?page=1&limit=100`;
     const res = await fetch(url, {
@@ -169,7 +172,19 @@ async function fetchProjects(): Promise<OptionItem[]> {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return [];
     const list = extractList(json);
-    return list.map((p: any) => ({
+    const email = userEmail || (typeof window !== "undefined" ? getStoredUser()?.email : "");
+    const cleanEmail = (email || "").toLowerCase().trim();
+    const userProjects = cleanEmail
+      ? list.filter((p: any) => {
+          const creator = String(
+            p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || ""
+          )
+            .toLowerCase()
+            .trim();
+          return creator === cleanEmail;
+        })
+      : [];
+    return userProjects.map((p: any) => ({
       uuid: p.uuid || p.id,
       name: p.name || p.projectName || p.code || "Unnamed",
       code: p.code,
@@ -269,6 +284,7 @@ const toApiPayload = (data: {
     note: ins.note || undefined,
   })),
   status: data.status || "active",
+  createdBy: (typeof window !== "undefined" ? getStoredUser()?.email : "") || "user",
 });
 
 // ---------- Form Modal ----------
@@ -468,27 +484,13 @@ function ShareConfigFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Project <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
                 required
+                placeholder="Select Project..."
+                options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
                 value={formData.projectId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select value</option>
-                {projects.length === 0 ? (
-                  <option value="" disabled>
-                    Loading projects...
-                  </option>
-                ) : (
-                  projects.map((p) => (
-                    <option key={p.uuid} value={p.uuid}>
-                      {p.name}
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(val) => setFormData({ ...formData, projectId: val })}
+              />
             </div>
 
             {/* Number of Shares */}
@@ -514,27 +516,20 @@ function ShareConfigFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Share Type <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
                 required
-                value={formData.shareType}
-                onChange={(e) =>
-                  setFormData({ ...formData, shareType: e.target.value })
+                placeholder="Select Share Type..."
+                options={
+                  projectTypes.length > 0
+                    ? projectTypes.map((t) => ({ value: t.name, label: t.name }))
+                    : [
+                        { value: "Construction Share", label: "Construction Share" },
+                        { value: "Development Share", label: "Development Share" },
+                      ]
                 }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select value</option>
-                {projectTypes.length === 0 ? (
-                  <option value="" disabled>
-                    Loading share types...
-                  </option>
-                ) : (
-                  projectTypes.map((t) => (
-                    <option key={t.uuid} value={t.name}>
-                      {t.name}
-                    </option>
-                  ))
-                )}
-              </select>
+                value={formData.shareType}
+                onChange={(val) => setFormData({ ...formData, shareType: val })}
+              />
             </div>
 
             {/* Task Names — PLAIN TEXT INPUT */}
@@ -558,19 +553,17 @@ function ShareConfigFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Assign Type <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
                 required
+                placeholder="Select Assign Type..."
+                options={[
+                  { value: "Fixed-Amount", label: "Fixed-Amount" },
+                  { value: "Percentage", label: "Percentage" },
+                  { value: "Per-Share", label: "Per-Share" },
+                ]}
                 value={formData.assignType}
-                onChange={(e) =>
-                  setFormData({ ...formData, assignType: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select Assign Type</option>
-                <option value="Fixed-Amount">Fixed-Amount</option>
-                <option value="Percentage">Percentage</option>
-                <option value="Per-Share">Per-Share</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, assignType: val })}
+              />
             </div>
 
             {/* Amount */}
@@ -653,16 +646,15 @@ function ShareConfigFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Status
               </label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="Select Status..."
+                options={[
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
                 value={formData.status}
-                onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, status: val })}
+              />
             </div>
           </div>
 
@@ -814,6 +806,7 @@ export default function ShareConfigurationSettingsPage() {
   const [configs, setConfigs] = useState<ShareConfigItem[]>([]);
   const [projects, setProjects] = useState<OptionItem[]>([]);
   const [projectTypes, setProjectTypes] = useState<OptionItem[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -836,7 +829,16 @@ export default function ShareConfigurationSettingsPage() {
       console.log("Loaded projects →", projectList.length);
       console.log("Loaded project types →", typeList.length);
 
-      setConfigs(configRes.data);
+      const userStored = typeof window !== "undefined" ? getStoredUser() : null;
+      const userEmail = (userStored?.email || "").toLowerCase().trim();
+      const validProjectIds = new Set(projectList.map((p) => p.uuid));
+      const userConfigs = configRes.data.filter(
+        (c: any) =>
+          validProjectIds.has(c.projectId) ||
+          (c.createdBy && c.createdBy.toLowerCase().trim() === userEmail)
+      );
+
+      setConfigs(userConfigs);
       setProjects(projectList);
       setProjectTypes(typeList);
     } catch (err: any) {
@@ -850,13 +852,15 @@ export default function ShareConfigurationSettingsPage() {
     loadData();
   }, []);
 
-  const filtered = configs.filter(
-    (item) =>
+  const filtered = configs.filter((item) => {
+    if (selectedProjectId && item.projectId !== selectedProjectId) return false;
+    return (
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.shareType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.assignType.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+      item.assignType.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   const totalPages = Math.ceil(filtered.length / entriesPerPage) || 1;
   const startIndex = (currentPage - 1) * entriesPerPage;
@@ -919,21 +923,41 @@ export default function ShareConfigurationSettingsPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/70 p-3 rounded-xl border border-slate-200/60">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => {
-                setEntriesPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
-            <span>entries</span>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="whitespace-nowrap">Select Project</span>
+              <div className="min-w-[200px]">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "", label: "All Projects" },
+                    ...projects.map((p) => ({ value: p.uuid, label: p.name })),
+                  ]}
+                  value={selectedProjectId}
+                  onChange={(val) => {
+                    setSelectedProjectId(val);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Select Project"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span>Show</span>
+              <select
+                value={entriesPerPage}
+                onChange={(e) => {
+                  setEntriesPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span>entries</span>
+            </div>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <span className="text-sm text-slate-600">Search:</span>

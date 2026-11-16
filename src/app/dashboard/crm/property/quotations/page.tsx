@@ -16,6 +16,12 @@ interface QuotationItem {
   status?: string;
   createdAt?: string;
   date?: string;
+  code?: string;
+  customer?: any;
+  project?: any;
+  grandTotal?: any;
+  approveStatus?: string;
+  [key: string]: any;
 }
 
 interface ApiResponse {

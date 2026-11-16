@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Search, Edit3, Trash2, Loader2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Edit3, Trash2, Loader2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import PredictiveSearchInput from "@/components/ui/PredictiveSearchInput";
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
 
 type ApiRow = Record<string, unknown> & { uuid: string };
 
@@ -56,12 +59,7 @@ function rowsFrom<T>(value: unknown): T[] {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token =
-    typeof window !== "undefined"
-      ? window.localStorage.getItem("access_token") ||
-        window.localStorage.getItem("token") ||
-        window.localStorage.getItem("share-project:access-token")
-      : null;
+  const token = getStoredAccessToken();
   const response = await fetch(`${API_ROOT}${path}`, {
     ...init,
     headers: {
@@ -135,6 +133,15 @@ export default function ProjectApiPage({
   const [editing, setEditing] = useState<ApiRow | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
 
+  // Active logged in user
+  const [storedUser, setStoredUser] = useState<StoredUser | null>(null);
+
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -147,7 +154,54 @@ export default function ProjectApiPage({
             request<unknown>(`${field.source!.endpoint}?page=1&limit=100`),
           ),
       ]);
-      setRows(rowsFrom<ApiRow>(response));
+
+      const fetchedRows = rowsFrom<ApiRow>(response);
+
+      const matchesUser = (row: ApiRow, email: string): boolean => {
+        if (!email) return false;
+        const target = email.toLowerCase().trim();
+        const candidateFields = [
+          row.createdBy,
+          row.created_by,
+          row.clientEmail,
+          row.client_email,
+          row.email,
+          row.userEmail,
+          row.user_email,
+          row.customerEmail,
+          row.customer_email,
+          row.salesBy,
+          row.sales_by,
+          row.projectManager,
+          row.project_manager,
+          row.assignedTo,
+          row.assigned_to,
+        ];
+        for (const f of candidateFields) {
+          if (f && String(f).toLowerCase().trim() === target) return true;
+        }
+        if (row.user && typeof row.user === "object" && (row.user as any).email) {
+          if (String((row.user as any).email).toLowerCase().trim() === target) return true;
+        }
+        if (row.shareUser && typeof row.shareUser === "object" && (row.shareUser as any).email) {
+          if (String((row.shareUser as any).email).toLowerCase().trim() === target) return true;
+        }
+        if (storedUser?.id && (String(row.createdBy) === String(storedUser.id) || String(row.userId) === String(storedUser.id))) {
+          return true;
+        }
+        if (storedUser?.username && String(row.createdBy).toLowerCase().trim() === storedUser.username.toLowerCase().trim()) {
+          return true;
+        }
+        return false;
+      };
+
+      // Strict user-level isolation: only records belonging to the logged-in user's email
+      const filteredByUser = userEmail
+        ? fetchedRows.filter((row) => matchesUser(row, userEmail))
+        : [];
+
+      setRows(filteredByUser);
+
       const sourceFields = fields.filter((field) => field.source);
       const nextOptions: Record<
         string,
@@ -155,42 +209,77 @@ export default function ProjectApiPage({
       > = {};
       sourceFields.forEach((field, index) => {
         const source = field.source!;
-        nextOptions[field.name] = rowsFrom<Record<string, unknown>>(
+        const rawOptions = rowsFrom<Record<string, unknown>>(
           optionResponses[index],
-        )
-          .filter((row) => row[source.valueKey] != null)
-          .map((row) => ({
-            value: String(row[source.valueKey]),
-            label: String(row[source.labelKey] ?? row[source.valueKey]),
-          }));
+        );
+        const filteredOptions = userEmail
+          ? rawOptions.filter((item) => {
+              const hasOwner = item.createdBy || item.clientEmail || item.email || item.userEmail;
+              if (hasOwner) {
+                return (
+                  String(item.createdBy || "").toLowerCase().trim() === userEmail ||
+                  String(item.clientEmail || "").toLowerCase().trim() === userEmail ||
+                  String(item.email || "").toLowerCase().trim() === userEmail ||
+                  String(item.userEmail || "").toLowerCase().trim() === userEmail
+                );
+              }
+              return true;
+            })
+          : rawOptions;
+
+        nextOptions[field.name] = filteredOptions
+          .map((item) => ({
+            value: String(item[source.valueKey] ?? ""),
+            label: String(item[source.labelKey] ?? item[source.valueKey] ?? ""),
+          }))
+          .filter((option) => option.value.length > 0);
       });
       setOptions(nextOptions);
     } catch (cause) {
-      setRows([]);
       setError(errorMessage(cause, `Could not load ${title.toLowerCase()}.`));
     } finally {
       setLoading(false);
     }
-  }, [endpoint, fields, title]);
+  }, [endpoint, fields, title, userEmail, storedUser]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  // Predictive search suggestions extracted from live dataset
+  const predictiveSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((r) => {
+      columns.forEach((c) => {
+        const val = valueAt(r, c.key);
+        if (typeof val === "string" && val.length > 1 && val.length < 50) {
+          set.add(val);
+        }
+      });
+    });
+    return Array.from(set).slice(0, 30);
+  }, [rows, columns]);
+
   const visibleRows = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const matches = rows.filter((row) =>
-      columns.some((column) =>
-        String(valueAt(row, column.key) ?? "")
-          .toLowerCase()
-          .includes(term),
-      ),
-    );
-    const pages = Math.max(1, Math.ceil(matches.length / pageSize));
-    const start = (Math.min(page, pages) - 1) * pageSize;
+    const query = search.trim().toLowerCase();
+    const filtered = query
+      ? rows.filter((row) =>
+          columns.some((column) => {
+            const value = valueAt(row, column.key);
+            return (
+              value !== null &&
+              value !== undefined &&
+              String(value).toLowerCase().includes(query)
+            );
+          }),
+        )
+      : rows;
+    const total = filtered.length;
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    const start = (page - 1) * pageSize;
     return {
-      data: matches.slice(start, start + pageSize),
-      total: matches.length,
+      data: filtered.slice(start, start + pageSize),
+      total,
       pages,
       start,
     };
@@ -256,6 +345,19 @@ export default function ProjectApiPage({
         else payload[field.name] = fieldValue;
       }
       if (Object.keys(details).length) payload.details = details;
+
+      // Auto-tag created record with user identity for tenant isolation
+      if (storedUser?.email && !editing) {
+        if (!payload.createdBy) payload.createdBy = storedUser.email;
+        if (!payload.clientEmail) payload.clientEmail = storedUser.email;
+        if (!payload.email) payload.email = storedUser.email;
+        if (!payload.userEmail) payload.userEmail = storedUser.email;
+        if (storedUser.id && !payload.userId) payload.userId = storedUser.id;
+      }
+      if (storedUser?.email && editing) {
+        payload.updatedBy = storedUser.email;
+      }
+
       await request(
         editing
           ? `${writeEndpoint}/${encodeURIComponent(editing.uuid)}`
@@ -291,9 +393,8 @@ export default function ProjectApiPage({
   };
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/20 to-purple-50/20 p-4 sm:p-6 text-slate-800">
+    <section className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-teal-50/20 p-4 sm:p-6 text-slate-800">
       <div className="mx-auto max-w-7xl space-y-5">
-        
         {/* Header with Breadcrumb & Action */}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -304,19 +405,24 @@ export default function ProjectApiPage({
               <span>/</span>
               <span>API Data</span>
               <span>/</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                 {title}
               </span>
             </nav>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               {title}
             </h1>
+            {userEmail && (
+              <p className="text-[11px] text-slate-500">
+                Showing data isolated for: <strong className="text-emerald-700">{userEmail}</strong>
+              </p>
+            )}
           </div>
           {!readOnly && (
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-100 transition-all hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg active:scale-95"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-100 transition-all hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg active:scale-95"
             >
               <Plus className="h-4 w-4" />
               <span>Add {title}</span>
@@ -324,8 +430,8 @@ export default function ProjectApiPage({
           )}
         </header>
 
-        {/* Filter / Search Card */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Filter / Search Card with Predictive Search */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
             <span>Show</span>
             <select
@@ -334,7 +440,7 @@ export default function ProjectApiPage({
                 setPageSize(Number(event.target.value));
                 setPage(1);
               }}
-              className="h-9 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="h-9 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
             >
               {[10, 25, 50, 100].map((size) => (
                 <option key={size} value={size}>
@@ -345,17 +451,15 @@ export default function ProjectApiPage({
             <span>entries</span>
           </label>
 
-          <div className="relative w-full sm:w-72">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder={`Search ${title.toLowerCase()}...`}
+          <div className="w-full sm:w-80">
+            <PredictiveSearchInput
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
+              onChange={(val) => {
+                setSearch(val);
                 setPage(1);
               }}
-              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              placeholder={`Predictive search ${title.toLowerCase()}...`}
+              suggestions={predictiveSuggestions}
             />
           </div>
         </div>
@@ -363,17 +467,16 @@ export default function ProjectApiPage({
         {error && (
           <div
             role="alert"
-            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700 shadow-sm"
+            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700 shadow-xs"
           >
             {error}
           </div>
         )}
 
-        {/* Modern Table Container */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-left text-xs whitespace-nowrap">
-              <thead className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white font-bold uppercase tracking-wider">
+            <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
+              <thead className="bg-emerald-600 text-[11px] font-semibold uppercase tracking-wider text-white">
                 <tr>
                   <th className="px-4 py-3.5 text-center w-12">#</th>
                   {columns.map((column) => (
@@ -382,11 +485,11 @@ export default function ProjectApiPage({
                     </th>
                   ))}
                   {!readOnly && (
-                    <th className="px-4 py-3.5 text-center">Actions</th>
+                    <th className="px-4 py-3.5 text-center w-28">Actions</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {loading ? (
                   <tr>
                     <td
@@ -394,7 +497,7 @@ export default function ProjectApiPage({
                       className="px-4 py-12 text-center text-slate-500"
                     >
                       <div className="flex flex-col items-center justify-center gap-2">
-                        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                         <span className="text-xs font-medium">Loading {title.toLowerCase()}...</span>
                       </div>
                     </td>
@@ -403,7 +506,7 @@ export default function ProjectApiPage({
                   visibleRows.data.map((row, index) => (
                     <tr
                       key={row.uuid}
-                      className="hover:bg-indigo-50/40 transition-colors"
+                      className="hover:bg-emerald-50/40 transition-colors"
                     >
                       <td className="px-4 py-3 text-center font-medium text-slate-600">
                         {visibleRows.start + index + 1}
@@ -419,7 +522,7 @@ export default function ProjectApiPage({
                             <button
                               type="button"
                               onClick={() => openEdit(row)}
-                              className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 transition-colors"
                               title="Edit"
                             >
                               <Edit3 className="h-4 w-4" />
@@ -470,12 +573,12 @@ export default function ProjectApiPage({
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
                 disabled={page <= 1 || loading}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 shadow-xs transition-all hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 <span>Prev</span>
               </button>
-              <span className="rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-3 py-1 text-white font-semibold shadow-sm">
+              <span className="rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1 text-white font-semibold shadow-xs">
                 {Math.min(page, visibleRows.pages)} / {visibleRows.pages}
               </span>
               <button
@@ -484,7 +587,7 @@ export default function ProjectApiPage({
                   setPage((current) => Math.min(visibleRows.pages, current + 1))
                 }
                 disabled={page >= visibleRows.pages || loading}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-slate-600 shadow-xs transition-all hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>Next</span>
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -494,9 +597,9 @@ export default function ProjectApiPage({
         </div>
       </div>
 
-      {/* Editor Modal */}
+      {/* Editor Modal with Predictive Search Dropdowns */}
       {editorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
           <form
             onSubmit={save}
             className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden space-y-4 p-6"
@@ -517,13 +620,14 @@ export default function ProjectApiPage({
 
             <div className="grid gap-3.5 sm:grid-cols-2">
               {fields.map((field) => (
-                <label key={field.name} className="space-y-1 block text-xs font-semibold text-slate-700">
-                  <span>
+                <div key={field.name} className="space-y-1 block text-xs font-semibold text-slate-700">
+                  <label htmlFor={`field-${field.name}`}>
                     {field.label}
                     {field.required ? " *" : ""}
-                  </span>
+                  </label>
                   {field.type === "textarea" ? (
                     <textarea
+                      id={`field-${field.name}`}
                       required={field.required}
                       value={form[field.name] ?? ""}
                       onChange={(event) =>
@@ -533,31 +637,30 @@ export default function ProjectApiPage({
                         }))
                       }
                       rows={3}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
                     />
                   ) : field.type === "select" ? (
-                    <select
+                    <PredictiveSearchSelect
+                      id={`field-${field.name}`}
                       required={field.required}
                       value={form[field.name] ?? ""}
-                      onChange={(event) =>
+                      onChange={(val) =>
                         setForm((current) => ({
                           ...current,
-                          [field.name]: event.target.value,
+                          [field.name]: val,
                         }))
                       }
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="">Select {field.label}</option>
-                      {(field.options ?? options[field.name] ?? []).map(
-                        (option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ),
+                      placeholder={`Select ${field.label}...`}
+                      options={(field.options ?? options[field.name] ?? []).map(
+                        (opt) => ({
+                          value: opt.value,
+                          label: opt.label,
+                        })
                       )}
-                    </select>
+                    />
                   ) : (
                     <input
+                      id={`field-${field.name}`}
                       type={field.type ?? "text"}
                       required={field.required}
                       value={form[field.name] ?? ""}
@@ -567,10 +670,10 @@ export default function ProjectApiPage({
                           [field.name]: event.target.value,
                         }))
                       }
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
                     />
                   )}
-                </label>
+                </div>
               ))}
             </div>
 
@@ -591,7 +694,7 @@ export default function ProjectApiPage({
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-100 transition-all hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-100 transition-all hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50"
               >
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 <span>{saving ? "Saving..." : "Save"}</span>
