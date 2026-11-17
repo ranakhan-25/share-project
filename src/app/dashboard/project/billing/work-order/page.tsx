@@ -19,20 +19,22 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
+
 // ==================== API CONFIG ====================
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return { "Content-Type": "application/json" };
-  }
   const token =
-    localStorage.getItem("share-project:access-token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -40,6 +42,12 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export default function WorkOrderPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +74,7 @@ export default function WorkOrderPage() {
   // Form State
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
-    code: `CW0000${Math.floor(10 + Math.random() * 90)}`,
+    code: `CW${Math.floor(100000 + Math.random() * 900000)}`,
     customerId: "",
     clientOrderNo: "",
     projectTypeId: "",
@@ -173,37 +181,65 @@ export default function WorkOrderPage() {
       result.status === "fulfilled" ? result.value : [],
     );
     setCustomers(values[0]);
-    setProjects(values[1]);
+    const userProjects = userEmail
+      ? (values[1] || []).filter((p: any) => {
+          const raw = p || {};
+          const creator = String(
+            raw.createdBy ||
+              raw.clientEmail ||
+              raw.email ||
+              raw.userEmail ||
+              raw.projectManager ||
+              ""
+          )
+            .toLowerCase()
+            .trim();
+          return creator === userEmail || creator === String(storedUser?.id);
+        })
+      : [];
+    setProjects(userProjects);
     setProjectTypes(values[2]);
     setCategories(values[3]);
     setSubCategories(values[4]);
     setItems(values[5]);
     setSites(values[6]);
-  }, []);
+  }, [userEmail, storedUser?.id]);
 
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      // ⚠️ Endpoint apnar backend onujayi change korte hobe
       const res = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/work-orders?page=1&limit=100`,
         { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error("Failed to load work orders");
       const json = await res.json();
-      setOrders(json?.data?.data || json?.data || []);
+      const rows = json?.data?.data || json?.data || [];
+      const userProjUuids = new Set(projects.map((p) => p.uuid));
+      const filtered = rows.filter((record: any) => {
+        if (!userEmail) return false;
+        const belongsToProj = record.projectId && userProjUuids.has(record.projectId);
+        const creator = String(record.createdBy || record.details?.createdBy || "").toLowerCase().trim();
+        return belongsToProj || creator === userEmail;
+      });
+      setOrders(filtered);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projects, userEmail]);
 
   useEffect(() => {
-    loadOrders();
     loadDropdowns();
-  }, [loadOrders, loadDropdowns]);
+  }, [loadDropdowns]);
+
+  useEffect(() => {
+    if (userEmail) {
+      loadOrders();
+    }
+  }, [loadOrders, userEmail]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -229,7 +265,7 @@ export default function WorkOrderPage() {
     setOrderItems([]);
     setFormData({
       date: new Date().toISOString().slice(0, 10),
-      code: `CW0000${Math.floor(10 + Math.random() * 90)}`,
+      code: `CW${Math.floor(100000 + Math.random() * 900000)}`,
       customerId: "",
       clientOrderNo: "",
       projectTypeId: "",
@@ -269,10 +305,38 @@ export default function WorkOrderPage() {
     try {
       setLoading(true);
       if (!formData.projectId) throw new Error("Select a project");
+      const formattedDate = formData.date
+        ? String(formData.date).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+
+      const cleanItems = orderItems.map(({ id, ...item }) => ({
+        ...item,
+        quantity: Number(item.quantity) || 1,
+        rate: Number(item.rate) || 0,
+        amount: Number(item.amount) || (Number(item.quantity) || 1) * (Number(item.rate) || 0),
+      }));
+
+      const details = {
+        ...formData,
+        date: formattedDate,
+        categoryId: categoryId || undefined,
+        subCategoryId: subCategoryId || undefined,
+        customerId: formData.customerId || undefined,
+        projectTypeId: formData.projectTypeId || undefined,
+        siteId: formData.siteId || undefined,
+        subtotal: Number(subtotal) || 0,
+        vatAmount: Number(vatAmount) || 0,
+        aitAmount: Number(aitAmount) || 0,
+        grandTotal: Number(grandTotal) || 0,
+        createdBy: userEmail || "Admin",
+        addedBy: userEmail || "USER-001",
+        items: cleanItems,
+      };
+
       const payload = {
         title: `Work Order ${formData.code}`,
-        date: formData.date,
-        recordDate: formData.date,
+        date: formattedDate,
+        recordDate: formattedDate,
         code: formData.code,
         projectId: formData.projectId,
         customerId: formData.customerId || undefined,
@@ -280,9 +344,10 @@ export default function WorkOrderPage() {
         siteId: formData.siteId || undefined,
         clientOrderNo: formData.clientOrderNo || undefined,
         poNo: formData.poNo || undefined,
+        attachment: formData.attachment || undefined,
         categoryId: categoryId || undefined,
         subCategoryId: subCategoryId || undefined,
-        items: orderItems.map(({ id, ...item }) => item),
+        items: cleanItems,
         subtotal: Number(subtotal) || 0,
         vatPercent: Number(formData.vatPercent) || 0,
         vatInclude: Boolean(formData.vatInclude),
@@ -292,16 +357,7 @@ export default function WorkOrderPage() {
         aitAmount: Number(aitAmount) || 0,
         grandTotal: Number(grandTotal) || 0,
         amount: Number(grandTotal) || 0,
-        details: {
-          ...formData,
-          categoryId,
-          subCategoryId,
-          subtotal,
-          vatAmount,
-          aitAmount,
-          grandTotal,
-          items: orderItems.map(({ id, ...item }) => item),
-        },
+        details,
       };
 
       console.log("📤 Sending Work Order Payload:", payload);
@@ -454,21 +510,19 @@ export default function WorkOrderPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Project</label>
-                <div className="relative">
-                  <select
-                    value={selectedListProjectId}
-                    onChange={(e) => setSelectedListProjectId(e.target.value)}
-                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-                  >
-                    <option value="">All projects</option>
-                    {projects.map((project) => (
-                      <option key={project.uuid} value={project.uuid}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+                <PredictiveSearchSelect
+                  label=""
+                  placeholder="All projects"
+                  value={selectedListProjectId}
+                  options={[
+                    { value: "", label: "All projects" },
+                    ...projects.map((project) => ({
+                      value: project.uuid,
+                      label: project.name,
+                    })),
+                  ]}
+                  onChange={(val) => setSelectedListProjectId(val)}
+                />
               </div>
             </div>
           </div>
@@ -720,20 +774,13 @@ export default function WorkOrderPage() {
               <label className="block font-semibold text-slate-600 mb-1">
                 Customer
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select One Option"
                 value={formData.customerId}
-                onChange={(e) =>
-                  setFormData({ ...formData, customerId: e.target.value })
-                }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select One Option</option>
-                {customers.map((c) => (
-                  <option key={c.uuid} value={c.uuid}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                options={customers.map((c) => ({ value: c.uuid, label: c.name }))}
+                onChange={(val) => setFormData({ ...formData, customerId: val })}
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
@@ -750,63 +797,44 @@ export default function WorkOrderPage() {
               <label className="block font-semibold text-slate-600 mb-1">
                 Project Type
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select value"
                 value={formData.projectTypeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectTypeId: e.target.value })
-                }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select value</option>
-                {projectTypes.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                options={projectTypes.map((t) => ({ value: t.uuid, label: t.name }))}
+                onChange={(val) => setFormData({ ...formData, projectTypeId: val })}
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Project
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Project"
                 value={formData.projectId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
+                options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectId: val, siteId: "" })
                 }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Site
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Site"
                 value={formData.siteId}
-                onChange={(e) =>
-                  setFormData({ ...formData, siteId: e.target.value })
-                }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Site</option>
-                {sites
+                options={sites
                   .filter(
                     (site) =>
                       !site.projectId || site.projectId === formData.projectId,
                   )
-                  .map((site) => (
-                    <option key={site.uuid} value={site.uuid}>
-                      {site.name}
-                    </option>
-                  ))}
-              </select>
+                  .map((site) => ({ value: site.uuid, label: site.name }))}
+                onChange={(val) => setFormData({ ...formData, siteId: val })}
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
@@ -863,57 +891,54 @@ export default function WorkOrderPage() {
               <label className="block font-semibold text-slate-600 mb-1">
                 Category
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Category"
                 value={categoryId}
-                onChange={(e) => {
-                  setCategoryId(e.target.value);
+                options={categories.map((c) => ({ value: c.uuid, label: c.name }))}
+                onChange={(val) => {
+                  setCategoryId(val);
                   setSubCategoryId("");
                 }}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Category</option>
-                {categories.map((c) => (
-                  <option key={c.uuid} value={c.uuid}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Sub Category
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Sub Category"
                 value={subCategoryId}
-                onChange={(e) => setSubCategoryId(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Sub Category</option>
-                {subCategories
+                options={subCategories
                   .filter(
                     (sc) =>
                       !categoryId ||
                       sc.categoryId === categoryId ||
                       sc.details?.categoryId === categoryId,
                   )
-                  .map((sc) => (
-                  <option key={sc.uuid} value={sc.uuid}>
-                    {sc.name}
-                  </option>
-                  ))}
-              </select>
+                  .map((sc) => ({ value: sc.uuid, label: sc.name }))}
+                onChange={(val) => setSubCategoryId(val)}
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Select Item (Product / Material)
               </label>
-              <select
-                className="w-full border rounded-lg px-3 py-2"
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Search Item / Product / Material..."
                 value=""
-                onChange={(e) => {
-                  const selected = items.find(
-                    (item) => item.uuid === e.target.value,
-                  );
+                options={items
+                  .filter(
+                    (item) =>
+                      (!item.projectId || item.projectId === formData.projectId) &&
+                      (!categoryId || !item.details?.categoryId || item.details.categoryId === categoryId) &&
+                      (!subCategoryId || !item.details?.subCategoryId || item.details.subCategoryId === subCategoryId),
+                  )
+                  .map((i) => ({ value: i.uuid, label: i.name }))}
+                onChange={(val) => {
+                  const selected = items.find((item) => item.uuid === val);
                   if (selected)
                     setOrderItems([
                       ...orderItems,
@@ -925,32 +950,11 @@ export default function WorkOrderPage() {
                         unit: selected.unit || "Nos",
                         quantity: 1,
                         rate: Number(selected.rate || selected.salePrice || 0),
-                        amount: Number(
-                          selected.rate || selected.salePrice || 0,
-                        ),
+                        amount: Number(selected.rate || selected.salePrice || 0),
                       },
                     ]);
                 }}
-              >
-                <option value="">Search Item / Product / Material...</option>
-                {items
-                  .filter(
-                    (item) =>
-                      (!item.projectId ||
-                        item.projectId === formData.projectId) &&
-                      (!categoryId ||
-                        !item.details?.categoryId ||
-                        item.details.categoryId === categoryId) &&
-                      (!subCategoryId ||
-                        !item.details?.subCategoryId ||
-                        item.details.subCategoryId === subCategoryId),
-                  )
-                  .map((i) => (
-                    <option key={i.uuid} value={i.uuid}>
-                      {i.name}
-                    </option>
-                  ))}
-              </select>
+              />
             </div>
           </div>
 

@@ -15,6 +15,9 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 // ---------- Types ----------
 export interface Customer {
@@ -29,6 +32,7 @@ export interface Customer {
   under: string;
   address: string;
   status: string;
+  createdBy?: string;
   buyerReference?: any;
   creditLimit?: any;
   chartOfGroups?: any;
@@ -43,14 +47,13 @@ export interface Customer {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return { "Content-Type": "application/json" };
-  }
   const token =
-    localStorage.getItem("share-project:access-token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -58,7 +61,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 // form values -> backend field names
-function toPayload(form: Partial<Customer>) {
+function toPayload(form: Partial<Customer>, userEmail?: string) {
   const clean = (v?: string) => {
     const t = (v || "").trim();
     return t === "" ? undefined : t;
@@ -86,8 +89,8 @@ async function handleRes(res: Response, action: string) {
   return json;
 }
 
-async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
-  const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account`, {
+async function fetchCustomers(userEmail?: string): Promise<{ data: Customer[]; meta: any }> {
+  const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account?page=1&limit=100`, {
     method: "GET",
     headers: getAuthHeaders(),
     cache: "no-store",
@@ -95,7 +98,7 @@ async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
 
   const json = await handleRes(res, "fetch customers");
 
-  const mapped: Customer[] = (json?.data?.data || []).map((item: any) => ({
+  const allMapped: Customer[] = (json?.data?.data || []).map((item: any) => ({
     id: Number(item.id) || item.uuid,
     uuid: item.uuid,
     code: item.customerCode || "",
@@ -107,6 +110,7 @@ async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
     under: item.underGroup || "",
     address: item.address || "",
     status: item.status || "active",
+    createdBy: item.createdBy || item.addedById || "",
     buyerReference: item.buyerReference,
     creditLimit: item.creditLimit,
     chartOfGroups: item.chartOfGroups,
@@ -117,27 +121,34 @@ async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
     image: item.image || item.photo || null,
   }));
 
-  return { data: mapped, meta: json?.data?.meta };
+  const filtered = userEmail
+    ? allMapped.filter((item: any) => {
+        const creator = String(item.createdBy || "").toLowerCase().trim();
+        return creator === userEmail;
+      })
+    : [];
+
+  return { data: filtered, meta: json?.data?.meta };
 }
 
 // POST /realbizpro/api/v1/customer-account
-async function createCustomer(form: Partial<Customer>) {
+async function createCustomer(form: Partial<Customer>, userEmail?: string) {
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify(toPayload(form)),
+    body: JSON.stringify(toPayload(form, userEmail)),
   });
   return handleRes(res, "create customer");
 }
 
 // PATCH /realbizpro/api/v1/customer-account/{uuid}
-async function updateCustomer(uuid: string, form: Partial<Customer>) {
+async function updateCustomer(uuid: string, form: Partial<Customer>, userEmail?: string) {
   const res = await fetch(
     `${API_BASE}/realbizpro/api/v1/customer-account/${uuid}`,
     {
       method: "PATCH",
       headers: getAuthHeaders(),
-      body: JSON.stringify(toPayload(form)),
+      body: JSON.stringify(toPayload(form, userEmail)),
     },
   );
   return handleRes(res, "update customer");
@@ -177,7 +188,7 @@ function CustomerFormModal({
     address: initialData?.address || "",
     code:
       initialData?.code ||
-      `CUS${Math.floor(1000000 + Math.random() * 9000000)}`,
+      `CUS${Date.now().toString().slice(-6)}`,
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -299,14 +310,20 @@ function CustomerFormModal({
               <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
                 Under Group
               </label>
-              <input
-                type="text"
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Under Group"
                 value={formData.under}
-                onChange={(e) =>
-                  setFormData({ ...formData, under: e.target.value })
+                options={[
+                  { value: "Corporate", label: "Corporate" },
+                  { value: "Individual", label: "Individual" },
+                  { value: "VIP", label: "VIP" },
+                  { value: "Retail", label: "Retail" },
+                  { value: "Investor", label: "Investor" },
+                ]}
+                onChange={(val) =>
+                  setFormData({ ...formData, under: val })
                 }
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Group code"
               />
             </div>
             <div>
@@ -363,6 +380,12 @@ function CustomerFormModal({
 
 // ---------- Main Page ----------
 export default function CustomerListPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -378,7 +401,9 @@ export default function CustomerListPage() {
   const loadCustomers = async () => {
     try {
       setError(null);
-      const { data } = await fetchCustomers();
+      const currentUser = getStoredUser();
+      const activeEmail = (currentUser?.email || userEmail || "").toLowerCase().trim();
+      const { data } = await fetchCustomers(activeEmail);
       setCustomers(data);
     } catch (err: any) {
       console.error(err);
@@ -387,9 +412,11 @@ export default function CustomerListPage() {
   };
 
   useEffect(() => {
-    setLoading(true);
-    loadCustomers().finally(() => setLoading(false));
-  }, []);
+    if (userEmail) {
+      setLoading(true);
+      loadCustomers().finally(() => setLoading(false));
+    }
+  }, [userEmail]);
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -405,10 +432,11 @@ export default function CustomerListPage() {
       const uuid = (customer as any).uuid;
       if (!uuid) throw new Error("Customer UUID is missing");
       await softDeleteCustomer(uuid);
+      toast.success("Deleted successfully!");
       await loadCustomers(); // database theke abar load
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || "Delete failed. Please try again.");
+      toast.error(err?.message || "Delete failed. Please try again.");
     }
   };
 
@@ -454,15 +482,19 @@ export default function CustomerListPage() {
         <div className="flex items-center justify-between md:justify-end gap-4">
           <div className="flex items-center space-x-2 text-sm text-slate-600">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-              className="border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
+            <div className="w-20">
+              <PredictiveSearchSelect
+                label=""
+                placeholder="20"
+                value={String(entriesPerPage)}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "20", label: "20" },
+                  { value: "50", label: "50" },
+                ]}
+                onChange={(val) => setEntriesPerPage(Number(val))}
+              />
+            </div>
             <span>entries</span>
           </div>
 
@@ -847,9 +879,10 @@ export default function CustomerListPage() {
           title="Customer Add"
           onClose={() => setIsAddModalOpen(false)}
           onSubmit={async (newData) => {
-            await createCustomer(newData); // POST /realbizpro/api/v1/customer-account
+            await createCustomer(newData, userEmail);
+            toast.success("Created successfully!");
             setIsAddModalOpen(false);
-            await loadCustomers(); // database theke abar load
+            await loadCustomers();
           }}
         />
       )}
@@ -863,10 +896,10 @@ export default function CustomerListPage() {
           onSubmit={async (updatedData) => {
             if (!editingCustomer.uuid)
               throw new Error("Customer UUID is missing");
-            // PATCH /realbizpro/api/v1/customer-account/{uuid}
-            await updateCustomer(editingCustomer.uuid, updatedData);
+            await updateCustomer(editingCustomer.uuid, updatedData, userEmail);
+            toast.success("Updated successfully!");
             setEditingCustomer(null);
-            await loadCustomers(); // database theke abar load
+            await loadCustomers();
           }}
         />
       )}

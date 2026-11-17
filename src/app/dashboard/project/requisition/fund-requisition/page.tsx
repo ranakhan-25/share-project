@@ -15,6 +15,8 @@ import {
   X,
   CreditCard,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 export interface FundRequisitionItem {
   id: string;
@@ -41,6 +43,11 @@ interface RelatedOption {
   uuid: string;
   name: string;
   projectId?: string;
+  createdBy?: string;
+  clientEmail?: string;
+  email?: string;
+  userEmail?: string;
+  projectManager?: string;
 }
 
 interface FundApiResponse {
@@ -71,14 +78,13 @@ const USER_API = `${API_BASE_URL}${API_PREFIX}/users`;
 const REFERENCE_API = `${API_BASE_URL}${API_PREFIX}/fund-requisition`;
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return { "Content-Type": "application/json" };
-  }
   const token =
-    localStorage.getItem("share-project:access-token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -127,11 +133,22 @@ async function fetchRelatedOptions(
               "Unnamed",
           ),
           projectId: row.projectId ? String(row.projectId) : undefined,
+          createdBy: row.createdBy,
+          clientEmail: row.clientEmail,
+          email: row.email,
+          userEmail: row.userEmail,
+          projectManager: row.projectManager,
         }))
     : [];
 }
 
 export default function FundRequisitionModule() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [requisitions, setRequisitions] = useState<FundRequisitionItem[]>([]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -204,10 +221,6 @@ export default function FundRequisitionModule() {
       .then(setProjectTypeOptions)
       .catch((e) => console.error("project types:", e));
 
-    fetchRelatedOptions(PROJECT_API, "projects")
-      .then(setProjectOptions)
-      .catch((e) => console.error("projects:", e));
-
     fetchRelatedOptions(TASK_API, "tasks")
       .then(setTaskOptions)
       .catch((e) => console.error("tasks:", e));
@@ -225,6 +238,29 @@ export default function FundRequisitionModule() {
       .catch((e) => console.error("references:", e));
   }, []);
 
+  useEffect(() => {
+    fetchRelatedOptions(PROJECT_API, "projects")
+      .then((raw) => {
+        const userProjects = userEmail
+          ? raw.filter((p: any) => {
+              const creator = String(
+                p.createdBy ||
+                  p.clientEmail ||
+                  p.email ||
+                  p.userEmail ||
+                  p.projectManager ||
+                  ""
+              )
+                .toLowerCase()
+                .trim();
+              return creator === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+        setProjectOptions(userProjects);
+      })
+      .catch((e) => console.error("projects:", e));
+  }, [userEmail, storedUser?.id]);
+
   // ==================== GET DATA ====================
   const fetchFundRequisitions = useCallback(async () => {
     try {
@@ -232,8 +268,8 @@ export default function FundRequisitionModule() {
       setError("");
 
       const params = new URLSearchParams();
-      params.set("page", String(currentPage));
-      params.set("limit", String(entriesPerPage));
+      params.set("page", "1");
+      params.set("limit", "100");
       if (searchQuery.trim()) params.set("search", searchQuery.trim());
       if (userFilter !== "All") params.set("addedById", userFilter);
       if (statusFilter !== "All") params.set("paymentStatus", statusFilter);
@@ -252,9 +288,18 @@ export default function FundRequisitionModule() {
         throw new Error(body.message || "Failed to fetch fund requisitions");
       }
 
-      setRequisitions(body.data?.data || []);
-      setTotalItems(body.data?.meta?.total || 0);
-      setTotalPages(body.data?.meta?.totalPages || 1);
+      const rawList = body.data?.data || [];
+      const userProjUuids = new Set(projectOptions.map((p) => p.uuid));
+      const filtered = rawList.filter((item) => {
+        if (!userEmail) return false;
+        const belongsToProj = item.projectId && userProjUuids.has(item.projectId);
+        const creator = String(item.createdBy || item.addedById || "").toLowerCase().trim();
+        return belongsToProj || creator === userEmail;
+      });
+
+      setRequisitions(filtered);
+      setTotalItems(filtered.length);
+      setTotalPages(1);
     } catch (err) {
       const message =
         err instanceof Error
@@ -265,7 +310,7 @@ export default function FundRequisitionModule() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, entriesPerPage, searchQuery, userFilter, statusFilter]);
+  }, [projectOptions, searchQuery, userFilter, statusFilter, userEmail]);
 
   useEffect(() => {
     fetchFundRequisitions();
@@ -274,6 +319,10 @@ export default function FundRequisitionModule() {
   // ==================== CREATE ====================
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.projectId) {
+      setError("Please select a project.");
+      return;
+    }
     try {
       setSubmitting(true);
       setError("");
@@ -292,8 +341,8 @@ export default function FundRequisitionModule() {
         reference: formData.reference || null,
         approveStatus: formData.approveStatus || "Pending",
         paymentStatus: formData.paymentStatus || "Payment Left",
-        addedById: formData.addedById || null,
-        createdBy: formData.createdBy || null,
+        addedById: userEmail || formData.addedById || null,
+        createdBy: userEmail || formData.createdBy || null,
         updatedBy: formData.updatedBy || null,
       };
 
@@ -563,40 +612,38 @@ export default function FundRequisitionModule() {
             <label className="block font-semibold text-slate-600 mb-1">
               Users
             </label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="All Users"
+              options={[
+                { value: "All", label: "All Users" },
+                ...userOptions.map((u) => ({ value: u.uuid, label: u.name })),
+              ]}
               value={userFilter}
-              onChange={(e) => {
-                setUserFilter(e.target.value);
+              onChange={(val) => {
+                setUserFilter(val || "All");
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="All">Select an option</option>
-              {userOptions.map((u) => (
-                <option key={u.uuid} value={u.uuid}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div>
             <label className="block font-semibold text-slate-600 mb-1">
               Payment Status
             </label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="All Status"
+              options={[
+                { value: "All", label: "All Status" },
+                { value: "Payment Left", label: "Payment Left" },
+                { value: "Partially Paid", label: "Partially Paid" },
+                { value: "Fully Paid", label: "Fully Paid" },
+              ]}
               value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
+              onChange={(val) => {
+                setStatusFilter(val || "All");
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="All">Select an option</option>
-              <option value="Payment Left">Payment Left</option>
-              <option value="Partially Paid">Partially Paid</option>
-              <option value="Fully Paid">Fully Paid</option>
-            </select>
+            />
           </div>
         </div>
 
@@ -856,23 +903,12 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project Type
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project Type"
+                    options={projectTypeOptions.map((pt) => ({ value: pt.name, label: pt.name }))}
                     value={formData.projectType}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        projectType: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Project Type</option>
-                    {projectTypeOptions.map((pt) => (
-                      <option key={pt.uuid} value={pt.name}>
-                        {pt.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectType: val })}
+                  />
                 </div>
 
                 {/* PROJECT — DYNAMIC */}
@@ -880,24 +916,12 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project"
+                    options={projectOptions.map((p) => ({ value: p.uuid, label: p.name }))}
                     value={formData.projectId}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        projectId: e.target.value,
-                        siteId: "",
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Project</option>
-                    {projectOptions.map((p) => (
-                      <option key={p.uuid} value={p.uuid}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectId: val, siteId: "" })}
+                  />
                 </div>
 
                 {/* TASK — DYNAMIC */}
@@ -905,20 +929,12 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     If Task
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Task"
+                    options={taskOptions.map((t) => ({ value: t.uuid, label: t.name }))}
                     value={formData.taskId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, taskId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Task</option>
-                    {taskOptions.map((t) => (
-                      <option key={t.uuid} value={t.uuid}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, taskId: val })}
+                  />
                 </div>
 
                 {/* SITE — DYNAMIC (filtered by project) */}
@@ -926,20 +942,12 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Site
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Site"
+                    options={filteredSiteOptions.map((s) => ({ value: s.uuid, label: s.name }))}
                     value={formData.siteId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, siteId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Site</option>
-                    {filteredSiteOptions.map((s) => (
-                      <option key={s.uuid} value={s.uuid}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, siteId: val })}
+                  />
                 </div>
 
                 {/* FROM — DYNAMIC */}
@@ -947,20 +955,12 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     From
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select User"
+                    options={userOptions.map((u) => ({ value: u.uuid, label: u.name }))}
                     value={formData.fromUserId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fromUserId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select User</option>
-                    {userOptions.map((u) => (
-                      <option key={u.uuid} value={u.uuid}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, fromUserId: val })}
+                  />
                 </div>
 
                 {/* AMOUNT */}
@@ -1024,20 +1024,16 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Approve Status
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Approve Status"
+                    options={[
+                      { value: "Pending", label: "Pending" },
+                      { value: "All Approval Done", label: "All Approval Done" },
+                      { value: "Rejected", label: "Rejected" },
+                    ]}
                     value={formData.approveStatus}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        approveStatus: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="All Approval Done">All Approval Done</option>
-                    <option value="Rejected">Rejected</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, approveStatus: val })}
+                  />
                 </div>
 
                 {/* PAYMENT STATUS */}
@@ -1045,20 +1041,16 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Payment Status
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Payment Status"
+                    options={[
+                      { value: "Payment Left", label: "Payment Left" },
+                      { value: "Partially Paid", label: "Partially Paid" },
+                      { value: "Fully Paid", label: "Fully Paid" },
+                    ]}
                     value={formData.paymentStatus}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        paymentStatus: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="Payment Left">Payment Left</option>
-                    <option value="Partially Paid">Partially Paid</option>
-                    <option value="Fully Paid">Fully Paid</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, paymentStatus: val })}
+                  />
                 </div>
 
                 {/* PURPOSE */}
@@ -1083,20 +1075,12 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     If Reference
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Reference"
+                    options={referenceOptions.map((r) => ({ value: r.name, label: r.name }))}
                     value={formData.reference}
-                    onChange={(e) =>
-                      setFormData({ ...formData, reference: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Reference</option>
-                    {referenceOptions.map((r) => (
-                      <option key={r.uuid} value={r.name}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, reference: val })}
+                  />
                 </div>
               </div>
 
@@ -1164,106 +1148,60 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project Type
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project Type"
+                    options={projectTypeOptions.map((pt) => ({ value: pt.name, label: pt.name }))}
                     value={formData.projectType}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        projectType: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Project Type</option>
-                    {projectTypeOptions.map((pt) => (
-                      <option key={pt.uuid} value={pt.name}>
-                        {pt.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectType: val })}
+                  />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project"
+                    options={projectOptions.map((p) => ({ value: p.uuid, label: p.name }))}
                     value={formData.projectId}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        projectId: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Project</option>
-                    {projectOptions.map((p) => (
-                      <option key={p.uuid} value={p.uuid}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectId: val, siteId: "" })}
+                  />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     If Task
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Task"
+                    options={taskOptions.map((t) => ({ value: t.uuid, label: t.name }))}
                     value={formData.taskId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, taskId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Task</option>
-                    {taskOptions.map((t) => (
-                      <option key={t.uuid} value={t.uuid}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, taskId: val })}
+                  />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Site
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Site"
+                    options={filteredSiteOptions.map((s) => ({ value: s.uuid, label: s.name }))}
                     value={formData.siteId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, siteId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Site</option>
-                    {filteredSiteOptions.map((s) => (
-                      <option key={s.uuid} value={s.uuid}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, siteId: val })}
+                  />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     From
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select User"
+                    options={userOptions.map((u) => ({ value: u.uuid, label: u.name }))}
                     value={formData.fromUserId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fromUserId: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select User</option>
-                    {userOptions.map((u) => (
-                      <option key={u.uuid} value={u.uuid}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, fromUserId: val })}
+                  />
                 </div>
 
                 <div>
@@ -1321,40 +1259,32 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Approve Status
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Approve Status"
+                    options={[
+                      { value: "Pending", label: "Pending" },
+                      { value: "All Approval Done", label: "All Approval Done" },
+                      { value: "Rejected", label: "Rejected" },
+                    ]}
                     value={formData.approveStatus}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        approveStatus: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="All Approval Done">All Approval Done</option>
-                    <option value="Rejected">Rejected</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, approveStatus: val })}
+                  />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Payment Status
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Payment Status"
+                    options={[
+                      { value: "Payment Left", label: "Payment Left" },
+                      { value: "Partially Paid", label: "Partially Paid" },
+                      { value: "Fully Paid", label: "Fully Paid" },
+                    ]}
                     value={formData.paymentStatus}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        paymentStatus: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="Payment Left">Payment Left</option>
-                    <option value="Partially Paid">Partially Paid</option>
-                    <option value="Fully Paid">Fully Paid</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, paymentStatus: val })}
+                  />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -1375,20 +1305,12 @@ export default function FundRequisitionModule() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Reference
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Reference"
+                    options={referenceOptions.map((r) => ({ value: r.name, label: r.name }))}
                     value={formData.reference}
-                    onChange={(e) =>
-                      setFormData({ ...formData, reference: e.target.value })
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg"
-                  >
-                    <option value="">Select Reference</option>
-                    {referenceOptions.map((r) => (
-                      <option key={r.uuid} value={r.name}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, reference: val })}
+                  />
                 </div>
               </div>
 

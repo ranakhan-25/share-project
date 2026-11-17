@@ -16,6 +16,9 @@ import {
   Loader2,
   Printer,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 // ---------- Types ----------
 interface Contractor {
@@ -31,6 +34,7 @@ interface Contractor {
   dueDate: string;
   under: string;
   status: string;
+  createdBy?: string;
   ledgerEntries?: LedgerEntry[];
 }
 
@@ -50,21 +54,20 @@ interface LedgerEntry {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return { "Content-Type": "application/json" };
-  }
   const token =
-    localStorage.getItem("share-project:access-token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
-async function fetchContractors(): Promise<{
+async function fetchContractors(userEmail?: string): Promise<{
   data: Contractor[];
   meta: any;
 }> {
@@ -81,7 +84,7 @@ async function fetchContractors(): Promise<{
   }
   const json = await res.json();
 
-  const mapped: Contractor[] = (json?.data?.data || []).map((item: any) => ({
+  const allMapped: Contractor[] = (json?.data?.data || []).map((item: any) => ({
     id: Number(item.id) || item.uuid,
     uuid: item.uuid,
     code: item.code || "",
@@ -96,10 +99,18 @@ async function fetchContractors(): Promise<{
       ? item.under.charAt(0).toUpperCase() + item.under.slice(1).toLowerCase()
       : "Worker",
     status: item.status || "active",
+    createdBy: item.createdBy || "",
     ledgerEntries: item.ledgerEntries || [],
   }));
 
-  return { data: mapped, meta: json?.data?.meta };
+  const filtered = userEmail
+    ? allMapped.filter((item: any) => {
+        const creator = String(item.createdBy || "").toLowerCase().trim();
+        return creator === userEmail;
+      })
+    : [];
+
+  return { data: filtered, meta: json?.data?.meta };
 }
 
 async function createContractor(payload: Record<string, any>) {
@@ -178,9 +189,7 @@ function ContractorFormModal({
     under: initialData?.under || "Worker",
     code:
       initialData?.code ||
-      `CON-${new Date().getFullYear()}-${String(
-        Math.floor(100 + Math.random() * 900),
-      ).padStart(3, "0")}`,
+      `CON-${Date.now().toString().slice(-6)}`,
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -319,16 +328,18 @@ function ContractorFormModal({
               <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
                 Under Group
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Under Group"
                 value={formData.under}
-                onChange={(e) =>
-                  setFormData({ ...formData, under: e.target.value })
+                options={[
+                  { value: "Worker", label: "Worker" },
+                  { value: "Contractor", label: "Contractor" },
+                ]}
+                onChange={(val) =>
+                  setFormData({ ...formData, under: val })
                 }
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-              >
-                <option value="Worker">Worker</option>
-                <option value="Contractor">Contractor</option>
-              </select>
+              />
             </div>
 
             <div className="sm:col-span-2">
@@ -376,6 +387,12 @@ function ContractorFormModal({
 
 // ---------- Main Page ----------
 export default function WorkerContractorPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [workers, setWorkers] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -394,7 +411,9 @@ export default function WorkerContractorPage() {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await fetchContractors();
+      const currentUser = getStoredUser();
+      const activeEmail = (currentUser?.email || userEmail || "").toLowerCase().trim();
+      const { data } = await fetchContractors(activeEmail);
       setWorkers(data);
     } catch (err: any) {
       console.error(err);
@@ -405,8 +424,10 @@ export default function WorkerContractorPage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (userEmail) {
+      loadData();
+    }
+  }, [userEmail]);
 
   const filteredWorkers = workers.filter(
     (w) =>
@@ -424,11 +445,11 @@ export default function WorkerContractorPage() {
       if (uuid) {
         await softDeleteContractor(uuid);
       }
-      // Optimistic UI update
+      toast.success("Deleted successfully!");
       setWorkers((prev) => prev.filter((w) => w.uuid !== worker.uuid));
     } catch (err) {
       console.error(err);
-      alert("Delete failed. Please try again.");
+      toast.error("Delete failed. Please try again.");
     }
   };
 
@@ -444,6 +465,7 @@ export default function WorkerContractorPage() {
     dueDate: data.dueDate ? new Date(data.dueDate).toISOString().slice(0, 10) : null,
     under: (data.under || "Worker").toLowerCase(),
     status: "active",
+    createdBy: userEmail || "sharetest@realbiz.com",
   });
 
   return (
@@ -484,15 +506,19 @@ export default function WorkerContractorPage() {
         <div className="flex items-center justify-between md:justify-end gap-4">
           <div className="flex items-center space-x-2 text-sm text-slate-600">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-              className="border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
+            <div className="w-20">
+              <PredictiveSearchSelect
+                label=""
+                placeholder="20"
+                value={String(entriesPerPage)}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "20", label: "20" },
+                  { value: "50", label: "50" },
+                ]}
+                onChange={(val) => setEntriesPerPage(Number(val))}
+              />
+            </div>
             <span>entries</span>
           </div>
           <div className="relative">
@@ -786,10 +812,11 @@ export default function WorkerContractorPage() {
           onSubmit={async (newData) => {
             try {
               await createContractor(toApiPayload(newData));
+              toast.success("Created successfully!");
               setIsAddModalOpen(false);
               await loadData();
             } catch (err: any) {
-              alert(err.message || "Create failed");
+              toast.error(err.message || "Create failed");
             }
           }}
         />
@@ -807,10 +834,11 @@ export default function WorkerContractorPage() {
                 editingWorker.uuid,
                 toApiPayload(updatedData),
               );
+              toast.success("Updated successfully!");
               setEditingWorker(null);
               await loadData();
             } catch (err: any) {
-              alert(err.message || "Update failed");
+              toast.error(err.message || "Update failed");
             }
           }}
         />

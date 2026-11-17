@@ -22,6 +22,8 @@ import {
   Calendar,
   Loader2,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 // ==================== TYPES ====================
 export interface MaterialRequisitionItem {
@@ -71,6 +73,11 @@ export interface MaterialBoqItem {
 interface ProjectOption {
   uuid: string;
   name: string;
+  createdBy?: string;
+  clientEmail?: string;
+  email?: string;
+  userEmail?: string;
+  projectManager?: string;
 }
 
 interface RelatedOption {
@@ -145,11 +152,12 @@ const emptyBoqRow = (): MaterialBoqItem => ({
 
 const getAuthHeaders = (): Record<string, string> => {
   const token =
-    typeof window !== "undefined"
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
       ? localStorage.getItem("share-project:access-token") ||
         localStorage.getItem("token") ||
         localStorage.getItem("accessToken")
-      : null;
+      : null);
   return {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -301,6 +309,11 @@ async function fetchProjects(): Promise<ProjectOption[]> {
         .map((project: any) => ({
           uuid: String(project.uuid),
           name: String(project.name),
+          createdBy: project.createdBy,
+          clientEmail: project.clientEmail,
+          email: project.email,
+          userEmail: project.userEmail,
+          projectManager: project.projectManager,
         }))
     : [];
 }
@@ -360,6 +373,12 @@ async function softDeleteRequisition(uuid: string) {
 
 // ==================== MAIN PAGE ====================
 export default function MaterialRequisitionPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [requisitions, setRequisitions] = useState<MaterialRequisitionItem[]>(
     [],
   );
@@ -433,7 +452,14 @@ export default function MaterialRequisitionPage() {
         limit: 100,
         search: searchQuery || undefined,
       });
-      setRequisitions(data);
+      const userProjUuids = new Set(projects.map((p) => p.uuid));
+      const filtered = data.filter((item) => {
+        if (!userEmail) return false;
+        const belongsToProj = item.projectId && userProjUuids.has(item.projectId);
+        const creator = String(item.createdBy || item.addedBy || "").toLowerCase().trim();
+        return belongsToProj || creator === userEmail;
+      });
+      setRequisitions(filtered);
     } catch (e: unknown) {
       const message =
         e instanceof Error ? e.message : "Failed to load material requisitions";
@@ -445,14 +471,6 @@ export default function MaterialRequisitionPage() {
   };
 
   useEffect(() => {
-    loadRequisitions();
-    fetchProjects()
-      .then(setProjects)
-      .catch((e: unknown) => {
-        setProjectsError(
-          e instanceof Error ? e.message : "Failed to load projects",
-        );
-      });
     fetchRelatedOptions(SITE_API, "project sites")
       .then(setSites)
       .catch((e: unknown) => {
@@ -486,8 +504,38 @@ export default function MaterialRequisitionPage() {
       .catch((e: unknown) => {
         setTasksError(e instanceof Error ? e.message : "Failed to load tasks");
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    fetchProjects()
+      .then((rawProjects) => {
+        const userProjects = userEmail
+          ? rawProjects.filter((p: any) => {
+              const creator = String(
+                p.createdBy ||
+                  p.clientEmail ||
+                  p.email ||
+                  p.userEmail ||
+                  p.projectManager ||
+                  ""
+              )
+                .toLowerCase()
+                .trim();
+              return creator === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+        setProjects(userProjects);
+      })
+      .catch((e: unknown) => {
+        setProjectsError(
+          e instanceof Error ? e.message : "Failed to load projects",
+        );
+      });
+  }, [userEmail, storedUser?.id]);
+
+  useEffect(() => {
+    loadRequisitions();
+  }, [projects, userEmail]);
 
   // ==================== SELECT ====================
   const handleSelectAll = () => {
@@ -919,62 +967,51 @@ export default function MaterialRequisitionPage() {
             <label className="block font-semibold text-slate-600 mb-1">
               Company
             </label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Search company..."
+              options={[
+                { value: "Somikoron IT Ltd", label: "Somikoron IT Ltd" },
+                { value: "Other Company", label: "Other Company" },
+              ]}
               value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="Somikoron IT Ltd">Somikoron IT Ltd</option>
-              <option value="Other Company">Other Company</option>
-            </select>
+              onChange={(val) => setCompanyFilter(val)}
+            />
           </div>
           <div>
             <label className="block font-semibold text-slate-600 mb-1">
               Supplier
             </label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Search supplier..."
+              options={[
+                { value: "Supplier A", label: "Supplier A" },
+                { value: "Supplier B", label: "Supplier B" },
+              ]}
               value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select an option</option>
-              <option value="Supplier A">Supplier A</option>
-              <option value="Supplier B">Supplier B</option>
-            </select>
+              onChange={(val) => setSupplierFilter(val)}
+            />
           </div>
           <div>
             <label className="block font-semibold text-slate-600 mb-1">
               Project
             </label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Search project..."
+              options={projects.map((p) => ({ value: p.name, label: p.name }))}
               value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select value</option>
-              {projects.map((project) => (
-                <option key={project.uuid} value={project.name}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setProjectFilter(val)}
+            />
           </div>
           <div>
             <label className="block font-semibold text-slate-600 mb-1">
               Title/Name of Work
             </label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Search work title..."
+              options={workOrders.map((wo) => ({ value: wo.name, label: wo.name }))}
               value={titleFilter}
-              onChange={(e) => setTitleFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select Title/Name of Work</option>
-              {workOrders.map((wo) => (
-                <option key={wo.uuid} value={wo.name}>
-                  {wo.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setTitleFilter(val)}
+            />
           </div>
         </div>
 
@@ -1298,20 +1335,12 @@ export default function MaterialRequisitionPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project Type
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project Type"
+                    options={projectTypes.map((pt) => ({ value: pt.name, label: pt.name }))}
                     value={formData.projectType}
-                    onChange={(e) =>
-                      setFormData({ ...formData, projectType: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="">Select Project Type</option>
-                    {projectTypes.map((pt) => (
-                      <option key={pt.uuid} value={pt.name}>
-                        {pt.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectType: val })}
+                  />
                 </div>
 
                 {/* Project */}
@@ -1319,24 +1348,12 @@ export default function MaterialRequisitionPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project"
+                    options={projects.map((project) => ({ value: project.uuid, label: project.name }))}
                     value={formData.project}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        project: e.target.value,
-                        site: "",
-                      })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map((project) => (
-                      <option key={project.uuid} value={project.uuid}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, project: val, site: "" })}
+                  />
                 </div>
 
                 {/* Title/Name of Work */}
@@ -1344,23 +1361,12 @@ export default function MaterialRequisitionPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Title/Name of Work
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Title/Name of Work"
+                    options={workOrders.map((wo) => ({ value: wo.name, label: wo.name }))}
                     value={formData.titleNameOfWork}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        titleNameOfWork: e.target.value,
-                      })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="">Select Title/Name of Work</option>
-                    {workOrders.map((wo) => (
-                      <option key={wo.uuid} value={wo.name}>
-                        {wo.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, titleNameOfWork: val })}
+                  />
                 </div>
 
                 {/* If Task */}
@@ -1368,20 +1374,12 @@ export default function MaterialRequisitionPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     If Task
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Task"
+                    options={tasks.map((task) => ({ value: task.name, label: task.name }))}
                     value={formData.ifTask}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ifTask: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="">Select Task</option>
-                    {tasks.map((task) => (
-                      <option key={task.uuid} value={task.name}>
-                        {task.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, ifTask: val })}
+                  />
                 </div>
 
                 {/* Site */}
@@ -1389,27 +1387,19 @@ export default function MaterialRequisitionPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Site
                   </label>
-                  <select
-                    value={formData.site}
-                    onChange={(e) =>
-                      setFormData({ ...formData, site: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="">Select Site</option>
-                    {sites
+                  <PredictiveSearchSelect
+                    placeholder="Select Site"
+                    options={sites
                       .filter(
                         (site) =>
                           !site.projectId ||
                           !formData.project ||
                           site.projectId === formData.project,
                       )
-                      .map((site) => (
-                        <option key={site.uuid} value={site.uuid}>
-                          {site.name}
-                        </option>
-                      ))}
-                  </select>
+                      .map((site) => ({ value: site.uuid, label: site.name }))}
+                    value={formData.site}
+                    onChange={(val) => setFormData({ ...formData, site: val })}
+                  />
                 </div>
 
                 {/* Category */}
@@ -1417,20 +1407,12 @@ export default function MaterialRequisitionPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Category
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Category"
+                    options={categories.map((category) => ({ value: category.uuid, label: category.name }))}
                     value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((category) => (
-                      <option key={category.uuid} value={category.uuid}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, category: val })}
+                  />
                 </div>
 
                 {/* Attachment */}
@@ -1762,118 +1744,67 @@ export default function MaterialRequisitionPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project Type
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project Type"
+                    options={projectTypes.map((pt) => ({ value: pt.name, label: pt.name }))}
                     value={formData.projectType}
-                    onChange={(e) =>
-                      setFormData({ ...formData, projectType: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"
-                  >
-                    <option value="">Select Project Type</option>
-                    {projectTypes.map((pt) => (
-                      <option key={pt.uuid} value={pt.name}>
-                        {pt.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectType: val })}
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Project
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Project"
+                    options={projects.map((project) => ({ value: project.uuid, label: project.name }))}
                     value={formData.project}
-                    onChange={(e) =>
-                      setFormData({ ...formData, project: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map((project) => (
-                      <option key={project.uuid} value={project.uuid}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, project: val })}
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Title/Name of Work
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Title/Name of Work"
+                    options={workOrders.map((wo) => ({ value: wo.name, label: wo.name }))}
                     value={formData.titleNameOfWork}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        titleNameOfWork: e.target.value,
-                      })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"
-                  >
-                    <option value="">Select Title/Name of Work</option>
-                    {workOrders.map((wo) => (
-                      <option key={wo.uuid} value={wo.name}>
-                        {wo.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, titleNameOfWork: val })}
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     If Task
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Task"
+                    options={tasks.map((task) => ({ value: task.name, label: task.name }))}
                     value={formData.ifTask}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ifTask: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"
-                  >
-                    <option value="">Select Task</option>
-                    {tasks.map((task) => (
-                      <option key={task.uuid} value={task.name}>
-                        {task.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, ifTask: val })}
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Site
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Site"
+                    options={sites.map((site) => ({ value: site.uuid, label: site.name }))}
                     value={formData.site}
-                    onChange={(e) =>
-                      setFormData({ ...formData, site: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"
-                  >
-                    <option value="">Select Site</option>
-                    {sites.map((site) => (
-                      <option key={site.uuid} value={site.uuid}>
-                        {site.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, site: val })}
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Category
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Category"
+                    options={categories.map((category) => ({ value: category.uuid, label: category.name }))}
                     value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((category) => (
-                      <option key={category.uuid} value={category.uuid}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, category: val })}
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
