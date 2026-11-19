@@ -29,6 +29,7 @@ import {
   Check,
   RotateCcw,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // Types & Data Structures for API integration
 export interface JournalVoucherRow {
@@ -125,6 +126,51 @@ export default function JournalVoucherListPage() {
   // Action Dropdown State
   const [openActionId, setOpenActionId] = useState<number | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+
+  const [coaOptions, setCoaOptions] = useState<{ value: string; label: string }[]>([]);
+  const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    const loadDropdowns = async () => {
+      try {
+        const [coaRes, projRes, siteRes] = await Promise.all([
+          fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project?limit=100", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project-sites?limit=100", { headers: getAuthHeaders() }),
+        ]);
+        const [coaJson, projJson, siteJson] = await Promise.all([
+          coaRes.json().catch(() => ({})),
+          projRes.json().catch(() => ({})),
+          siteRes.json().catch(() => ({})),
+        ]);
+        const coaList = coaJson?.data?.data || coaJson?.data || [];
+        if (Array.isArray(coaList)) {
+          setCoaOptions(coaList.map((a: any) => ({
+            value: a.name || a.uuid || a.id || "",
+            label: a.name || "Account",
+          })));
+        }
+        const pList = projJson?.data?.data || projJson?.data || [];
+        if (Array.isArray(pList)) {
+          setProjectOptions(pList.map((p: any) => ({
+            value: p.name || p.title || p.uuid || String(p.id),
+            label: p.name || p.title || "Project",
+          })));
+        }
+        const sList = siteJson?.data?.data || siteJson?.data || [];
+        if (Array.isArray(sList)) {
+          setSiteOptions(sList.map((s: any) => ({
+            value: s.name || s.siteName || s.uuid || String(s.id),
+            label: s.name || s.siteName || "Site",
+          })));
+        }
+      } catch (err) {
+        console.error("Error loading dropdown data:", err);
+      }
+    };
+    loadDropdowns();
+  }, []);
 
   const unwrapData = (result: unknown): Record<string, unknown>[] => {
     if (!result || typeof result !== "object") return [];
@@ -352,45 +398,48 @@ export default function JournalVoucherListPage() {
               <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                 Debit Accounts
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={coaOptions.length ? coaOptions : [
+                  { value: "Others Inventory", label: "Others Inventory" },
+                  { value: "Sanitary Work Inventory", label: "Sanitary Work Inventory" },
+                ]}
                 value={filters.debitAccount}
-                onChange={(e) => setFilters({ ...filters, debitAccount: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Chart Of Account</option>
-                <option value="Others Inventory">Others Inventory</option>
-                <option value="Sanitary Work Inventory">Sanitary Work Inventory</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, debitAccount: val })}
+                placeholder="Select Chart Of Account"
+                className="w-full text-[11px]"
+              />
             </div>
 
             <div>
               <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                 Credit Accounts
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={coaOptions.length ? coaOptions : [
+                  { value: "Riva Steel Mils", label: "Riva Steel Mils" },
+                  { value: "Rifat Thai House", label: "Rifat Thai House" },
+                ]}
                 value={filters.creditAccount}
-                onChange={(e) => setFilters({ ...filters, creditAccount: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Chart Of Account</option>
-                <option value="Riva Steel Mils">Riva Steel Mils</option>
-                <option value="Rifat Thai House">Rifat Thai House</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, creditAccount: val })}
+                placeholder="Select Chart Of Account"
+                className="w-full text-[11px]"
+              />
             </div>
 
             <div>
               <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                 Select Project
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={projectOptions.length ? projectOptions : [
+                  { value: "Project A", label: "Project A" },
+                  { value: "Project B", label: "Project B" },
+                ]}
                 value={filters.project}
-                onChange={(e) => setFilters({ ...filters, project: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Project</option>
-                <option value="Project A">Project A</option>
-                <option value="Project B">Project B</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, project: val })}
+                placeholder="Select Project"
+                className="w-full text-[11px]"
+              />
             </div>
           </div>
 
@@ -400,39 +449,48 @@ export default function JournalVoucherListPage() {
               <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                 Title/Name of Work
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={[
+                  { value: "Material Purchase", label: "Material Purchase" },
+                  { value: "Civil Work", label: "Civil Work" },
+                ]}
                 value={filters.titleOfWork}
-                onChange={(e) => setFilters({ ...filters, titleOfWork: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Title/Name of Work</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, titleOfWork: val })}
+                placeholder="Select Title/Name of Work"
+                className="w-full text-[11px]"
+              />
             </div>
 
             <div>
               <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                 Site
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={siteOptions.length ? siteOptions : [
+                  { value: "Site A", label: "Site A" },
+                  { value: "Site B", label: "Site B" },
+                ]}
                 value={filters.site}
-                onChange={(e) => setFilters({ ...filters, site: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Site</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, site: val })}
+                placeholder="Select Site"
+                className="w-full text-[11px]"
+              />
             </div>
 
             <div>
               <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                 Task
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={[
+                  { value: "Foundation", label: "Foundation" },
+                  { value: "Finishing", label: "Finishing" },
+                ]}
                 value={filters.task}
-                onChange={(e) => setFilters({ ...filters, task: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-1 text-[11px] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Task</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, task: val })}
+                placeholder="Select Task"
+                className="w-full text-[11px]"
+              />
             </div>
           </div>
         </div>

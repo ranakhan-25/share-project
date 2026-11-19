@@ -18,6 +18,7 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // API Base URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
@@ -232,7 +233,8 @@ export default function ChartOfAccountsPage() {
         }
       });
     }
-    return `COA-${maxNum + 1}`;
+    const rand = Math.floor(100 + Math.random() * 900);
+    return `COA-${maxNum + rand}`;
   };
 
   // ==========================================
@@ -363,18 +365,16 @@ export default function ChartOfAccountsPage() {
         <label className="block text-xs font-semibold text-slate-700 mb-1">
           Chart Of Group(Under)
         </label>
-        <select
+        <PredictiveSearchSelect
           value={groupFilter}
-          onChange={(e) => setGroupFilter(e.target.value)}
-          className="w-full sm:w-64 px-3 py-1.5 text-xs md:text-sm bg-white border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500"
-        >
-          <option value="">All Groups</option>
-          <option value="Sundry Creditors">Sundry Creditors</option>
-          <option value="Cost of Goods Sold (COGS)">Cost of Goods Sold (COGS)</option>
-          <option value="Closing Stock">Closing Stock</option>
-          <option value="Direct Expense">Direct Expense</option>
-          <option value="Current Liabilities">Current Liabilities</option>
-        </select>
+          onChange={setGroupFilter}
+          options={[
+            { value: "", label: "All Groups" },
+            ...groups.map((g) => ({ value: g.name, label: `${g.name} (${g.under})` })),
+          ]}
+          placeholder="Search group..."
+          className="w-full sm:w-64"
+        />
       </div>
 
       {/* Main Table Container */}
@@ -388,18 +388,20 @@ export default function ChartOfAccountsPage() {
             <button className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-emerald-600 text-white"><FileSpreadsheet className="w-3 h-3" /> Excel</button>
             <button className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-rose-600 text-white"><FileText className="w-3 h-3" /> PDF</button>
 
-            <div className="flex items-center gap-1 text-xs md:text-sm text-slate-600 ml-2">
+            <div className="flex items-center gap-1.5 text-xs md:text-sm text-slate-600 ml-2">
               <span>Show</span>
-              <select
-                value={entriesPerPage}
-                onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-                className="bg-slate-50 border border-slate-200 rounded px-2 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
+              <PredictiveSearchSelect
+                value={String(entriesPerPage)}
+                onChange={(value) => setEntriesPerPage(Number(value) || 10)}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "25", label: "25" },
+                  { value: "50", label: "50" },
+                  { value: "100", label: "100" },
+                ]}
+                placeholder="10"
+                className="w-20"
+              />
               <span>entries</span>
             </div>
           </div>
@@ -605,27 +607,23 @@ export default function ChartOfAccountsPage() {
 
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Chart Of Group (Under) <span className="text-rose-500">*</span></label>
-                <select
+                <PredictiveSearchSelect
                   name="under"
-                  required
                   value={formData.under}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
-                >
-                  <option value="">Select Group</option>
-                  {groups.length > 0 ? (
-                    groups.map((g) => (
-                      <option key={g.uuid || g.id} value={g.name}>
-                        {g.name} ({g.under})
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Current Assets">Current Assets (Assets)</option>
-                      <option value="Direct Expenses">Direct Expenses (Expenses)</option>
-                    </>
-                  )}
-                </select>
+                  onChange={(value) => setFormData((prev) => ({ ...prev, under: value }))}
+                  options={[
+                    { value: "", label: "Select Group" },
+                    ...(groups.length > 0
+                      ? groups.map((g) => ({ value: g.name, label: `${g.name} (${g.under})` }))
+                      : [
+                          { value: "Current Assets", label: "Current Assets (Assets)" },
+                          { value: "Direct Expenses", label: "Direct Expenses (Expenses)" },
+                        ]),
+                  ]}
+                  placeholder="Search account group..."
+                  required
+                  className="w-full"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 mt-4">

@@ -16,6 +16,9 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 // ==================== TYPES ====================
 interface LedgerEntry {
@@ -44,6 +47,7 @@ interface Supplier {
   dueDate?: string;
   image?: string;
   status?: string;
+  createdBy?: string;
   ledger?: LedgerEntry[];
 }
 
@@ -51,14 +55,13 @@ interface Supplier {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return { "Content-Type": "application/json" };
-  }
   const token =
-    localStorage.getItem("share-project:access-token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -79,9 +82,11 @@ async function handleRes(res: Response, action: string) {
 async function fetchSuppliers(params?: {
   page?: number;
   limit?: number;
+  userEmail?: string;
 }): Promise<{ data: Supplier[]; meta: any }> {
   const page = params?.page ?? 1;
   const limit = params?.limit ?? 100;
+  const userEmail = params?.userEmail;
 
   // status=active — tai soft-deleted (inactive) record ar list e asbe na
   const url = `${API_BASE}/realbizpro/api/v1/supplier-accounts?page=${page}&limit=${limit}&skip=0&status=active&sortBy=createdAt&sortOrder=DESC&withDeleted=false`;
@@ -94,7 +99,7 @@ async function fetchSuppliers(params?: {
 
   const json = await handleRes(res, "fetch suppliers");
 
-  const mapped: Supplier[] = (json?.data?.data || [])
+  const allMapped: Supplier[] = (json?.data?.data || [])
     .map((item: any) => ({
       id: item.id ?? item.uuid,
       uuid: item.uuid,
@@ -109,6 +114,7 @@ async function fetchSuppliers(params?: {
       // YYYY-MM-DD রাখা হলো, date input e tikm bose
       dueDate: item.dueDate ? String(item.dueDate).slice(0, 10) : "",
       status: item.status || "active",
+      createdBy: item.createdBy || item.addedById || "",
       ledger: item.ledger || [],
     }))
     // safety net: backend status param ignore korleo inactive record aasbe na
@@ -116,7 +122,14 @@ async function fetchSuppliers(params?: {
       (s: Supplier) => s.status !== "inactive" && s.status !== "deleted",
     );
 
-  return { data: mapped, meta: json?.data?.meta };
+  const filtered = userEmail
+    ? allMapped.filter((item: any) => {
+        const creator = String(item.createdBy || "").toLowerCase().trim();
+        return creator === userEmail;
+      })
+    : [];
+
+  return { data: filtered, meta: json?.data?.meta };
 }
 
 // POST /realbizpro/api/v1/supplier-accounts
@@ -195,9 +208,7 @@ function SupplierFormModal({
   const [formData, setFormData] = useState({
     code:
       initialData?.code ||
-      `SUP-${new Date().getFullYear()}-${String(
-        Math.floor(Math.random() * 900) + 100,
-      )}`,
+      `SUP-${Date.now().toString().slice(-6)}`,
     name: initialData?.name || "",
     company: initialData?.company || "",
     email: initialData?.email || "",
@@ -365,20 +376,22 @@ function SupplierFormModal({
 
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Under
+                Under Group
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Under Group"
                 value={formData.under}
-                onChange={(e) =>
-                  setFormData({ ...formData, under: e.target.value })
+                options={[
+                  { value: "Local Supplier", label: "Local Supplier" },
+                  { value: "Sundry Creditors", label: "Sundry Creditors" },
+                  { value: "Direct Expenses", label: "Direct Expenses" },
+                  { value: "Indirect Expenses", label: "Indirect Expenses" },
+                ]}
+                onChange={(val) =>
+                  setFormData({ ...formData, under: val })
                 }
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="Local Supplier">Local Supplier</option>
-                <option value="Sundry Creditors">Sundry Creditors</option>
-                <option value="Direct Expenses">Direct Expenses</option>
-                <option value="Indirect Expenses">Indirect Expenses</option>
-              </select>
+              />
             </div>
           </div>
 
@@ -423,6 +436,12 @@ function SupplierFormModal({
 
 // ==================== MAIN PAGE ====================
 export default function SupplierListPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -441,7 +460,9 @@ export default function SupplierListPage() {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await fetchSuppliers({ page: 1, limit: 100 });
+      const currentUser = getStoredUser();
+      const activeEmail = (currentUser?.email || userEmail || "").toLowerCase().trim();
+      const { data } = await fetchSuppliers({ page: 1, limit: 100, userEmail: activeEmail });
       setSuppliers(data);
     } catch (err: any) {
       console.error(err);
@@ -452,8 +473,10 @@ export default function SupplierListPage() {
   };
 
   useEffect(() => {
-    loadSuppliers();
-  }, []);
+    if (userEmail) {
+      loadSuppliers();
+    }
+  }, [userEmail]);
 
   const filteredSuppliers = suppliers.filter((s) => {
     const matchesSearch =
@@ -480,13 +503,14 @@ export default function SupplierListPage() {
       setActionLoading(true);
       if (!supplier.uuid) throw new Error("Supplier UUID is missing");
       await softDeleteSupplier(supplier.uuid); // DELETE
+      toast.success("Deleted successfully!");
       await loadSuppliers(); // database theke abar load
       if (currentPage > 1 && currentTableData.length === 1) {
         setCurrentPage(currentPage - 1);
       }
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || "Delete failed. Please try again.");
+      toast.error(err?.message || "Delete failed. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -523,20 +547,22 @@ export default function SupplierListPage() {
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="w-full md:w-72">
-            <select
+            <PredictiveSearchSelect
+              label=""
+              placeholder="All Groups"
               value={groupFilter}
-              onChange={(e) => {
-                setGroupFilter(e.target.value);
+              options={[
+                { value: "", label: "All Groups" },
+                { value: "Local Supplier", label: "Local Supplier" },
+                { value: "Sundry Creditors", label: "Sundry Creditors" },
+                { value: "Direct Expenses", label: "Direct Expenses" },
+                { value: "Indirect Expenses", label: "Indirect Expenses" },
+              ]}
+              onChange={(val) => {
+                setGroupFilter(val);
                 setCurrentPage(1);
               }}
-              className="w-full border border-slate-200 rounded-md px-3 py-2 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select value</option>
-              <option value="Local Supplier">Local Supplier</option>
-              <option value="Sundry Creditors">Sundry Creditors</option>
-              <option value="Direct Expenses">Direct Expenses</option>
-              <option value="Indirect Expenses">Indirect Expenses</option>
-            </select>
+            />
           </div>
 
           <div className="flex items-center space-x-2">
@@ -554,19 +580,23 @@ export default function SupplierListPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-2 gap-4">
         <div className="flex items-center space-x-2 text-xs text-slate-600">
           <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-          >
-            <option value={10}>10</option>
-            <option value={13}>13</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </select>
+          <div className="w-20">
+            <PredictiveSearchSelect
+              label=""
+              placeholder="13"
+              value={String(entriesPerPage)}
+              options={[
+                { value: "10", label: "10" },
+                { value: "13", label: "13" },
+                { value: "20", label: "20" },
+                { value: "50", label: "50" },
+              ]}
+              onChange={(val) => {
+                setEntriesPerPage(Number(val));
+                setCurrentPage(1);
+              }}
+            />
+          </div>
           <span>entries</span>
         </div>
 
@@ -927,6 +957,7 @@ export default function SupplierListPage() {
           onClose={() => setIsAddModalOpen(false)}
           onSubmit={async (newData) => {
             await createSupplier(toApiPayload(newData)); // POST
+            toast.success("Created successfully!");
             setIsAddModalOpen(false);
             await loadSuppliers(); // database theke abar load
           }}
@@ -947,6 +978,7 @@ export default function SupplierListPage() {
               editingSupplier.uuid,
               toApiPayload(updatedData),
             );
+            toast.success("Updated successfully!");
             setEditingSupplier(null);
             await loadSuppliers(); // database theke abar load
           }}

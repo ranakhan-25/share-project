@@ -56,6 +56,23 @@ export async function loginUniversalSession(
         password,
       }),
     });
+    // Fallback to sys-user /auth/login if share-user login rejected or not found
+    if (!response.ok) {
+      const authRes = await fetch(`${API_BASE}/realbizpro/api/v1/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          username: identifier,
+          password,
+        }),
+      });
+      if (authRes.ok) {
+        response = authRes;
+      }
+    }
   } catch {
     throw new Error(
       "Cannot reach the server. Please check your connection and try again.",

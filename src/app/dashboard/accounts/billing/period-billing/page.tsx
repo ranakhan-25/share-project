@@ -5,9 +5,25 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, ChevronRight, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 // ====================== TYPES ======================
 interface PeriodBill {
@@ -33,7 +49,7 @@ interface PeriodBill {
     grandTotal?: number;
     refWoNo?: string;
     contentBody?: string;
-    attachment?: string; // ✅ Added to fix TypeScript error
+    attachment?: string;
   };
   deletedAt?: string;
 }
@@ -46,16 +62,18 @@ export default function PeriodBillPage() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
 
-  // ড্রপডাউন ডাটা
+  // Dropdown Data
   const [customers, setCustomers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
-  const [ledgers, setLedgers] = useState<any[]>([
-    { uuid: "1", name: "Interest Income" },
-    { uuid: "2", name: "Sales" }
+  const [ledgers] = useState<any[]>([
+    { uuid: "Interest Income", name: "Interest Income" },
+    { uuid: "Sales", name: "Sales" },
+    { uuid: "Consultancy Income", name: "Consultancy Income" },
+    { uuid: "Service Income", name: "Service Income" }
   ]);
 
-  // ফর্ম ডাটা
+  // Form Data
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     customerId: "",
@@ -79,11 +97,12 @@ export default function PeriodBillPage() {
   const fetchPeriodBills = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/project-billing/period-billings`);
+      const res = await fetch(`${API_PATH}/project-billing/period-billings?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
-      if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
-      }
+      const rows = Array.isArray(json?.data?.data) ? json.data.data : Array.isArray(json?.data) ? json.data : [];
+      setDataList(rows.filter((item: any) => !item.deletedAt));
     } catch (err) {
       toast.error("Failed to load period bills");
     } finally {
@@ -94,20 +113,29 @@ export default function PeriodBillPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      // ১. কাস্টমার
-      const resCus = await fetch(`${API_PATH}/customer-account`);
+      // 1. Customer
+      const resCus = await fetch(`${API_PATH}/customer-account?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonCus = await resCus.json();
-      if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
+      const cusList = Array.isArray(jsonCus?.data?.data) ? jsonCus.data.data : Array.isArray(jsonCus?.data) ? jsonCus.data : [];
+      setCustomers(cusList.map((c: any) => ({ uuid: c.uuid || c.id, name: c.customerName || c.name || "Customer" })));
 
-      // ২. প্রজেক্ট
-      const resProj = await fetch(`${API_PATH}/project`);
+      // 2. Project
+      const resProj = await fetch(`${API_PATH}/project?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      const projList = Array.isArray(jsonProj?.data?.data) ? jsonProj.data.data : Array.isArray(jsonProj?.data) ? jsonProj.data : [];
+      setProjects(projList.map((p: any) => ({ uuid: p.uuid || p.id, name: p.name || p.projectName || "Project" })));
 
-      // ৩. সাইট (সব সাইট ফেচ করে রাখছি, পরে প্রজেক্ট অনুযায়ী ফিল্টার হবে)
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      // 3. Site
+      const resSite = await fetch(`${API_PATH}/project-sites?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const jsonSite = await resSite.json();
-      if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
+      const siteList = Array.isArray(jsonSite?.data?.data) ? jsonSite.data.data : Array.isArray(jsonSite?.data) ? jsonSite.data : [];
+      setSites(siteList.map((s: any) => ({ uuid: s.uuid || s.id, name: s.name || s.siteName || "Site", projectId: s.projectId })));
     } catch (err) {
       console.error("Error fetching dropdowns:", err);
     }
@@ -121,16 +149,20 @@ export default function PeriodBillPage() {
   // ====================== SUBMIT (POST / PATCH) ======================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.projectId) {
+      toast.error("Please select a Project.");
+      return;
+    }
     setSubmitting(true);
 
     const payload = {
       projectId: formData.projectId,
-      title: formData.contentBody ? formData.contentBody.substring(0, 50) : "Period Bill Title",
+      title: formData.contentBody ? formData.contentBody.substring(0, 50) : `Period Bill ${formData.code}`,
       code: formData.code,
       recordDate: formData.date,
       amount: Number(formData.grandTotal),
       status: "active",
-      description: formData.description,
+      description: formData.description || formData.refWoNo || "",
       details: {
         customerId: formData.customerId,
         customerName: formData.customerName,
@@ -156,7 +188,7 @@ export default function PeriodBillPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -182,6 +214,7 @@ export default function PeriodBillPage() {
     try {
       const res = await fetch(`${API_PATH}/project-billing/period-billings/${item.uuid}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         toast.success("Deleted successfully!");
@@ -221,7 +254,7 @@ export default function PeriodBillPage() {
   const handleEdit = (item: PeriodBill) => {
     setEditingItem(item);
     setFormData({
-      date: item.recordDate,
+      date: item.recordDate ? item.recordDate.slice(0, 10) : new Date().toISOString().split("T")[0],
       customerId: item.details?.customerId || "",
       customerName: item.details?.customerName || "",
       ledger: item.details?.ledger || "",
@@ -230,18 +263,18 @@ export default function PeriodBillPage() {
       refWoNo: item.details?.refWoNo || "",
       startDate: item.details?.startDate || "",
       endDate: item.details?.endDate || "",
-      projectId: item.project?.uuid || "",
+      projectId: item.project?.uuid || (item as any).projectId || "",
       projectCost: item.details?.projectCost || 0,
       percentage: item.details?.percentage || 0,
-      grandTotal: Number(item.amount),
-      description: item.description,
+      grandTotal: Number(item.amount || item.details?.grandTotal || 0),
+      description: item.description || "",
       attachment: item.details?.attachment || "",
-      contentBody: item.details?.contentBody || item.title,
+      contentBody: item.details?.contentBody || item.title || "",
     });
     setIsModalOpen(true);
   };
 
-  // ক্যালকুলেশন (Project Cost এবং Percentage থেকে Grand Total)
+  // Calculation (Project Cost and Percentage -> Grand Total)
   const handleCalculation = (cost: number, per: number) => {
     const total = (cost * per) / 100;
     setFormData(prev => ({ ...prev, projectCost: cost, percentage: per, grandTotal: total }));
@@ -253,8 +286,8 @@ export default function PeriodBillPage() {
     item.details?.customerName?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // সিলেক্টেড প্রজেক্টের সাইট ফিল্টার
-  const filteredSites = sites.filter(site => site.projectId === formData.projectId);
+  // Filter sites for selected project
+  const filteredSites = sites.filter(site => !formData.projectId || site.projectId === formData.projectId);
 
   // ====================== RENDER ======================
   return (
@@ -331,15 +364,15 @@ export default function PeriodBillPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredData.map((item) => (
-                      <tr key={item.uuid} className="hover:bg-indigo-50/30 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-900">{item.id}</td>
+                    filteredData.map((item, idx) => (
+                      <tr key={item.uuid || idx} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900">{idx + 1}</td>
                         <td className="px-4 py-3">{item.details?.projectType || "N/A"}</td>
-                        <td className="px-4 py-3 font-bold text-slate-900">{item.project?.name || "Unknown"}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{item.project?.name || "Share Pinnacle Hub"}</td>
                         <td className="px-4 py-3 font-medium text-slate-800">{item.details?.customerName || "N/A"}</td>
                         <td className="px-4 py-3 text-slate-600 font-mono text-xs">{item.code}</td>
                         <td className="px-4 py-3 text-slate-500">{item.details?.refWoNo || "-"}</td>
-                        <td className="px-4 py-3 text-slate-600">{item.recordDate}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.recordDate ? item.recordDate.slice(0, 10) : "-"}</td>
                         <td className="px-4 py-3 text-slate-600">{item.details?.startDate || "-"}</td>
                         <td className="px-4 py-3 text-slate-600">{item.details?.endDate || "-"}</td>
                         <td className="px-4 py-3 text-slate-800">{item.details?.projectCost || "0"}</td>
@@ -399,7 +432,7 @@ export default function PeriodBillPage() {
             
             {/* Modal Header */}
             <div className="flex justify-between items-center p-4 border-b bg-[#F3F0FF]">
-              <h2 className="text-lg font-bold">{editingItem ? "Edit Period Bill" : "Period Bill List"}</h2>
+              <h2 className="text-lg font-bold">{editingItem ? "Edit Period Bill" : "Add Period Bill"}</h2>
               <button onClick={() => setIsModalOpen(false)}><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
@@ -414,22 +447,24 @@ export default function PeriodBillPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Customer</label>
-                  <select value={formData.customerId} onChange={(e) => {
-                    const cus = customers.find(c => c.uuid === e.target.value);
-                    setFormData({ ...formData, customerId: e.target.value, customerName: cus?.customerName || "" });
-                  }} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                    <option value="">Select value</option>
-                    {customers.map(c => (
-                      <option key={c.uuid} value={c.uuid}>{c.customerName}</option>
-                    ))}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={customers.map(c => ({ value: c.uuid, label: c.name }))}
+                    value={formData.customerId}
+                    onChange={(val) => {
+                      const cus = customers.find(c => c.uuid === val);
+                      setFormData({ ...formData, customerId: val, customerName: cus?.name || "" });
+                    }}
+                    placeholder="Select Customer"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Ledger</label>
-                  <select value={formData.ledger} onChange={(e) => setFormData({ ...formData, ledger: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Ledger</option>
-                    {ledgers.map(l => <option key={l.uuid} value={l.name}>{l.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={ledgers.map(l => ({ value: l.name, label: l.name }))}
+                    value={formData.ledger}
+                    onChange={(val) => setFormData({ ...formData, ledger: val })}
+                    placeholder="Select Ledger"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Code</label>
@@ -437,10 +472,12 @@ export default function PeriodBillPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Site</label>
-                  <select value={formData.site} onChange={(e) => setFormData({ ...formData, site: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Site</option>
-                    {filteredSites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={filteredSites.map(s => ({ value: s.name, label: s.name }))}
+                    value={formData.site}
+                    onChange={(val) => setFormData({ ...formData, site: val })}
+                    placeholder="Select Site"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Ref W/O No.</label>
@@ -460,12 +497,12 @@ export default function PeriodBillPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project</label>
-                  <select value={formData.projectId} onChange={(e) => {
-                    setFormData({ ...formData, projectId: e.target.value, site: "" }); // Reset site when project changes
-                  }} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                    <option value="">Select value</option>
-                    {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                    value={formData.projectId}
+                    onChange={(val) => setFormData({ ...formData, projectId: val, site: "" })}
+                    placeholder="Select Project"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project Cost</label>
@@ -490,17 +527,10 @@ export default function PeriodBillPage() {
                 <input type="file" onChange={(e) => setFormData({ ...formData, attachment: e.target.files?.[0]?.name || "" })} className="w-full border rounded px-3 py-1 text-sm file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-indigo-50 file:text-indigo-700" />
               </div>
 
-              {/* Content Body Mock Editor */}
+              {/* Content Body */}
               <div>
                 <label className="block text-xs text-gray-600 mb-1 font-bold">Content Body</label>
-                <div className="border rounded bg-white">
-                  <div className="p-2 border-b flex gap-3 text-sm text-gray-700 bg-gray-50"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Tools</span><span>Table</span></div>
-                  <div className="p-2 border-b flex gap-3 text-gray-600 flex-wrap">
-                    <span>↶</span><span>↷</span><span>Paragraph ▾</span><span className="font-bold">B</span><span className="italic">I</span><span>U</span><span>≡</span>
-                    <span>🖼️</span><span>📄</span><span>👁️</span><span>▶️</span>
-                  </div>
-                  <textarea value={formData.contentBody} onChange={(e) => setFormData({ ...formData, contentBody: e.target.value })} className="w-full h-32 p-3 text-sm focus:outline-none resize-none" placeholder="Type your content here..."></textarea>
-                </div>
+                <textarea value={formData.contentBody} onChange={(e) => setFormData({ ...formData, contentBody: e.target.value })} className="w-full h-24 p-3 text-sm border rounded bg-white focus:outline-none resize-none" placeholder="Type your content here..."></textarea>
               </div>
 
               {/* Modal Footer Buttons */}

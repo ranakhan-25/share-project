@@ -7,6 +7,7 @@ import {
   X, Loader2, AlertCircle, CheckCircle2, Eye, Edit, Trash2,
   Upload, FileSpreadsheet
 } from 'lucide-react';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 /* ----------------------------------------------------------------------------
@@ -388,12 +389,13 @@ export default function UnitPlotPage() {
               ) : floors.length === 0 ? (
                 <div className="text-sm text-rose-600 py-2 bg-rose-50 px-3 rounded-lg">No floors found. Please create a floor first.</div>
               ) : (
-                <select required value={formData.floorUuid} onChange={e => setFormData({ ...formData, floorUuid: e.target.value })} className={inputCls}>
-                  <option value="">-- Select a Floor --</option>
-                  {floors.map(f => (
-                    <option key={f.uuid} value={f.uuid}>{f.floorName} (Level {f.floorNumber}) - {f.floorCode}</option>
-                  ))}
-                </select>
+                <PredictiveSearchSelect
+                  required
+                  placeholder="Select a Floor..."
+                  options={floors.map((f) => ({ value: f.uuid, label: f.floorName, subLabel: `Level ${f.floorNumber} - ${f.floorCode}` }))}
+                  value={formData.floorUuid}
+                  onChange={(val) => setFormData({ ...formData, floorUuid: val })}
+                />
               )}
             </div>
 
@@ -405,9 +407,12 @@ export default function UnitPlotPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Type *</label>
-                <select value={formData.plotType} onChange={e => setFormData({ ...formData, plotType: e.target.value })} className={inputCls}>
-                  {['1BHK', '2BHK', '3BHK', 'Office', 'Shop', 'Plot'].map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <PredictiveSearchSelect
+                  placeholder="Select Type..."
+                  options={['1BHK', '2BHK', '3BHK', 'Office', 'Shop', 'Plot'].map((t) => ({ value: t, label: t }))}
+                  value={formData.plotType}
+                  onChange={(val) => setFormData({ ...formData, plotType: val })}
+                />
               </div>
               <div>
                 <label className={labelCls}>Size Sqft *</label>
@@ -418,9 +423,12 @@ export default function UnitPlotPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Facing *</label>
-                <select value={formData.facing} onChange={e => setFormData({ ...formData, facing: e.target.value })} className={inputCls}>
-                  {['NORTH (N)', 'SOUTH (S)', 'EAST (E)', 'WEST (W)', 'NE', 'NW', 'SE', 'SW'].map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <PredictiveSearchSelect
+                  placeholder="Select Facing..."
+                  options={['NORTH (N)', 'SOUTH (S)', 'EAST (E)', 'WEST (W)', 'NE', 'NW', 'SE', 'SW'].map((f) => ({ value: f, label: f }))}
+                  value={formData.facing}
+                  onChange={(val) => setFormData({ ...formData, facing: val })}
+                />
               </div>
               <div>
                 <label className={labelCls}>Base Price ($) *</label>
@@ -465,9 +473,12 @@ export default function UnitPlotPage() {
           <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
             <div>
               <label className={labelCls}>Status</label>
-              <select value={editPlot.status} onChange={e => setEditPlot({ ...editPlot, status: e.target.value as any })} className={inputCls}>
-                {['Available', 'Booked', 'Sold', 'Reserved', 'Blocked'].map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Status..."
+                options={['Available', 'Booked', 'Sold', 'Reserved', 'Blocked'].map((s) => ({ value: s, label: s }))}
+                value={editPlot.status}
+                onChange={(val) => setEditPlot({ ...editPlot, status: val as any })}
+              />
             </div>
             <div>
               <label className={labelCls}>Base Price ($)</label>

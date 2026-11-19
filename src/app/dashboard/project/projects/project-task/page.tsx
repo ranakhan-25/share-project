@@ -21,7 +21,8 @@ import {
   Edit,
   CheckCircle2
 } from 'lucide-react';
-import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
+import { getStoredAccessToken, getStoredUser } from '@/lib/admin-auth/adminAuthStorage';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 
 // Backend Response Type
 interface ApiTask {
@@ -74,6 +75,10 @@ export default function ProjectTasksPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
 
   // State
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || '').toLowerCase().trim();
+
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
@@ -102,13 +107,22 @@ export default function ProjectTasksPage() {
   const [formData, setFormData] = useState({
     title: '',
     milestoneUuid: '',
-    assignee: 'Shamim Khan',
+    assignee: '',
     priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'Critical',
     dueDate: new Date().toISOString().slice(0, 16),
     description: '',
     reminderBefore: '30',
     hasAttachment: false
   });
+
+  useEffect(() => {
+    if (storedUser) {
+      setFormData(prev => ({
+        ...prev,
+        assignee: storedUser.name || storedUser.email || 'Share User'
+      }));
+    }
+  }, [storedUser]);
 
   const getHeaders = () => {
     const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
@@ -130,13 +144,24 @@ export default function ProjectTasksPage() {
       if (!res.ok) return;
       const data = await res.json();
       const list = Array.isArray(data) ? data : data?.data?.data || data?.data?.items || data?.data || [];
-      const opts: ProjectOption[] = list.map((p: any) => ({
+      const userProjects = userEmail
+        ? list.filter((p: any) => {
+            const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || '').toLowerCase().trim();
+            return creator === userEmail || creator === String(storedUser?.id);
+          })
+        : [];
+
+      const opts: ProjectOption[] = userProjects.map((p: any) => ({
         uuid: p.uuid,
         name: p.projectName || p.name || 'Unnamed Project'
       }));
       setProjects(opts);
       if (opts.length > 0) {
         setSelectedProjectUuid(opts[0].uuid);
+      } else {
+        setSelectedProjectUuid('');
+        setTasks([]);
+        setIsLoading(false);
       }
     } catch (e) {
       console.error('Failed to load projects', e);
@@ -145,7 +170,7 @@ export default function ProjectTasksPage() {
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, [userEmail]);
 
   // 2. FETCH TASKS (GET)
   const fetchTasks = async (page = 1, limit = 10, projectUuid = selectedProjectUuid) => {
@@ -396,18 +421,15 @@ export default function ProjectTasksPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Project Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-[200px]">
             <label className="text-xs font-semibold text-slate-500 uppercase">Project:</label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Select Project..."
+              options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
               value={selectedProjectUuid}
-              onChange={(e) => setSelectedProjectUuid(e.target.value)}
-              className="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-            >
-              {projects.length === 0 && <option value="">No Projects Found</option>}
-              {projects.map((p) => (
-                <option key={p.uuid} value={p.uuid}>{p.name}</option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedProjectUuid(val)}
+              className="w-48"
+            />
           </div>
 
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
@@ -446,31 +468,47 @@ export default function ProjectTasksPage() {
         {/* Filters */}
         <div className="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[150px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Assignee:</label>
-              <select value={selectedAssignee} onChange={(e) => setSelectedAssignee(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer">
-                {assigneesList.map((a, i) => <option key={i} value={a}>{a}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Assignee..."
+                options={assigneesList.map((a) => ({ value: a, label: a }))}
+                value={selectedAssignee}
+                onChange={(val) => setSelectedAssignee(val)}
+                className="w-36"
+              />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[140px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Priority:</label>
-              <select value={selectedPriority} onChange={(e) => setSelectedPriority(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer capitalize">
-                <option value="All">All Priorities</option>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Priority..."
+                options={[
+                  { value: 'All', label: 'All Priorities' },
+                  { value: 'Low', label: 'Low' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'High', label: 'High' },
+                  { value: 'Critical', label: 'Critical' },
+                ]}
+                value={selectedPriority}
+                onChange={(val) => setSelectedPriority(val)}
+                className="w-32"
+              />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[140px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Status:</label>
-              <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer capitalize">
-                <option value="All">All Statuses</option>
-                <option value="Todo">To Do</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Under Review">Under Review</option>
-                <option value="Completed">Completed</option>
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Status..."
+                options={[
+                  { value: 'All', label: 'All Statuses' },
+                  { value: 'Todo', label: 'To Do' },
+                  { value: 'In Progress', label: 'In Progress' },
+                  { value: 'Under Review', label: 'Under Review' },
+                  { value: 'Completed', label: 'Completed' },
+                ]}
+                value={selectedStatus}
+                onChange={(val) => setSelectedStatus(val)}
+                className="w-32"
+              />
             </div>
           </div>
 
@@ -685,12 +723,17 @@ export default function ProjectTasksPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Priority *</label>
-                  <select value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm capitalize">
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Select Priority..."
+                    options={[
+                      { value: 'Low', label: 'Low' },
+                      { value: 'Medium', label: 'Medium' },
+                      { value: 'High', label: 'High' },
+                      { value: 'Critical', label: 'Critical' },
+                    ]}
+                    value={formData.priority}
+                    onChange={(val) => setFormData({ ...formData, priority: val as any })}
+                  />
                 </div>
               </div>
 
@@ -742,12 +785,17 @@ export default function ProjectTasksPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Status</label>
-                  <select value={editingTask.status} onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value as any })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm">
-                    <option value="Todo">Todo</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Under Review">Under Review</option>
-                    <option value="Completed">Completed</option>
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Select Status..."
+                    options={[
+                      { value: 'Todo', label: 'Todo' },
+                      { value: 'In Progress', label: 'In Progress' },
+                      { value: 'Under Review', label: 'Under Review' },
+                      { value: 'Completed', label: 'Completed' },
+                    ]}
+                    value={editingTask.status}
+                    onChange={(val) => setEditingTask({ ...editingTask, status: val as any })}
+                  />
                 </div>
               </div>
               <div>

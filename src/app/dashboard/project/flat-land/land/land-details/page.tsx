@@ -5,17 +5,20 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, Search, FileSpreadsheet, FileText } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 
 const getAuthHeaders = (): Record<string, string> => {
   const token =
-    typeof window !== "undefined"
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
       ? localStorage.getItem("share-project:access-token") ||
         localStorage.getItem("token") ||
         localStorage.getItem("accessToken")
-      : null;
+      : null);
   return {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -47,6 +50,10 @@ interface Land {
 }
 
 export default function LandPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [dataList, setDataList] = useState<Land[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -84,12 +91,21 @@ export default function LandPage() {
   const fetchLands = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/flat-land/lands`, {
+      const res = await fetch(`${API_PATH}/flat-land/lands?limit=100`, {
         headers: getAuthHeaders(),
       });
       const json = await res.json();
       if (json.success) {
-        setDataList((json.data?.data || json.data || []).filter((item: any) => !item.deletedAt));
+        const rawList = json.data?.data || json.data || [];
+        const userProjUuids = new Set(projects.map((p: any) => p.uuid));
+        const filtered = rawList.filter((item: any) => {
+          if (item.deletedAt) return false;
+          if (!userEmail) return false;
+          const belongsToProj = item.projectId && userProjUuids.has(item.projectId);
+          const creator = String(item.createdBy || item.customerName || item.userEmail || "").toLowerCase().trim();
+          return belongsToProj || creator === userEmail;
+        });
+        setDataList(filtered);
       }
     } catch (err) {
       toast.error("Failed to load lands");
@@ -101,13 +117,22 @@ export default function LandPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resProj = await fetch(`${API_PATH}/project`, {
+      const resProj = await fetch(`${API_PATH}/project?limit=100`, {
         headers: getAuthHeaders(),
       });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data?.data || jsonProj.data || []);
+      if (jsonProj.success) {
+        const raw = jsonProj.data?.data || jsonProj.data || [];
+        const userProjects = userEmail
+          ? raw.filter((p: any) => {
+              const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || "").toLowerCase().trim();
+              return creator === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+        setProjects(userProjects);
+      }
 
-      const resSite = await fetch(`${API_PATH}/project-sites`, {
+      const resSite = await fetch(`${API_PATH}/project-sites?limit=100`, {
         headers: getAuthHeaders(),
       });
       const jsonSite = await resSite.json();
@@ -118,9 +143,12 @@ export default function LandPage() {
   };
 
   useEffect(() => {
-    fetchLands();
     fetchDropdowns();
-  }, []);
+  }, [userEmail]);
+
+  useEffect(() => {
+    fetchLands();
+  }, [projects]);
 
   const filteredSites = formData.projectId 
     ? sites.filter(s => String(s.projectId).toLowerCase() === String(formData.projectId).toLowerCase()) 
@@ -129,6 +157,10 @@ export default function LandPage() {
   // ====================== SUBMIT (POST / PATCH) ======================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.projectId) {
+      toast.error("Please select a project");
+      return;
+    }
     setSubmitting(true);
 
     const payload = {
@@ -297,39 +329,35 @@ export default function LandPage() {
         <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3.5">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Project</label>
-            <select 
-              value={filterProject} 
-              onChange={e => setFilterProject(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="">Select value</option>
-              {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-            </select>
+            <PredictiveSearchSelect
+              placeholder="Search or select project..."
+              options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
+              value={filterProject}
+              onChange={(val) => setFilterProject(val)}
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Site</label>
-            <select 
-              value={filterSite} 
-              onChange={e => setFilterSite(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="">Select Site</option>
-              {sites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-            </select>
+            <PredictiveSearchSelect
+              placeholder="Search or select site..."
+              options={sites.map((s) => ({ value: s.name, label: s.name }))}
+              value={filterSite}
+              onChange={(val) => setFilterSite(val)}
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
-            <select 
-              value={filterStatus} 
-              onChange={e => setFilterStatus(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="">Select Status</option>
-              <option value="Available">Available</option>
-              <option value="Sold">Sold</option>
-              <option value="Unsold">Unsold</option>
-              <option value="Booked">Booked</option>
-            </select>
+            <PredictiveSearchSelect
+              placeholder="Search or select status..."
+              options={[
+                { value: "Available", label: "Available" },
+                { value: "Sold", label: "Sold" },
+                { value: "Unsold", label: "Unsold" },
+                { value: "Booked", label: "Booked" },
+              ]}
+              value={filterStatus}
+              onChange={(val) => setFilterStatus(val)}
+            />
           </div>
         </div>
 
@@ -460,26 +488,21 @@ export default function LandPage() {
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Project <span className="text-rose-500">*</span>
                   </label>
-                  <select 
-                    required 
-                    value={formData.projectId} 
-                    onChange={(e) => setFormData({ ...formData, projectId: e.target.value, siteName: "" })} 
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Search or select project..."
+                    options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
+                    value={formData.projectId}
+                    onChange={(val) => setFormData({ ...formData, projectId: val, siteName: "" })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Site</label>
-                  <select 
-                    value={formData.siteName} 
-                    onChange={(e) => setFormData({ ...formData, siteName: e.target.value })} 
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="">Select Site</option>
-                    {filteredSites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Search or select site..."
+                    options={filteredSites.map((s) => ({ value: s.name, label: s.name }))}
+                    value={formData.siteName}
+                    onChange={(val) => setFormData({ ...formData, siteName: val })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Block Name</label>
@@ -578,17 +601,17 @@ export default function LandPage() {
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Status <span className="text-rose-500">*</span>
                   </label>
-                  <select 
-                    required 
-                    value={formData.status} 
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })} 
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="Available">Available</option>
-                    <option value="Sold">Sold</option>
-                    <option value="Unsold">Unsold</option>
-                    <option value="Booked">Booked</option>
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Search or select status..."
+                    options={[
+                      { value: "Available", label: "Available" },
+                      { value: "Sold", label: "Sold" },
+                      { value: "Unsold", label: "Unsold" },
+                      { value: "Booked", label: "Booked" },
+                    ]}
+                    value={formData.status}
+                    onChange={(val) => setFormData({ ...formData, status: val })}
+                  />
                 </div>
               </div>
 

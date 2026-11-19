@@ -14,12 +14,14 @@ import {
   Save,
   Folder,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== TYPES ====================
 export interface BoqTitleItem {
   id: number | string;
   uuid: string;
   projectId: string;
+  projectName?: string;
   title: string;
   status?: string;
 }
@@ -37,13 +39,26 @@ const API_PREFIX = "/realbizpro/api/v1";
 const BOQ_API = `${API_BASE_URL}${API_PREFIX}/boq`;
 const PROJECT_API = `${API_BASE_URL}${API_PREFIX}/project`;
 
+const getAuthHeaders = () => {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("share-project:access-token")
+      : "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ==================== API FUNCTIONS ====================
 async function fetchProjects(): Promise<ProjectOption[]> {
   try {
     const query = new URLSearchParams({ page: "1", limit: "100" });
     const res = await fetch(`${PROJECT_API}?${query}`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
     if (!res.ok) return [];
@@ -52,7 +67,7 @@ async function fetchProjects(): Promise<ProjectOption[]> {
       json?.data?.data ?? (Array.isArray(json?.data) ? json.data : null) ?? [];
     return Array.isArray(rows)
       ? rows
-          .filter((p: any) => p?.uuid)
+          .filter((p: any) => p?.uuid && !p.deletedAt && !p.deleted_at)
           .map((p: any) => ({
             uuid: String(p.uuid),
             name: String(p.name || p.projectName || p.code || "Unnamed"),
@@ -68,7 +83,7 @@ async function fetchBoqTitles(): Promise<BoqTitleItem[]> {
   const query = new URLSearchParams({ page: "1", limit: "100" });
   const res = await fetch(`${BOQ_API}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -81,21 +96,23 @@ async function fetchBoqTitles(): Promise<BoqTitleItem[]> {
   const rows = json?.data?.data ?? json?.data ?? [];
 
   return Array.isArray(rows)
-    ? rows.map((item: any) => ({
-        id: item.id ?? item.uuid,
-        uuid: item.uuid,
-        projectId: item.projectId || item.project?.uuid || "",
-        title: item.titleOfWork || item.title || "",
-        status: item.status || "active",
-      }))
+    ? rows
+        .filter((item: any) => !item.deletedAt && !item.deleted_at)
+        .map((item: any) => ({
+          id: item.id ?? item.uuid,
+          uuid: item.uuid,
+          projectId: item.projectId || item.project?.uuid || "",
+          projectName: item.project?.name || item.projectName || "",
+          title: item.titleOfWork || item.title || "",
+          status: item.status || "active",
+        }))
     : [];
 }
 
 async function createBoqTitle(payload: Record<string, any>) {
-  console.log("POST payload →", payload);
   const res = await fetch(BOQ_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -107,15 +124,14 @@ async function createBoqTitle(payload: Record<string, any>) {
 }
 
 async function updateBoqTitle(uuid: string, payload: Record<string, any>) {
-  console.log("PUT", uuid, "payload →", payload);
   const res = await fetch(`${BOQ_API}/${uuid}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    method: "PATCH",
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    console.error("PUT error →", err);
+    console.error("PATCH error →", err);
     throw new Error(err?.message || "Update boq title failed");
   }
   return res.json();
@@ -124,7 +140,7 @@ async function updateBoqTitle(uuid: string, payload: Record<string, any>) {
 async function deleteBoqTitle(uuid: string) {
   const res = await fetch(`${BOQ_API}/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -225,7 +241,7 @@ export default function BoqTitleListPage() {
       setSubmitting(true);
       setFormError(null);
 
-      const now = new Date().toISOString();
+      const now = new Date().toISOString().split("T")[0];
 
       await createBoqTitle({
         projectId: formData.projectId,
@@ -333,18 +349,20 @@ export default function BoqTitleListPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between p-3 gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <span>Show</span>
-              <select
-                value={entriesPerPage}
-                onChange={(e) => {
-                  setEntriesPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <div className="w-20">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "10", label: "10" },
+                    { value: "25", label: "25" },
+                    { value: "50", label: "50" },
+                  ]}
+                  value={String(entriesPerPage)}
+                  onChange={(val) => {
+                    setEntriesPerPage(Number(val) || 10);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
               <span>entries</span>
             </div>
             <div className="flex items-center gap-2">
@@ -404,8 +422,10 @@ export default function BoqTitleListPage() {
                       <td className="py-2.5 px-3 text-slate-700">
                         {item.projectId
                           ? projects.find((p) => p.uuid === item.projectId)
-                              ?.name || "-"
-                          : "-"}
+                              ?.name ||
+                            item.projectName ||
+                            "-"
+                          : item.projectName || "-"}
                       </td>
                       <td className="py-2.5 px-3 text-slate-800">
                         <div className="flex items-center gap-2">
@@ -519,21 +539,17 @@ export default function BoqTitleListPage() {
                 <label className="block font-medium text-slate-700 mb-1">
                   Project <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  required
+                <PredictiveSearchSelect
+                  options={projects.map((p) => ({
+                    value: p.uuid,
+                    label: p.name,
+                  }))}
                   value={formData.projectId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, projectId: e.target.value })
+                  onChange={(val) =>
+                    setFormData({ ...formData, projectId: val })
                   }
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map((p) => (
-                    <option key={p.uuid} value={p.uuid}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Project"
+                />
               </div>
 
               {/* BOQ TITLE */}
@@ -607,21 +623,17 @@ export default function BoqTitleListPage() {
                 <label className="block font-medium text-slate-700 mb-1">
                   Project <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  required
+                <PredictiveSearchSelect
+                  options={projects.map((p) => ({
+                    value: p.uuid,
+                    label: p.name,
+                  }))}
                   value={formData.projectId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, projectId: e.target.value })
+                  onChange={(val) =>
+                    setFormData({ ...formData, projectId: val })
                   }
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map((p) => (
-                    <option key={p.uuid} value={p.uuid}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Project"
+                />
               </div>
 
               <div>

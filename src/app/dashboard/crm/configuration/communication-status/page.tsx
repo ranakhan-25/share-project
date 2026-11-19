@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { crmFetch } from "../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -182,11 +183,18 @@ export default function CommunicationStatusPage() {
         <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
           <div className="flex items-center gap-2 text-sm">
             <span>Show</span>
-            <select value={entriesLimit} onChange={(e) => setEntriesLimit(Number(e.target.value))} className="border rounded px-2 py-1">
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+            <div className="w-24">
+              <PredictiveSearchSelect
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "25", label: "25" },
+                  { value: "50", label: "50" },
+                ]}
+                value={String(entriesLimit)}
+                onChange={(val) => setEntriesLimit(Number(val))}
+                placeholder="10"
+              />
+            </div>
             <span>entries</span>
           </div>
           <div className="flex gap-2 items-center text-sm">
@@ -255,11 +263,16 @@ export default function CommunicationStatusPage() {
 
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                  <option value="">Select One Option</option>
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="INACTIVE">INACTIVE</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "", label: "Select One Option" },
+                    { value: "ACTIVE", label: "ACTIVE" },
+                    { value: "INACTIVE", label: "INACTIVE" },
+                  ]}
+                  value={formData.status}
+                  onChange={(val) => setFormData({ ...formData, status: val })}
+                  placeholder="Select One Option"
+                />
               </div>
 
               <div>
@@ -274,12 +287,18 @@ export default function CommunicationStatusPage() {
 
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Lead Stage (If Communication Status wise changes)</label>
-                <select value={formData.leadStageId} onChange={(e) => setFormData({ ...formData, leadStageId: e.target.value })} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                  <option value="">Select Stage</option>
-                  {leadStages.map((stage: any) => (
-                    <option key={stage.uuid || stage.id} value={stage.uuid || stage.id}>{stage.name}</option>
-                  ))}
-                </select>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "", label: "Select Stage" },
+                    ...leadStages.map((stage: any) => ({
+                      value: String(stage.uuid || stage.id),
+                      label: stage.name,
+                    })),
+                  ]}
+                  value={formData.leadStageId}
+                  onChange={(val) => setFormData({ ...formData, leadStageId: val })}
+                  placeholder="Select Stage"
+                />
               </div>
 
               {/* Modal Footer Buttons */}

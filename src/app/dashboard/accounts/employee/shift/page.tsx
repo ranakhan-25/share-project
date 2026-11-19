@@ -12,6 +12,7 @@ import {
   Loader2,
   Clock,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ---------- Types ----------
 export interface ShiftSchedule {
@@ -44,6 +45,17 @@ const DAYS = [
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 async function handleRes(res: Response, action: string) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -68,7 +80,7 @@ async function fetchShifts(): Promise<{ data: Shift[]; meta: any }> {
   console.log("GET shifts →", url);
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   const json = await handleRes(res, "fetch shifts");
@@ -108,7 +120,7 @@ async function createShift(payload: Record<string, any>) {
   console.log("POST payload →", payload);
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/shift`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleRes(res, "create shift");
@@ -120,7 +132,7 @@ async function updateShift(uuid: string, payload: Record<string, any>) {
   console.log("PATCH", uuid, "payload →", payload);
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/shift/${uuid}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleRes(res, "update shift");
@@ -132,7 +144,7 @@ async function softDeleteShift(uuid: string) {
   console.log("DELETE →", uuid);
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/shift/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   const json = await handleRes(res, "delete shift");
   console.log("DELETE response →", json);
@@ -145,7 +157,7 @@ async function restoreShift(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/shift/${uuid}/restore`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   const json = await handleRes(res, "restore shift");
@@ -497,18 +509,20 @@ export default function ShiftListPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/70 p-3 rounded-xl border border-slate-200/60">
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => {
-                setEntriesPerPage(Number(e.target.value));
+            <PredictiveSearchSelect
+              value={String(entriesPerPage)}
+              onChange={(value) => {
+                setEntriesPerPage(Number(value) || 10);
                 setCurrentPage(1);
               }}
-              className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
           </div>
 

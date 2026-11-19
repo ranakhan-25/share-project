@@ -29,7 +29,8 @@ import {
   Edit,
   Trash2
 } from 'lucide-react';
-import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
+import { getStoredAccessToken, getStoredUser } from '@/lib/admin-auth/adminAuthStorage';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 
 // Frontend UI Types
 interface ProgressRecord {
@@ -68,6 +69,10 @@ export default function ProjectProgressPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
 
   // State
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || '').toLowerCase().trim();
+
   const [progressLogs, setProgressLogs] = useState<ProgressRecord[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
@@ -130,13 +135,24 @@ export default function ProjectProgressPage() {
       if (!res.ok) return;
       const data = await res.json();
       const list = Array.isArray(data) ? data : data?.data?.data || data?.data?.items || data?.data || [];
-      const opts: ProjectOption[] = list.map((p: any) => ({
+      const userProjects = userEmail
+        ? list.filter((p: any) => {
+            const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || '').toLowerCase().trim();
+            return creator === userEmail || creator === String(storedUser?.id);
+          })
+        : [];
+
+      const opts: ProjectOption[] = userProjects.map((p: any) => ({
         uuid: p.uuid,
         name: p.projectName || p.name || 'Unnamed Project'
       }));
       setProjects(opts);
       if (opts.length > 0) {
         setSelectedProjectUuid(opts[0].uuid);
+      } else {
+        setSelectedProjectUuid('');
+        setProgressLogs([]);
+        setIsLoading(false);
       }
     } catch (e) {
       console.error('Failed to load projects', e);
@@ -145,7 +161,7 @@ export default function ProjectProgressPage() {
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, [userEmail]);
 
   // 2. FETCH PROGRESS LOGS (GET)
   const fetchProgressLogs = async (page = 1, limit = 10, projectUuid = selectedProjectUuid) => {
@@ -399,18 +415,15 @@ export default function ProjectProgressPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Project Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-[200px]">
             <label className="text-xs font-semibold text-slate-500 uppercase">Project:</label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Select Project..."
+              options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
               value={selectedProjectUuid}
-              onChange={(e) => setSelectedProjectUuid(e.target.value)}
-              className="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-            >
-              {projects.length === 0 && <option value="">No Projects Found</option>}
-              {projects.map((p) => (
-                <option key={p.uuid} value={p.uuid}>{p.name}</option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedProjectUuid(val)}
+              className="w-48"
+            />
           </div>
 
           <button

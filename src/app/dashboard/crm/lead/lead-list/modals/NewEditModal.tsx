@@ -1,4 +1,5 @@
 import { X, ChevronDown } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface NewEditModalProps {
   isOpen: boolean;
@@ -28,6 +29,13 @@ export default function NewEditModal({
   options = {},
 }: NewEditModalProps) {
   if (!isOpen) return null;
+
+  const optionsFor = (key: string, valueKey: "uuid" | "id" | "name" = "id") =>
+    (options[key] ?? []).map((item: any) => ({
+      value: String(item[valueKey] ?? item.uuid ?? item.id ?? item.name ?? ""),
+      label: String(item.name ?? item.label ?? item[valueKey] ?? ""),
+      subLabel: item.email || item.code || undefined,
+    }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
@@ -126,29 +134,38 @@ export default function NewEditModal({
 
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Assign User/SR</label>
-                <select
+                <PredictiveSearchSelect
+                  id="lead-assign-user"
+                  label="Assign User/SR"
                   value={formData.assignUser}
-                  onChange={(e) => setFormData({ ...formData, assignUser: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                ><option value="">Select User/SR</option>{(options.user ?? []).map((item) => <option key={item.uuid} value={item.uuid}>{item.name}</option>)}</select>
+                  onChange={(value) => setFormData({ ...formData, assignUser: value })}
+                  options={optionsFor("user", "uuid")}
+                  placeholder="Search or select user..."
+                />
               </div>
 
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">If CR</label>
-                <select
+                <PredictiveSearchSelect
+                  id="lead-credit-officer"
+                  label="If CR"
                   value={formData.ifCr}
-                  onChange={(e) => setFormData({ ...formData, ifCr: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                ><option value="">Select CR</option>{(options.user ?? []).map((item) => <option key={item.uuid} value={item.uuid}>{item.name}</option>)}</select>
+                  onChange={(value) => setFormData({ ...formData, ifCr: value })}
+                  options={optionsFor("user", "uuid")}
+                  placeholder="Search or select CR..."
+                />
               </div>
 
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Lead Stages</label>
-                <select
+                <PredictiveSearchSelect
+                  id="lead-stage"
+                  label="Lead Stages"
                   value={formData.leadStages}
-                  onChange={(e) => setFormData({ ...formData, leadStages: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                ><option value="">Select Stage</option>{(options.stage ?? []).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}</select>
+                  onChange={(value) => setFormData({ ...formData, leadStages: value })}
+                  options={optionsFor("stage", "name")}
+                  placeholder="Search or select stage..."
+                />
               </div>
             </div>
           </div>
@@ -170,50 +187,50 @@ export default function NewEditModal({
               <div className="p-5 bg-slate-50/50 dark:bg-slate-950/40 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in">
                 <div>
                   <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Lead Source</label>
-                  <select
+                  <PredictiveSearchSelect
+                    id="lead-source"
+                    label="Lead Source"
                     value={formData.leadSource}
-                    onChange={(e) => setFormData({ ...formData, leadSource: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                  >
-                    <option value="">Select Source</option>
-                    {(options.source ?? []).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, leadSource: value })}
+                    options={optionsFor("source", "name")}
+                    placeholder="Search or select source..."
+                  />
                 </div>
 
                 <div>
                   <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Interested Project</label>
-                  <select
+                  <PredictiveSearchSelect
+                    id="lead-project"
+                    label="Interested Project"
                     value={formData.interestedProject}
-                    onChange={(e) => setFormData({ ...formData, interestedProject: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                  >
-                    <option value="">Select Interested Project</option>
-                    {(options.project ?? []).map((item) => <option key={item.uuid} value={item.name}>{item.name}</option>)}
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, interestedProject: value })}
+                    options={optionsFor("project", "name")}
+                    placeholder="Search or select project..."
+                  />
                 </div>
 
                 <div>
                   <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Lead Category</label>
-                  <select
+                  <PredictiveSearchSelect
+                    id="lead-category"
+                    label="Lead Category"
                     value={formData.leadCategory}
-                    onChange={(e) => setFormData({ ...formData, leadCategory: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                  >
-                    <option value="">Select Category</option>
-                    {(options.category ?? []).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, leadCategory: value })}
+                    options={optionsFor("category", "name")}
+                    placeholder="Search or select category..."
+                  />
                 </div>
 
                 <div>
                   <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Campaign</label>
-                  <select
+                  <PredictiveSearchSelect
+                    id="lead-campaign"
+                    label="Campaign"
                     value={formData.campaign}
-                    onChange={(e) => setFormData({ ...formData, campaign: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                  >
-                    <option value="">Select Campaign</option>
-                    {(options.campaign ?? []).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, campaign: value })}
+                    options={optionsFor("campaign", "name")}
+                    placeholder="Search or select campaign..."
+                  />
                 </div>
               </div>
             )}
@@ -263,14 +280,14 @@ export default function NewEditModal({
                 </div>
                 <div>
                   <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Profession</label>
-                  <select
+                  <PredictiveSearchSelect
+                    id="lead-profession"
+                    label="Profession"
                     value={formData.profession}
-                    onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-600"
-                  >
-                    <option value="">Select Profession</option>
-                    {(options.profession ?? []).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
-                  </select>
+                    onChange={(value) => setFormData({ ...formData, profession: value })}
+                    options={optionsFor("profession", "name")}
+                    placeholder="Search or select profession..."
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-slate-600 dark:text-slate-300 mb-1.5 font-bold text-xs md:text-sm">Address</label>

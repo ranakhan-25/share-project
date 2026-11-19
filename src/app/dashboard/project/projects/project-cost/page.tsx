@@ -22,7 +22,8 @@ import {
   Trash2,
   CheckCircle2
 } from 'lucide-react';
-import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
+import { getStoredAccessToken, getStoredUser } from '@/lib/admin-auth/adminAuthStorage';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 
 // Backend API Response Types
 interface ApiCost {
@@ -78,6 +79,10 @@ export default function ProjectCostPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
 
   // State
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || '').toLowerCase().trim();
+
   const [costs, setCosts] = useState<ProjectCost[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
@@ -133,13 +138,24 @@ export default function ProjectCostPage() {
       if (!res.ok) return;
       const data = await res.json();
       const list = Array.isArray(data) ? data : data?.data?.data || data?.data?.items || data?.data || [];
-      const opts: ProjectOption[] = list.map((p: any) => ({
+      const userProjects = userEmail
+        ? list.filter((p: any) => {
+            const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || '').toLowerCase().trim();
+            return creator === userEmail || creator === String(storedUser?.id);
+          })
+        : [];
+
+      const opts: ProjectOption[] = userProjects.map((p: any) => ({
         uuid: p.uuid,
         name: p.projectName || p.name || 'Unnamed Project'
       }));
       setProjects(opts);
       if (opts.length > 0) {
         setSelectedProjectUuid(opts[0].uuid);
+      } else {
+        setSelectedProjectUuid('');
+        setCosts([]);
+        setIsLoading(false);
       }
     } catch (e) {
       console.error('Failed to load projects', e);
@@ -148,7 +164,7 @@ export default function ProjectCostPage() {
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, [userEmail]);
 
   // 2. FETCH COSTS (GET)
   const fetchCosts = async (page = 1, limit = 10, projectUuid = selectedProjectUuid) => {
@@ -382,18 +398,15 @@ export default function ProjectCostPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Project Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-[200px]">
             <label className="text-xs font-semibold text-slate-500 uppercase">Project:</label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Select Project..."
+              options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
               value={selectedProjectUuid}
-              onChange={(e) => setSelectedProjectUuid(e.target.value)}
-              className="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-            >
-              {projects.length === 0 && <option value="">No Projects Found</option>}
-              {projects.map((p) => (
-                <option key={p.uuid} value={p.uuid}>{p.name}</option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedProjectUuid(val)}
+              className="w-48"
+            />
           </div>
 
           <button
@@ -457,35 +470,39 @@ export default function ProjectCostPage() {
         {/* Filters */}
         <div className="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[150px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Cost Head:</label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="All Heads"
+                options={[
+                  { value: 'All', label: 'All Heads' },
+                  { value: 'Material', label: 'Material' },
+                  { value: 'Labour', label: 'Labour' },
+                  { value: 'Equipment', label: 'Equipment' },
+                  { value: 'Consultant', label: 'Consultant' },
+                  { value: 'Overhead', label: 'Overhead' },
+                ]}
                 value={selectedCostHead}
-                onChange={(e) => { setSelectedCostHead(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer capitalize"
-              >
-                <option value="All">All Heads</option>
-                <option value="Material">Material</option>
-                <option value="Labour">Labour</option>
-                <option value="Equipment">Equipment</option>
-                <option value="Consultant">Consultant</option>
-                <option value="Overhead">Overhead</option>
-              </select>
+                onChange={(val) => { setSelectedCostHead(val); setCurrentPage(1); }}
+                className="w-36"
+              />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[140px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Ref Type:</label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="All Types"
+                options={[
+                  { value: 'All', label: 'All Types' },
+                  { value: 'BILL', label: 'BILL' },
+                  { value: 'JOURNAL', label: 'JOURNAL' },
+                  { value: 'PO', label: 'PO' },
+                  { value: 'MANUAL', label: 'MANUAL' },
+                ]}
                 value={selectedRefType}
-                onChange={(e) => { setSelectedRefType(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-              >
-                <option value="All">All Types</option>
-                <option value="BILL">BILL</option>
-                <option value="JOURNAL">JOURNAL</option>
-                <option value="PO">PO</option>
-                <option value="MANUAL">MANUAL</option>
-              </select>
+                onChange={(val) => { setSelectedRefType(val); setCurrentPage(1); }}
+                className="w-32"
+              />
             </div>
           </div>
 
@@ -621,22 +638,32 @@ export default function ProjectCostPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Cost Head *</label>
-                  <select value={formData.costHead} onChange={(e) => setFormData({ ...formData, costHead: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm capitalize">
-                    <option value="Material">Material</option>
-                    <option value="Labour">Labour</option>
-                    <option value="Equipment">Equipment</option>
-                    <option value="Consultant">Consultant</option>
-                    <option value="Overhead">Overhead</option>
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Select Head..."
+                    options={[
+                      { value: 'Material', label: 'Material' },
+                      { value: 'Labour', label: 'Labour' },
+                      { value: 'Equipment', label: 'Equipment' },
+                      { value: 'Consultant', label: 'Consultant' },
+                      { value: 'Overhead', label: 'Overhead' },
+                    ]}
+                    value={formData.costHead}
+                    onChange={(val) => setFormData({ ...formData, costHead: val })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Ref Type *</label>
-                  <select value={formData.refType} onChange={(e) => setFormData({ ...formData, refType: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm">
-                    <option value="BILL">BILL</option>
-                    <option value="JOURNAL">JOURNAL</option>
-                    <option value="PO">PO</option>
-                    <option value="MANUAL">MANUAL</option>
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Select Type..."
+                    options={[
+                      { value: 'BILL', label: 'BILL' },
+                      { value: 'JOURNAL', label: 'JOURNAL' },
+                      { value: 'PO', label: 'PO' },
+                      { value: 'MANUAL', label: 'MANUAL' },
+                    ]}
+                    value={formData.refType}
+                    onChange={(val) => setFormData({ ...formData, refType: val })}
+                  />
                 </div>
               </div>
 

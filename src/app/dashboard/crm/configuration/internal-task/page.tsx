@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Sparkles, Search, ChevronLeft, ChevronRight, Plus, Edit, Trash2, X, AlertTriangle, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { crmFetch } from "../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -340,18 +341,21 @@ export default function TaskPage() {
       <div className="p-4 md:p-5 rounded-2xl border border-border/80 bg-white shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-muted-foreground w-full sm:w-auto">
           <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 border rounded-xl bg-background border-border text-foreground font-black text-sm outline-none cursor-pointer"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
+          <div className="w-24">
+            <PredictiveSearchSelect
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              value={String(entriesPerPage)}
+              onChange={(val) => {
+                setEntriesPerPage(Number(val));
+                setCurrentPage(1);
+              }}
+              placeholder="10"
+            />
+          </div>
           <span>entries</span>
         </div>
 
@@ -548,17 +552,18 @@ export default function TaskPage() {
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Project</label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "", label: "Select Project" },
+                      ...projects.map((p: any) => ({
+                        value: p.code,
+                        label: p.name,
+                      })),
+                    ]}
                     value={formData.projectCode}
-                    onChange={(e) => setFormData({ ...formData, projectCode: e.target.value })}
-                    className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">Select Project</option>
-                    {/* ✅ projectCode হিসেবে p.code পাঠানো হচ্ছে */}
-                    {projects.map((p: any) => (
-                      <option key={p.uuid} value={p.code}>{p.name}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectCode: val })}
+                    placeholder="Select Project"
+                  />
                 </div>
               </div>
 
@@ -579,52 +584,71 @@ export default function TaskPage() {
                 <label className="block text-slate-500 mb-1.5">
                   Assigned To <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  multiple
-                  required
-                  value={formData.assignedTo}
-                  onChange={(e) => {
-                    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                    setFormData({ ...formData, assignedTo: selectedOptions });
+                <PredictiveSearchSelect
+                  options={users.map((u: any) => ({
+                    value: u.uuid,
+                    label: `${u.name} (${u.email})`,
+                  }))}
+                  value=""
+                  onChange={(val) => {
+                    if (val && !formData.assignedTo.includes(val)) {
+                      setFormData({ ...formData, assignedTo: [...formData.assignedTo, val] });
+                    }
                   }}
-                  className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20 min-h-[100px]"
-                >
-                  {users.map((u: any) => (
-                    <option key={u.uuid} value={u.uuid}>{u.name} ({u.email})</option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple users.</p>
+                  placeholder="Type to search and assign users..."
+                />
+                {formData.assignedTo.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.assignedTo.map((uId: string) => {
+                      const userObj = users.find((u: any) => u.uuid === uId);
+                      return (
+                        <span key={uId} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {userObj ? `${userObj.name}` : uId}
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, assignedTo: formData.assignedTo.filter((id: string) => id !== uId) })}
+                            className="hover:text-rose-600 font-bold transition cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Row 4: Priority, Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-500 mb-1.5">Priority <span className="text-rose-500">*</span></label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Low", label: "Low" },
+                      { value: "Medium", label: "Medium" },
+                      { value: "High", label: "High" },
+                      { value: "Critical", label: "Critical" },
+                    ]}
                     value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, priority: val })}
+                    placeholder="Select Priority"
+                  />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Status <span className="text-rose-500">*</span></label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Todo", label: "Todo" },
+                      { value: "In Progress", label: "In Progress" },
+                      { value: "Review", label: "Review" },
+                      { value: "Testing", label: "Testing" },
+                      { value: "Completed", label: "Completed" },
+                      { value: "Cancelled", label: "Cancelled" },
+                    ]}
                     value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none"
-                  >
-                    <option value="Todo">Todo</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Review">Review</option>
-                    <option value="Testing">Testing</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, status: val })}
+                    placeholder="Select Status"
+                  />
                 </div>
               </div>
 

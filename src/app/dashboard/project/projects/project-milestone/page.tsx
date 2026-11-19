@@ -10,7 +10,8 @@ import {
   Activity, CalendarDays, CheckCircle2, Clock3, Edit3, Loader2, Plus,
   RefreshCw, Search, Trash2, X, ChevronRight, Home
 } from "lucide-react";
-import { getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 /* -------------------------------------------------------------------------- */
 /*                                  TYPES                                     */
@@ -142,6 +143,10 @@ function MilestonesInner() {
   const searchParams = useSearchParams();
   const projectUuidFromUrl = searchParams.get("projectUuid") || undefined;
 
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -152,28 +157,35 @@ function MilestonesInner() {
   const [deletingUuid, setDeletingUuid] = useState<string | null>(null);
   const [form, setForm] = useState<MilestoneForm>(EMPTY_FORM);
 
-  // ✅ GET
+  // ✅ GET with User Isolation
   const loadMilestones = useCallback(async (showToast = false) => {
     setLoading(true);
     try {
       const res = await apiRequest<any>(`${API_URL}?page=1&limit=100`);
       const arrayData = extractArray(res);
-      setMilestones(arrayData.map(normalizeMilestone));
+      const filtered = userEmail
+        ? arrayData.filter((item: any) => {
+            const addedBy = String(item.addedBy || "").toLowerCase().trim();
+            const creator = String(item.createdBy || item.email || item.userEmail || "").toLowerCase().trim();
+            return addedBy === userEmail || creator === userEmail || addedBy === String(storedUser?.name || "").toLowerCase().trim();
+          })
+        : [];
+      setMilestones(filtered.map(normalizeMilestone));
       if (showToast) toast.success("Milestones refreshed.");
     } catch (error: any) {
       toast.error(error.message || "Failed to load milestones");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userEmail, storedUser]);
 
   useEffect(() => { void loadMilestones(); }, [loadMilestones]);
 
-  // ✅ অটো projectUuid
+  // ✅ অটো user's projectUuid
   const getFirstProjectUuid = async (): Promise<string | null> => {
     try {
       const token = typeof window !== "undefined" ? getStoredAccessToken() : null;
-      const res = await fetch(`${API_BASE_URL}/project?limit=1`, {
+      const res = await fetch(`${API_BASE_URL}/project?limit=100`, {
         headers: {
           Accept: "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -184,8 +196,14 @@ function MilestonesInner() {
       if (!text) return null;
       const result = JSON.parse(text);
       const list = extractArray(result);
-      if (list.length > 0) {
-        return String(list[0].uuid ?? list[0].id ?? "");
+      const userProjects = userEmail
+        ? list.filter((p: any) => {
+            const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || "").toLowerCase().trim();
+            return creator === userEmail || creator === String(storedUser?.id);
+          })
+        : [];
+      if (userProjects.length > 0) {
+        return String(userProjects[0].uuid ?? userProjects[0].id ?? "");
       }
       return null;
     } catch { 
@@ -210,7 +228,11 @@ function MilestonesInner() {
 
   function openCreateModal() {
     setEditingMilestone(null);
-    setForm({ ...EMPTY_FORM, projectUuid: projectUuidFromUrl || "" });
+    setForm({
+      ...EMPTY_FORM,
+      addedBy: userEmail || storedUser?.name || "sharetest@realbiz.com",
+      projectUuid: projectUuidFromUrl || "",
+    });
     setIsModalOpen(true);
   }
 
@@ -224,7 +246,7 @@ function MilestonesInner() {
       progress: item.progress,
       status: item.status,
       varianceDays: String(item.varianceDays ?? "0"),
-      addedBy: item.addedBy || "Shamim Khan",
+      addedBy: item.addedBy || userEmail || "sharetest@realbiz.com",
       projectUuid: item.projectUuid || projectUuidFromUrl || "",
     });
     setIsModalOpen(true);
@@ -382,14 +404,17 @@ function MilestonesInner() {
                   className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10" 
                 />
               </div>
-              <select 
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)} 
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-              >
-                <option value="All">All Statuses</option>
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <div className="w-40">
+                <PredictiveSearchSelect
+                  placeholder="All Statuses"
+                  options={[
+                    { value: "All", label: "All Statuses" },
+                    ...STATUSES.map((s) => ({ value: s, label: s })),
+                  ]}
+                  value={statusFilter}
+                  onChange={(val) => setStatusFilter(val)}
+                />
+              </div>
             </div>
           </div>
 
@@ -463,9 +488,12 @@ function MilestonesInner() {
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Code" required><input required value={form.milestoneCode} onChange={(e) => updateForm("milestoneCode", e.target.value)} className={inputClass} disabled={!!editingMilestone} /></FormField>
                 <FormField label="Status" required>
-                  <select value={form.status} onChange={(e) => updateForm("status", normalizeStatus(e.target.value))} className={inputClass}>
-                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    placeholder="Select Status..."
+                    options={STATUSES.map((s) => ({ value: s, label: s }))}
+                    value={form.status}
+                    onChange={(val) => updateForm("status", normalizeStatus(val))}
+                  />
                 </FormField>
               </div>
               <FormField label="Name" required><input required value={form.milestoneName} onChange={(e) => updateForm("milestoneName", e.target.value)} className={inputClass} /></FormField>

@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { crmFetch, API_ORIGIN } from "../../crm-fetch";
 import { ChevronLeft, ChevronRight, Search, RotateCcw } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface DropdownItem {
   id?: string | number;
@@ -210,21 +211,12 @@ export default function TaskVisitDetailsReportPage() {
           <label className="block text-[11px] font-semibold text-gray-600 mb-1">
             Officer / Agent
           </label>
-          <select
+          <PredictiveSearchSelect
             value={selectedUser}
-            onChange={(e) => {
-              setSelectedUser(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 bg-white shadow-sm"
-          >
-            <option value="">All Officers</option>
-            {dropdowns?.users?.map((u) => (
-              <option key={u.uuid} value={u.uuid}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => { setSelectedUser(value); setCurrentPage(1); }}
+            placeholder="All Officers"
+            options={(dropdowns?.users || []).map((u) => ({ value: u.uuid, label: u.name }))}
+          />
         </div>
 
         {/* Place Filter */}
@@ -232,21 +224,12 @@ export default function TaskVisitDetailsReportPage() {
           <label className="block text-[11px] font-semibold text-gray-600 mb-1">
             Visit Place
           </label>
-          <select
+          <PredictiveSearchSelect
             value={selectedPlace}
-            onChange={(e) => {
-              setSelectedPlace(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 bg-white shadow-sm"
-          >
-            <option value="">All Places</option>
-            {dropdowns?.places?.map((p) => (
-              <option key={p.id || p.uuid} value={String(p.id || p.uuid)}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => { setSelectedPlace(value); setCurrentPage(1); }}
+            placeholder="All Places"
+            options={(dropdowns?.places || []).map((p) => ({ value: String(p.id || p.uuid), label: p.name }))}
+          />
         </div>
 
         {/* Status Filter */}
@@ -254,21 +237,12 @@ export default function TaskVisitDetailsReportPage() {
           <label className="block text-[11px] font-semibold text-gray-600 mb-1">
             Visit Status
           </label>
-          <select
+          <PredictiveSearchSelect
             value={selectedStatus}
-            onChange={(e) => {
-              setSelectedStatus(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full border border-gray-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 bg-white shadow-sm"
-          >
-            <option value="">All Statuses</option>
-            {dropdowns?.statuses?.map((s) => (
-              <option key={s.id || s.uuid} value={String(s.id || s.uuid)}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => { setSelectedStatus(value); setCurrentPage(1); }}
+            placeholder="All Statuses"
+            options={(dropdowns?.statuses || []).map((s) => ({ value: String(s.id || s.uuid), label: s.name }))}
+          />
         </div>
 
         {/* Date From */}

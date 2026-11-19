@@ -14,6 +14,7 @@ import {
   Search,
   RotateCcw,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // Types structured for future API integration
 export interface ContraVoucherItem {
@@ -54,6 +55,58 @@ export default function ContraVoucherListPage() {
 
   // --- Voucher List State (Ready for API response payload) ---
   const [vouchers, setVouchers] = useState<ContraVoucherItem[]>([]);
+
+  const [accountOptions, setAccountOptions] = useState<{ value: string; label: string }[]>([]);
+  const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ value: string; label: string }[]>([]);
+  const [taskOptions, setTaskOptions] = useState<{ value: string; label: string }[]>([
+    { value: "Foundation", label: "Foundation" },
+    { value: "Finishing", label: "Finishing" },
+    { value: "Civil Work", label: "Civil Work" },
+    { value: "Electrical", label: "Electrical" },
+  ]);
+
+  useEffect(() => {
+    const loadDropdownData = async () => {
+      try {
+        const [coaRes, projRes, siteRes] = await Promise.all([
+          fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project?limit=100", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project-sites?limit=100", { headers: getAuthHeaders() }),
+        ]);
+        const coaJson = await coaRes.json().catch(() => ({}));
+        const projJson = await projRes.json().catch(() => ({}));
+        const siteJson = await siteRes.json().catch(() => ({}));
+
+        const coaList = coaJson?.data?.data || coaJson?.data || [];
+        if (Array.isArray(coaList)) {
+          setAccountOptions(coaList.map((c: any) => ({
+            value: c.name || c.uuid || String(c.id),
+            label: `${c.name || 'Account'} (${c.code || 'COA'})`,
+          })));
+        }
+
+        const pList = projJson?.data?.data || projJson?.data || [];
+        if (Array.isArray(pList)) {
+          setProjectOptions(pList.map((p: any) => ({
+            value: p.name || p.title || p.uuid || String(p.id),
+            label: p.name || p.title || "Project",
+          })));
+        }
+
+        const sList = siteJson?.data?.data || siteJson?.data || [];
+        if (Array.isArray(sList)) {
+          setSiteOptions(sList.map((s: any) => ({
+            value: s.name || s.siteName || s.uuid || String(s.id),
+            label: s.name || s.siteName || "Site",
+          })));
+        }
+      } catch (err) {
+        console.error("Contra voucher filter load error", err);
+      }
+    };
+    void loadDropdownData();
+  }, []);
 
   const unwrapRecords = (result: Record<string, unknown>): Record<string, unknown>[] => {
     const nested = result.data as Record<string, unknown> | unknown[] | undefined;
@@ -220,15 +273,12 @@ const getAuthHeaders = () => {
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Debit Accounts
               </label>
-              <select
+              <PredictiveSearchSelect
                 value={filters.debitAccount}
-                onChange={(e) => setFilters({ ...filters, debitAccount: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
-              >
-                <option value="">Select Chart Of Account</option>
-                <option value="Cash in Hand">Cash in Hand</option>
-                <option value="Bank Account">Bank Account</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, debitAccount: val })}
+                options={accountOptions}
+                placeholder="Select Chart Of Account"
+              />
             </div>
 
             {/* Credit Accounts */}
@@ -236,15 +286,12 @@ const getAuthHeaders = () => {
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Credit Accounts
               </label>
-              <select
+              <PredictiveSearchSelect
                 value={filters.creditAccount}
-                onChange={(e) => setFilters({ ...filters, creditAccount: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
-              >
-                <option value="">Select Chart Of Account</option>
-                <option value="Cash in Hand">Cash in Hand</option>
-                <option value="Bank Account">Bank Account</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, creditAccount: val })}
+                options={accountOptions}
+                placeholder="Select Chart Of Account"
+              />
             </div>
 
             {/* Select Project */}
@@ -252,15 +299,12 @@ const getAuthHeaders = () => {
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Select Project
               </label>
-              <select
+              <PredictiveSearchSelect
                 value={filters.project}
-                onChange={(e) => setFilters({ ...filters, project: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
-              >
-                <option value="">Select Project</option>
-                <option value="Tower A">Tower A</option>
-                <option value="Plaza B">Plaza B</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, project: val })}
+                options={projectOptions}
+                placeholder="Select Project"
+              />
             </div>
           </div>
 
@@ -270,15 +314,12 @@ const getAuthHeaders = () => {
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Site
               </label>
-              <select
+              <PredictiveSearchSelect
                 value={filters.site}
-                onChange={(e) => setFilters({ ...filters, site: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
-              >
-                <option value="">Select Site</option>
-                <option value="Dhaka Site">Dhaka Site</option>
-                <option value="Chittagong Site">Chittagong Site</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, site: val })}
+                options={siteOptions}
+                placeholder="Select Site"
+              />
             </div>
 
             {/* Task */}
@@ -286,15 +327,12 @@ const getAuthHeaders = () => {
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Task
               </label>
-              <select
+              <PredictiveSearchSelect
                 value={filters.task}
-                onChange={(e) => setFilters({ ...filters, task: e.target.value })}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
-              >
-                <option value="">Select Task</option>
-                <option value="Foundation">Foundation</option>
-                <option value="Finishing">Finishing</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, task: val })}
+                options={taskOptions}
+                placeholder="Select Task"
+              />
             </div>
           </div>
         </div>
@@ -303,15 +341,17 @@ const getAuthHeaders = () => {
         <div className="flex items-center justify-between gap-2 mb-2 w-full">
           <div className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-              className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-0.5 outline-none text-xs"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+            <PredictiveSearchSelect
+              value={String(entriesPerPage)}
+              onChange={(val) => setEntriesPerPage(Number(val))}
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
           </div>
 

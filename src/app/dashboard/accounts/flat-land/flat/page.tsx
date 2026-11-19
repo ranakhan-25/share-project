@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, Search, FileSpreadsheet, FileText, Building2 } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -74,11 +75,19 @@ export default function FlatPage() {
     amenities: "",
   });
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== "undefined" ? (localStorage.getItem("token") || localStorage.getItem("accessToken") || "") : "";
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
   // ====================== FETCH LISTS ======================
   const fetchFlats = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/flat-land/flats`);
+      const res = await fetch(`${API_PATH}/flat-land/flats`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success) {
         setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
@@ -93,11 +102,11 @@ export default function FlatPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, { headers: getAuthHeaders() });
       const jsonProj = await resProj.json();
       if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites`, { headers: getAuthHeaders() });
       const jsonSite = await resSite.json();
       if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
     } catch (err) {
@@ -161,7 +170,7 @@ export default function FlatPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -187,6 +196,7 @@ export default function FlatPage() {
     try {
       const res = await fetch(`${API_PATH}/flat-land/flats/${item.uuid}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         toast.success("Deleted successfully!");
@@ -313,39 +323,35 @@ export default function FlatPage() {
         <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-3.5">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Project</label>
-            <select 
+            <PredictiveSearchSelect 
               value={filterProject} 
-              onChange={e => setFilterProject(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="">Select value</option>
-              {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-            </select>
+              onChange={(val) => setFilterProject(val)} 
+              options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+              placeholder="Select value"
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Site</label>
-            <select 
+            <PredictiveSearchSelect 
               value={filterSite} 
-              onChange={e => setFilterSite(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="">Select Site</option>
-              {sites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-            </select>
+              onChange={(val) => setFilterSite(val)} 
+              options={sites.map(s => ({ value: s.name, label: s.name }))}
+              placeholder="Select Site"
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
-            <select 
+            <PredictiveSearchSelect 
               value={filterStatus} 
-              onChange={e => setFilterStatus(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="">Select Status</option>
-              <option value="Available">Available</option>
-              <option value="Sold">Sold</option>
-              <option value="Unsold">Unsold</option>
-              <option value="Booked">Booked</option>
-            </select>
+              onChange={(val) => setFilterStatus(val)} 
+              options={[
+                { value: "Available", label: "Available" },
+                { value: "Sold", label: "Sold" },
+                { value: "Unsold", label: "Unsold" },
+                { value: "Booked", label: "Booked" },
+              ]}
+              placeholder="Select Status"
+            />
           </div>
         </div>
 
@@ -478,26 +484,21 @@ export default function FlatPage() {
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Project <span className="text-rose-500">*</span>
                   </label>
-                  <select 
-                    required 
+                  <PredictiveSearchSelect 
                     value={formData.projectId} 
-                    onChange={(e) => setFormData({ ...formData, projectId: e.target.value, siteName: "" })} 
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="">Select One Option</option>
-                    {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, projectId: val, siteName: "" })} 
+                    options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                    placeholder="Select One Option"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Site</label>
-                  <select 
+                  <PredictiveSearchSelect 
                     value={formData.siteName} 
-                    onChange={(e) => setFormData({ ...formData, siteName: e.target.value })} 
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="">Select Site</option>
-                    {filteredSites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, siteName: val })} 
+                    options={filteredSites.map(s => ({ value: s.name, label: s.name }))}
+                    placeholder="Select Site"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -634,17 +635,17 @@ export default function FlatPage() {
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Status <span className="text-rose-500">*</span>
                   </label>
-                  <select 
-                    required 
+                  <PredictiveSearchSelect 
                     value={formData.status} 
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })} 
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="Available">Available</option>
-                    <option value="Sold">Sold</option>
-                    <option value="Unsold">Unsold</option>
-                    <option value="Booked">Booked</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, status: val })} 
+                    options={[
+                      { value: "Available", label: "Available" },
+                      { value: "Sold", label: "Sold" },
+                      { value: "Unsold", label: "Unsold" },
+                      { value: "Booked", label: "Booked" },
+                    ]}
+                    placeholder="Select Status"
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Amenities</label>

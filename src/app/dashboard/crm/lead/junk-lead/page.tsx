@@ -15,6 +15,7 @@ import {
   UserX
 } from "lucide-react";
 import { crmLeadApi } from "@/services/crmLeadApi";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface JunkLeadRecord {
   id: string;
@@ -232,36 +233,30 @@ export default function JunkLeadPage() {
 
         <div>
           <label className="block font-bold text-muted-foreground mb-1.5 text-xs">Lead Category</label>
-          <select
+          <PredictiveSearchSelect
+            id="junk-category-filter"
             value={selectedCategory}
-            onChange={(e) => {
-              setSelectedCategory(e.target.value);
+            onChange={(value) => {
+              setSelectedCategory(value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border text-sm font-extrabold outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-          >
-            <option value="">Select Category</option>
-            <option value="Ready Flat">Ready Flat</option>
-            <option value="On going">On going</option>
-            <option value="Upcoming">Upcoming</option>
-          </select>
+            options={[{ value: "", label: "Select Category" }, { value: "Ready Flat", label: "Ready Flat" }, { value: "On going", label: "On going" }, { value: "Upcoming", label: "Upcoming" }]}
+            placeholder="Search category..."
+          />
         </div>
 
         <div>
           <label className="block font-bold text-muted-foreground mb-1.5 text-xs">Users</label>
-          <select
+          <PredictiveSearchSelect
+            id="junk-user-filter"
             value={selectedUser}
-            onChange={(e) => {
-              setSelectedUser(e.target.value);
+            onChange={(value) => {
+              setSelectedUser(value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border text-sm font-extrabold outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-          >
-            <option value="">Select Users</option>
-            <option value="Admin">Admin</option>
-            <option value="Mohin">Mohin</option>
-            <option value="Tazmul Reza">Tazmul Reza</option>
-          </select>
+            options={[{ value: "", label: "Select Users" }, { value: "Admin", label: "Admin" }, { value: "Mohin", label: "Mohin" }, { value: "Tazmul Reza", label: "Tazmul Reza" }]}
+            placeholder="Search user..."
+          />
         </div>
       </div>
 

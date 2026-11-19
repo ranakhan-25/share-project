@@ -1,4 +1,5 @@
 'use client';
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 import React, { useState } from 'react';
 import { 
@@ -91,15 +92,12 @@ export default function ReceiptReport() {
             {/* Chart Of Account */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Chart Of Account</label>
-              <select 
-                value={chartOfAccount} 
-                onChange={(e) => setChartOfAccount(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select value">Select value</option>
-                <option value="Cash">Cash</option>
-                <option value="Bank">Bank</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select value","label":"Select value"},{"value":"Cash","label":"Cash"},{"value":"Bank","label":"Bank"}]}
+                value={chartOfAccount}
+                onChange={(val: any) => (val)}
+                placeholder="Select value"
+              />
             </div>
 
             {/* Company with Clear Action */}
@@ -124,28 +122,23 @@ export default function ReceiptReport() {
             {/* Select Project */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Select Project</label>
-              <select 
-                value={selectProject} 
-                onChange={(e) => setSelectProject(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Project">Select Project</option>
-                <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
-                <option value="Lake Garden">Lake Garden</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Project","label":"Select Project"},{"value":"Sheba Eyecon Tower","label":"Sheba Eyecon Tower"},{"value":"Lake Garden","label":"Lake Garden"}]}
+                value={selectProject}
+                onChange={(val: any) => (val)}
+                placeholder="Select Project"
+              />
             </div>
 
             {/* Site */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Site</label>
-              <select 
-                value={site} 
-                onChange={(e) => setSite(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Site">Select Site</option>
-                <option value="Main Site">Main Site</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Site","label":"Select Site"},{"value":"Main Site","label":"Main Site"}]}
+                value={site}
+                onChange={(val: any) => (val)}
+                placeholder="Select Site"
+              />
             </div>
 
           </div>

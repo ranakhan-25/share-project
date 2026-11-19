@@ -1,4 +1,5 @@
 'use client';
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 import React, { useState } from 'react';
 import { 
@@ -106,29 +107,23 @@ export default function PayableReport() {
               <label className="block text-slate-600 font-medium mb-1.5">
                 Contact Type <span className="text-red-500">*</span>
               </label>
-              <select 
-                value={contactType} 
-                onChange={(e) => setContactType(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Type">Select Type</option>
-                <option value="Supplier">Supplier</option>
-                <option value="Contractor">Contractor</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Type","label":"Select Type"},{"value":"Supplier","label":"Supplier"},{"value":"Contractor","label":"Contractor"}]}
+                value={contactType}
+                onChange={(val: any) => (val)}
+                placeholder="Select Type"
+              />
             </div>
 
             {/* Contractor/Supplier */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Contractor/Supplier</label>
-              <select 
-                value={contractorSupplier} 
-                onChange={(e) => setContractorSupplier(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select One Option">Select One Option</option>
-                <option value="Prime Tiles">Prime Tiles</option>
-                <option value="BSRM">BSRM</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select One Option","label":"Select One Option"},{"value":"Prime Tiles","label":"Prime Tiles"},{"value":"BSRM","label":"BSRM"}]}
+                value={contractorSupplier}
+                onChange={(val: any) => (val)}
+                placeholder="Select One Option"
+              />
             </div>
 
             {/* Company with Clear Action */}
@@ -155,15 +150,12 @@ export default function PayableReport() {
               <label className="block text-slate-600 font-medium mb-1.5">
                 Project <span className="text-red-500">*</span>
               </label>
-              <select 
-                value={project} 
-                onChange={(e) => setProject(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Project">Select Project</option>
-                <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
-                <option value="Lake Garden">Lake Garden</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Project","label":"Select Project"},{"value":"Sheba Eyecon Tower","label":"Sheba Eyecon Tower"},{"value":"Lake Garden","label":"Lake Garden"}]}
+                value={project}
+                onChange={(val: any) => (val)}
+                placeholder="Select Project"
+              />
             </div>
 
           </div>

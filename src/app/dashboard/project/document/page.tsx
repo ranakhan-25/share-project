@@ -1,7 +1,22 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, Plus, Eye, Trash2, X, FileText } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  FileText,
+  Search,
+  Save,
+  Loader2,
+  ChevronRight,
+  Eye,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 interface DocumentItem {
   uuid: string;
@@ -11,6 +26,7 @@ interface DocumentItem {
   documentType: string;
   details?: string | null;
   rajuk?: string | null;
+  createdBy?: string;
   createdAt?: string;
 }
 
@@ -24,106 +40,150 @@ const API_BASE_URL = (
   `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002"}/realbizpro/api/v1`
 ).replace(/\/+$/, "");
 
-function rowsFrom<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[];
-  if (!value || typeof value !== "object") return [];
-
-  const response = value as Record<string, unknown>;
-  for (const key of ["data", "documents", "projects", "items", "rows"]) {
-    if (key in response) {
-      const rows = rowsFrom<T>(response[key]);
-      if (rows.length > 0 || Array.isArray(response[key])) return rows;
-    }
-  }
-  return [];
+function getAuthHeaders(): Record<string, string> {
+  const token =
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-      ...(options?.body ? { "Content-Type": "application/json" } : {}),
-      ...options?.headers,
-    },
-    cache: "no-store",
-  });
-  const text = await response.text();
-  let body: unknown;
-  if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      body = text;
-    }
-  }
-  if (!response.ok) {
-    const payload =
-      body && typeof body === "object"
-        ? (body as Record<string, unknown>)
-        : undefined;
-    const message = payload?.message;
-    throw new Error(
-      Array.isArray(message)
-        ? message.join(", ")
-        : typeof message === "string"
-          ? message
-          : typeof body === "string"
-            ? body
-            : `Request failed (${response.status})`,
-    );
-  }
-  return body as T;
-}
+const DOC_TYPE_OPTIONS = [
+  { value: "Legal", label: "Legal Document" },
+  { value: "RAJUK Approval", label: "RAJUK Approval" },
+  { value: "Architectural Drawing", label: "Architectural Drawing" },
+  { value: "Structural Drawing", label: "Structural Drawing" },
+  { value: "Soil Test Report", label: "Soil Test Report" },
+  { value: "Fire Safety Clearance", label: "Fire Safety Clearance" },
+  { value: "General", label: "General" },
+];
+
+const entriesOptions = [
+  { value: "10", label: "10 entries" },
+  { value: "25", label: "25 entries" },
+  { value: "50", label: "50 entries" },
+];
 
 export default function DocumentationPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [docList, setDocList] = useState<DocumentItem[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deletingUuid, setDeletingUuid] = useState("");
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
-  const [entriesCount, setEntriesCount] = useState("50");
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newProjectId, setNewProjectId] = useState("");
-  const [newDocName, setNewDocName] = useState("");
-  const [newDocType, setNewDocType] = useState("");
-  const [newDetails, setNewDetails] = useState("");
+  const [editingDoc, setEditingDoc] = useState<DocumentItem | null>(null);
 
+  // Form State
+  const [formData, setFormData] = useState({
+    projectId: "",
+    documentName: "",
+    documentType: "Legal",
+    details: "",
+    rajuk: "",
+  });
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Load Projects
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/project?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const rows = json?.data?.data ?? json?.data ?? [];
+        if (Array.isArray(rows)) {
+          setProjects(
+            rows
+              .filter((p: any) => p?.uuid || p?.id)
+              .map((p: any) => ({
+                uuid: String(p.uuid || p.id),
+                name: String(p.name || p.projectName || p.code || "Unnamed"),
+              }))
+          );
+        }
+      }
+    } catch (err) {
+      console.error("fetchProjects error:", err);
+    }
+  };
+
+  // Load Documents
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [documentResponse, projectResponse] = await Promise.all([
-        request<unknown>("/project-documents?page=1&limit=100"),
-        request<unknown>("/project?page=1&limit=100"),
-      ]);
-      setDocList(rowsFrom<DocumentItem>(documentResponse));
-      setProjects(rowsFrom<ProjectOption>(projectResponse));
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not load documents.",
-      );
+      const res = await fetch(`${API_BASE_URL}/project-documents?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || "Failed to load documents");
+      }
+      const json = await res.json();
+      const rows = json?.data?.data ?? json?.data ?? [];
+      const activeEmail = (getStoredUser()?.email || userEmail || "").toLowerCase().trim();
+
+      const mapped: DocumentItem[] = (Array.isArray(rows) ? rows : [])
+        .filter((item: any) => !item.deletedAt)
+        .filter((item: any) => {
+          if (!activeEmail) return true;
+          const creator = String(item.createdBy || "").toLowerCase().trim();
+          const pClient = String(item.project?.clientEmail || item.project?.createdBy || "").toLowerCase().trim();
+          return !creator || creator === activeEmail || pClient === activeEmail;
+        })
+        .map((item: any) => ({
+          uuid: item.uuid,
+          projectId: item.projectId || item.project?.uuid || "",
+          project: item.project
+            ? { uuid: item.project.uuid, code: item.project.code || "", name: item.project.name || "" }
+            : undefined,
+          documentName: item.documentName || item.title || "",
+          documentType: item.documentType || "General",
+          details: item.details || null,
+          rajuk: item.rajuk || null,
+          createdBy: item.createdBy || activeEmail,
+          createdAt: item.createdAt,
+        }));
+
+      setDocList(mapped);
+    } catch (cause: any) {
+      setError(cause?.message || "Could not load documents.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userEmail]);
 
   useEffect(() => {
-    void loadData();
+    fetchProjects();
+  }, [userEmail]);
+
+  useEffect(() => {
+    loadData();
   }, [loadData]);
 
   const filteredDocuments = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return docList.filter((item) => {
       const matchesProject = !projectFilter || item.projectId === projectFilter;
-      const matchesDate =
-        !selectedDate || item.createdAt?.slice(0, 10) === selectedDate;
       const matchesSearch =
         !query ||
         [
@@ -133,381 +193,443 @@ export default function DocumentationPage() {
           item.details,
           item.rajuk,
         ].some((value) => value?.toLowerCase().includes(query));
-      return matchesProject && matchesDate && matchesSearch;
+      return matchesProject && matchesSearch;
     });
-  }, [docList, projectFilter, searchTerm, selectedDate]);
+  }, [docList, projectFilter, searchTerm]);
 
-  const pageSize = Number(entriesCount);
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredDocuments.length / pageSize),
-  );
-  const pageDocuments = filteredDocuments.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / entriesPerPage));
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const paginatedDocs = filteredDocuments.slice(startIndex, startIndex + entriesPerPage);
 
-  const handleAddDocument = async (e: React.FormEvent) => {
+  const projectOptions = projects.map((p) => ({ value: p.uuid, label: p.name }));
+  const filterProjectOptions = [{ value: "", label: "All Projects" }, ...projectOptions];
+
+  const resetForm = () => {
+    setFormData({
+      projectId: projects[0]?.uuid || "",
+      documentName: "",
+      documentType: "Legal",
+      details: "",
+      rajuk: "",
+    });
+    setFormError(null);
+  };
+
+  const handleOpenAdd = () => {
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (doc: DocumentItem) => {
+    setEditingDoc(doc);
+    setFormData({
+      projectId: doc.projectId || projects[0]?.uuid || "",
+      documentName: doc.documentName,
+      documentType: doc.documentType || "Legal",
+      details: doc.details || "",
+      rajuk: doc.rajuk || "",
+    });
+    setFormError(null);
+  };
+
+  // Submit Create
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    setError("");
+    if (!formData.projectId) {
+      setFormError("Project is required.");
+      return;
+    }
+    if (!formData.documentName.trim()) {
+      setFormError("Document Name is required.");
+      return;
+    }
+
     try {
-      await request("/project-documents", {
+      setSaving(true);
+      setFormError(null);
+      const activeEmail = (getStoredUser()?.email || userEmail || "sharetest@realbiz.com").toLowerCase().trim();
+
+      const payload = {
+        projectId: formData.projectId,
+        documentName: formData.documentName.trim(),
+        documentType: formData.documentType || "General",
+        details: formData.details.trim() || undefined,
+        rajuk: formData.rajuk.trim() || undefined,
+        createdBy: activeEmail,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/project-documents`, {
         method: "POST",
-        body: JSON.stringify({
-          projectId: newProjectId,
-          documentName: newDocName.trim(),
-          documentType: newDocType.trim() || "General",
-          details: newDetails.trim() || undefined,
-        }),
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || "Create document failed");
+      }
+
+      toast.success("Document created successfully!");
       setIsModalOpen(false);
-      setNewProjectId("");
-      setNewDocName("");
-      setNewDocType("");
-      setNewDetails("");
-      setCurrentPage(1);
+      resetForm();
       await loadData();
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not save document.",
-      );
+    } catch (cause: any) {
+      setFormError(cause?.message || "Could not save document.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (uuid: string) => {
-    setDeletingUuid(uuid);
-    setError("");
+  // Submit Edit
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDoc?.uuid) return;
+    if (!formData.projectId) {
+      setFormError("Project is required.");
+      return;
+    }
+    if (!formData.documentName.trim()) {
+      setFormError("Document Name is required.");
+      return;
+    }
+
     try {
-      await request(`/project-documents/${uuid}`, { method: "DELETE" });
+      setSaving(true);
+      setFormError(null);
+      const activeEmail = (getStoredUser()?.email || userEmail || "sharetest@realbiz.com").toLowerCase().trim();
+
+      const payload = {
+        projectId: formData.projectId,
+        documentName: formData.documentName.trim(),
+        documentType: formData.documentType || "General",
+        details: formData.details.trim() || undefined,
+        rajuk: formData.rajuk.trim() || undefined,
+        updatedBy: activeEmail,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/project-documents/${editingDoc.uuid}`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || "Update document failed");
+      }
+
+      toast.success("Document updated successfully!");
+      setEditingDoc(null);
+      resetForm();
       await loadData();
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not delete document.",
-      );
+    } catch (cause: any) {
+      setFormError(cause?.message || "Could not update document.");
     } finally {
-      setDeletingUuid("");
+      setSaving(false);
+    }
+  };
+
+  // Delete
+  const handleDelete = async (doc: DocumentItem) => {
+    if (!doc.uuid) return;
+    if (!window.confirm(`Delete document "${doc.documentName}"?`)) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/project-documents/${doc.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      toast.success("Document deleted successfully!");
+      setDocList((prev) => prev.filter((d) => d.uuid !== doc.uuid));
+    } catch (cause: any) {
+      toast.error(cause?.message || "Could not delete document.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 p-6 font-sans relative">
-      {/* Breadcrumb & Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div>
-          <div className="text-xs text-purple-600 font-medium mb-1 flex items-center gap-1">
-            <span>Home</span> &gt; <span>Project</span> &gt;{" "}
-            <span className="text-slate-500">Documentation</span>
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Top Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Dashboard</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Project</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Documents
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Project Documentation / প্রজেক্ট ডকুমেন্ট
+            </h1>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Documentation
-          </h1>
-        </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-cyan-400 hover:bg-cyan-500 text-slate-900 font-semibold px-4 py-2 rounded-md text-xs flex items-center gap-1.5 shadow-sm transition"
-        >
-          <Plus size={16} /> ADD NEW
-        </button>
-      </div>
-
-      {/* Filter Section */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">
-            Select Date
-          </label>
-          <div className="relative">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <Calendar
-              size={14}
-              className="absolute right-3 top-2.5 text-slate-400"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">
-            Project
-          </label>
-          <select
-            value={projectFilter}
-            onChange={(e) => {
-              setProjectFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          <button
+            onClick={handleOpenAdd}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
           >
-            <option value="">All projects</option>
-            {projects.map((project) => (
-              <option key={project.uuid} value={project.uuid}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Controls Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-white px-4 py-3 border-t border-x border-slate-200 rounded-t-lg gap-4">
-        <div className="flex items-center gap-2 text-xs text-slate-600">
-          <span>Show</span>
-          <select
-            value={entriesCount}
-            onChange={(e) => {
-              setEntriesCount(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-500"
-          >
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-          </select>
-          <span>entries</span>
+            <Plus className="w-4 h-4" /> + Add New Document
+          </button>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs text-slate-600">Search:</span>
-          <div className="relative w-full sm:w-64">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-            />
+        {/* Table Container */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="w-36">
+                <PredictiveSearchSelect
+                  options={entriesOptions}
+                  value={String(entriesPerPage)}
+                  onChange={(val) => {
+                    setEntriesPerPage(Number(val));
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Show entries"
+                />
+              </div>
+
+              <div className="w-56">
+                <PredictiveSearchSelect
+                  options={filterProjectOptions}
+                  value={projectFilter}
+                  onChange={(val) => {
+                    setProjectFilter(val);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Filter by Project"
+                />
+              </div>
+            </div>
+
+            <div className="relative w-full md:w-72">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search documents..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Main Table */}
-      <div className="bg-white border border-slate-200 shadow-sm overflow-x-auto rounded-b-lg">
-        <table className="w-full text-left border-collapse min-w-[900px]">
-          <thead>
-            <tr className="bg-purple-600 text-white text-[11px] font-semibold tracking-wider uppercase">
-              <th className="py-3 px-4 w-16">SL</th>
-              <th className="py-3 px-4">Project Name</th>
-              <th className="py-3 px-4">Document Name</th>
-              <th className="py-3 px-4">Document Type</th>
-              <th className="py-3 px-4">Details</th>
-              <th className="py-3 px-4 text-center w-24">View</th>
-              <th className="py-3 px-4 text-center w-24">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 text-xs text-slate-700">
-            {error ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="text-center py-6 text-rose-600 text-xs"
-                >
-                  {error}
-                </td>
-              </tr>
-            ) : loading ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="text-center py-6 text-slate-500 text-xs"
-                >
-                  Loading project documents...
-                </td>
-              </tr>
-            ) : pageDocuments.length > 0 ? (
-              pageDocuments.map((item, index) => (
-                <tr
-                  key={item.uuid}
-                  className="hover:bg-purple-50/40 transition"
-                >
-                  <td className="py-3 px-4 font-medium">
-                    {(currentPage - 1) * pageSize + index + 1}
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-900">
-                    {item.project?.name ?? "—"}
-                  </td>
-                  <td className="py-3 px-4 font-medium text-purple-700">
-                    {item.documentName}
-                  </td>
-                  <td className="py-3 px-4">{item.documentType}</td>
-                  <td className="py-3 px-4 text-slate-500">
-                    {item.details || item.rajuk || "—"}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() =>
-                        alert(`Viewing document: ${item.documentName}`)
-                      }
-                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 p-1.5 rounded transition inline-flex items-center justify-center"
-                      title="View Document"
-                    >
-                      <Eye size={15} />
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => void handleDelete(item.uuid)}
-                      disabled={deletingUuid === item.uuid}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded transition inline-flex items-center justify-center"
-                      title="Delete"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-slate-100/80 text-slate-700 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">#</th>
+                  <th className="py-3 px-4">PROJECT NAME</th>
+                  <th className="py-3 px-4">DOCUMENT NAME</th>
+                  <th className="py-3 px-4">DOCUMENT TYPE</th>
+                  <th className="py-3 px-4">DETAILS / APPROVAL</th>
+                  <th className="py-3 px-4">ADDED BY</th>
+                  <th className="py-3 px-4 text-center">ACTION</th>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="text-center py-6 text-slate-400 text-xs"
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-normal">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
+                    </td>
+                  </tr>
+                ) : paginatedDocs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
+                      No project document records available
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedDocs.map((item, idx) => (
+                    <tr key={item.uuid} className="hover:bg-slate-50/70 transition">
+                      <td className="py-3 px-4 font-medium text-slate-500">{startIndex + idx + 1}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-900">{item.project?.name || "—"}</td>
+                      <td className="py-3 px-4 font-medium text-indigo-700 flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                        {item.documentName}
+                      </td>
+                      <td className="py-3 px-4 text-slate-700">
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                          {item.documentType}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 text-xs">{item.details || item.rajuk || "—"}</td>
+                      <td className="py-3 px-4 text-slate-500 text-xs">{item.createdBy || "-"}</td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(item)}
+                            title="Edit"
+                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item)}
+                            title="Delete"
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="p-4 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-500">
+            <div>
+              Showing {filteredDocuments.length === 0 ? 0 : startIndex + 1} to{" "}
+              {Math.min(startIndex + entriesPerPage, filteredDocuments.length)} of {filteredDocuments.length} entries
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition font-medium"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  className={`w-8 h-8 rounded-lg font-medium transition ${
+                    currentPage === p
+                      ? "bg-indigo-600 text-white shadow-2xs"
+                      : "border border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                  }`}
                 >
-                  {docList.length === 0
-                    ? "No project documents yet."
-                    : "No documents match the selected filters."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination Footer */}
-      <div className="flex flex-col sm:flex-row justify-between items-center pt-4 text-xs text-slate-500 gap-4">
-        <div>
-          Showing{" "}
-          {filteredDocuments.length === 0
-            ? 0
-            : (currentPage - 1) * pageSize + 1}{" "}
-          to {Math.min(currentPage * pageSize, filteredDocuments.length)} of{" "}
-          {filteredDocuments.length} entries
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            className="px-3 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50"
-            disabled={currentPage === 1 || loading}
-          >
-            Previous
-          </button>
-          <button className="px-3 py-1 bg-purple-600 text-white border border-purple-600 rounded">
-            {currentPage} / {totalPages}
-          </button>
-          <button
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-            }
-            className="px-3 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100"
-            disabled={currentPage >= totalPages || loading}
-          >
-            Next
-          </button>
+                  {p}
+                </button>
+              ))}
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition font-medium"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Modal Form for "+ ADD NEW" */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center bg-purple-600 text-white px-4 py-3">
-              <h3 className="text-sm font-bold flex items-center gap-1.5">
-                <FileText size={16} /> Add New Document
+      {/* ==================== ADD / EDIT MODAL ==================== */}
+      {(isModalOpen || editingDoc) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8">
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
+              <h3 className="font-bold text-slate-900 text-base">
+                {editingDoc ? `Edit Document: ${editingDoc.documentName}` : "Add New Document"}
               </h3>
               <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-white/80 hover:text-white transition"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingDoc(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 transition"
               >
-                <X size={18} />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddDocument} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Project Name *
+            <form onSubmit={editingDoc ? handleEditSubmit : handleCreateSubmit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Project Name <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  value={newProjectId}
-                  onChange={(e) => setNewProjectId(e.target.value)}
-                  required
-                  className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map((project) => (
-                    <option key={project.uuid} value={project.uuid}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Document Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter document name"
-                  value={newDocName}
-                  onChange={(e) => setNewDocName(e.target.value)}
-                  required
-                  className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                <PredictiveSearchSelect
+                  options={projectOptions}
+                  value={formData.projectId}
+                  onChange={(val) => setFormData({ ...formData, projectId: val })}
+                  placeholder="Select Project"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Document Type
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Document Name <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Legal, Engineering, Safety"
-                  value={newDocType}
-                  onChange={(e) => setNewDocType(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  required
+                  value={formData.documentName}
+                  onChange={(e) => setFormData({ ...formData, documentName: e.target.value })}
+                  placeholder="e.g. Land Mutation & Deed Copy"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Details
-                </label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Document Type</label>
+                <PredictiveSearchSelect
+                  options={DOC_TYPE_OPTIONS}
+                  value={formData.documentType}
+                  onChange={(val) => setFormData({ ...formData, documentType: val })}
+                  placeholder="Select Document Type"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">RAJUK / Authority Clearance</label>
+                <input
+                  type="text"
+                  value={formData.rajuk}
+                  onChange={(e) => setFormData({ ...formData, rajuk: e.target.value })}
+                  placeholder="e.g. RAJUK Memo # 2026-X49"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Details / Description</label>
                 <textarea
                   rows={3}
-                  placeholder="Enter additional details..."
-                  value={newDetails}
-                  onChange={(e) => setNewDetails(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  value={formData.details}
+                  onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                  placeholder="Additional document notes or archives location..."
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                  {formError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-4 py-2 rounded-md text-xs transition"
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setEditingDoc(null);
+                  }}
+                  className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2 rounded-md text-xs shadow-sm transition"
+                  className="inline-flex items-center gap-2 px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition disabled:opacity-50"
                 >
-                  {saving ? "Saving..." : "Save Document"}
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  {editingDoc ? "Update Document" : "Save Document"}
                 </button>
               </div>
             </form>

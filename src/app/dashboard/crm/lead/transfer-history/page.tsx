@@ -9,6 +9,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { crmLeadApi } from "@/services/crmLeadApi";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface TransferLeadRecord {
   id: string;
@@ -121,40 +122,30 @@ export default function TransferLeadListPage() {
 
         <div>
           <label className="block font-bold text-muted-foreground mb-1.5 text-xs">From</label>
-          <select
+          <PredictiveSearchSelect
+            id="transfer-from-filter"
             value={selectedFrom}
-            onChange={(e) => {
-              setSelectedFrom(e.target.value);
+            onChange={(value) => {
+              setSelectedFrom(value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border text-sm font-extrabold cursor-pointer"
-          >
-            <option value="">Select One Option</option>
-            {userOptions.map((u) => (
-              <option key={u.uuid || u.name} value={u.name}>
-                {u.name} {u.designationName ? `(${u.designationName})` : ""}
-              </option>
-            ))}
-          </select>
+            options={[{ value: "", label: "Select One Option" }, ...userOptions.map((u) => ({ value: String(u.name ?? ""), label: `${u.name ?? ""}${u.designationName ? ` (${u.designationName})` : ""}` }))]}
+            placeholder="Search source user..."
+          />
         </div>
 
         <div>
           <label className="block font-bold text-muted-foreground mb-1.5 text-xs">To</label>
-          <select
+          <PredictiveSearchSelect
+            id="transfer-to-filter"
             value={selectedTo}
-            onChange={(e) => {
-              setSelectedTo(e.target.value);
+            onChange={(value) => {
+              setSelectedTo(value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border text-sm font-extrabold cursor-pointer"
-          >
-            <option value="">Select One Option</option>
-            {userOptions.map((u) => (
-              <option key={u.uuid || u.name} value={u.name}>
-                {u.name} {u.designationName ? `(${u.designationName})` : ""}
-              </option>
-            ))}
-          </select>
+            options={[{ value: "", label: "Select One Option" }, ...userOptions.map((u) => ({ value: String(u.name ?? ""), label: `${u.name ?? ""}${u.designationName ? ` (${u.designationName})` : ""}` }))]}
+            placeholder="Search target user..."
+          />
         </div>
       </div>
 

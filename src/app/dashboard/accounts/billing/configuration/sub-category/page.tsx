@@ -13,6 +13,7 @@ import {
   Loader2,
   Save,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== TYPES ====================
 export interface SubCategoryItem {
@@ -42,6 +43,16 @@ const API_PREFIX = "/realbizpro/api/v1";
 const SUB_CATEGORY_API = `${API_BASE_URL}${API_PREFIX}/billing-sub-category`;
 const CATEGORY_API = `${API_BASE_URL}${API_PREFIX}/category`;
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ==================== HELPERS ====================
 const generateSubCategoryCode = () => {
   const rand = Math.floor(100000 + Math.random() * 900000);
@@ -57,7 +68,7 @@ async function fetchRelatedOptions(
     const query = new URLSearchParams({ page: "1", limit: "100" });
     const res = await fetch(`${endpoint}?${query}`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
     if (!res.ok) {
@@ -96,7 +107,7 @@ async function fetchSubCategories(): Promise<SubCategoryItem[]> {
   const query = new URLSearchParams({ page: "1", limit: "100" });
   const res = await fetch(`${SUB_CATEGORY_API}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -109,26 +120,28 @@ async function fetchSubCategories(): Promise<SubCategoryItem[]> {
   const rows = json?.data?.data ?? json?.data ?? [];
 
   return Array.isArray(rows)
-    ? rows.map((item: any) => ({
-        id: item.id ?? item.uuid,
-        uuid: item.uuid,
-        categoryId: item.categoryId || item.category?.uuid || "",
-        categoryName:
-          item.category?.name || item.categoryName || item.category || "",
-        type: item.type || item.category?.type || "",
-        code: item.code || "",
-        name: item.name || item.subCategoryName || "",
-        createdBy: item.createdBy || "",
-        updatedBy: item.updatedBy || "",
-        status: item.status || "active",
-      }))
+    ? rows
+        .filter((item: any) => !item.deletedAt && !item.deleted_at)
+        .map((item: any) => ({
+          id: item.id ?? item.uuid,
+          uuid: item.uuid,
+          categoryId: item.categoryId || item.category?.uuid || "",
+          categoryName:
+            item.category?.name || item.categoryName || item.category || "",
+          type: item.type || item.category?.type || "",
+          code: item.code || "",
+          name: item.name || item.subCategoryName || "",
+          createdBy: item.createdBy || "",
+          updatedBy: item.updatedBy || "",
+          status: item.status || "active",
+        }))
     : [];
 }
 
 async function createSubCategory(payload: Record<string, any>) {
   const res = await fetch(SUB_CATEGORY_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -141,7 +154,7 @@ async function createSubCategory(payload: Record<string, any>) {
 async function updateSubCategory(uuid: string, payload: Record<string, any>) {
   const res = await fetch(`${SUB_CATEGORY_API}/${uuid}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -154,7 +167,7 @@ async function updateSubCategory(uuid: string, payload: Record<string, any>) {
 async function deleteSubCategory(uuid: string) {
   const res = await fetch(`${SUB_CATEGORY_API}/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -394,21 +407,18 @@ export default function SubCategoryListPage() {
             <label className="block font-semibold text-slate-700 mb-1 text-xs">
               Category
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "", label: "All Categories" },
+                ...categories.map((c) => ({ value: c.uuid, label: c.name })),
+              ]}
               value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
+              onChange={(val) => {
+                setCategoryFilter(val);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">All Categories</option>
-              {categories.map((c) => (
-                <option key={c.uuid} value={c.uuid}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Select Category Filter"
+            />
           </div>
         </div>
 
@@ -428,18 +438,20 @@ export default function SubCategoryListPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between p-3 gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <span>Show</span>
-              <select
-                value={entriesPerPage}
-                onChange={(e) => {
-                  setEntriesPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <div className="w-24">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "10", label: "10" },
+                    { value: "25", label: "25" },
+                    { value: "50", label: "50" },
+                  ]}
+                  value={String(entriesPerPage)}
+                  onChange={(val) => {
+                    setEntriesPerPage(Number(val) || 10);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
               <span>entries</span>
             </div>
             <div className="flex items-center gap-2">
@@ -609,29 +621,24 @@ export default function SubCategoryListPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Category <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    required
+                  <PredictiveSearchSelect
+                    options={categories.map((c) => ({
+                      value: c.uuid,
+                      label: c.name,
+                    }))}
                     value={formData.categoryId}
-                    onChange={(e) => {
-                      const selectedUuid = e.target.value;
+                    onChange={(val) => {
                       const selectedCategory = categories.find(
-                        (c) => c.uuid === selectedUuid,
+                        (c) => c.uuid === val,
                       );
                       setFormData({
                         ...formData,
-                        categoryId: selectedUuid,
+                        categoryId: val,
                         type: selectedCategory?.type || "",
                       });
                     }}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c.uuid} value={c.uuid}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Category"
+                  />
                 </div>
 
                 {/* CODE — auto-generated */}
@@ -721,29 +728,24 @@ export default function SubCategoryListPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Category <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    required
+                  <PredictiveSearchSelect
+                    options={categories.map((c) => ({
+                      value: c.uuid,
+                      label: c.name,
+                    }))}
                     value={formData.categoryId}
-                    onChange={(e) => {
-                      const selectedUuid = e.target.value;
+                    onChange={(val) => {
                       const selectedCategory = categories.find(
-                        (c) => c.uuid === selectedUuid,
+                        (c) => c.uuid === val,
                       );
                       setFormData({
                         ...formData,
-                        categoryId: selectedUuid,
+                        categoryId: val,
                         type: selectedCategory?.type || "",
                       });
                     }}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c.uuid} value={c.uuid}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Category"
+                  />
                 </div>
 
                 <div>

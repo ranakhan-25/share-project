@@ -24,6 +24,8 @@ import {
   Tag,
   Receipt
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 // ==================== API CONFIG ====================
 const API_BASE =
@@ -31,14 +33,13 @@ const API_BASE =
 const API_PREFIX = "/realbizpro/api/v1";
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return { "Content-Type": "application/json" };
-  }
   const token =
-    localStorage.getItem("share-project:access-token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -66,6 +67,12 @@ interface OptionItem {
 }
 
 export default function InvoiceBillListPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   // ==================== LIST STATES ====================
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -184,9 +191,25 @@ export default function InvoiceBillListPage() {
     setItems(itms);
     setCategories(cats);
     setSubCategories(subCats);
-    setProjects(projs);
+    const userProjects = userEmail
+      ? projs.filter((p: any) => {
+          const raw = p.raw || {};
+          const creator = String(
+            raw.createdBy ||
+              raw.clientEmail ||
+              raw.email ||
+              raw.userEmail ||
+              raw.projectManager ||
+              ""
+          )
+            .toLowerCase()
+            .trim();
+          return creator === userEmail || creator === String(storedUser?.id);
+        })
+      : [];
+    setProjects(userProjects);
     setProjectTypes(types);
-  }, []);
+  }, [userEmail, storedUser?.id]);
 
   const visibleSubCategories = selectedCategoryId
     ? subCategories.filter(
@@ -210,8 +233,16 @@ export default function InvoiceBillListPage() {
 
       const json = await res.json();
       const rows = json?.data?.data || json?.data || [];
+      const userProjUuids = new Set(projects.map((p) => p.uuid));
+      const filtered = rows.filter((record: any) => {
+        if (!userEmail) return false;
+        const belongsToProj = record.projectId && userProjUuids.has(record.projectId);
+        const creator = String(record.createdBy || "").toLowerCase().trim();
+        return belongsToProj || creator === userEmail;
+      });
+
       setInvoices(
-        rows.map((record: any) => ({
+        filtered.map((record: any) => ({
           ...record,
           date: record.date ? String(record.date).slice(0, 10) : "",
           customerId: record.customerId || "",
@@ -230,12 +261,17 @@ export default function InvoiceBillListPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projects, userEmail]);
 
   useEffect(() => {
-    loadInvoices();
     loadDropdowns();
-  }, [loadInvoices, loadDropdowns]);
+  }, [loadDropdowns]);
+
+  useEffect(() => {
+    if (userEmail) {
+      loadInvoices();
+    }
+  }, [loadInvoices, userEmail]);
 
   // Filtered Invoices
   const filteredInvoices = invoices.filter((inv) => {
@@ -316,12 +352,13 @@ export default function InvoiceBillListPage() {
         date: formData.date,
         customerId: formData.customerId || undefined,
         projectId: formData.projectId || undefined,
-        projectTypeId: undefined,
+        projectTypeId: formData.projectTypeId || undefined,
         grandTotal,
         paidAmount: Number(formData.paidAmount) || 0,
         dueAmount,
         paymentMethod: formData.paymentMethod || "Cash",
         contentBody: formData.contentBody || undefined,
+        createdBy: userEmail || "Admin",
         items: invoiceItems.map((i) => ({
           itemId: i.itemId || undefined,
           itemName: i.itemName,
@@ -671,20 +708,15 @@ export default function InvoiceBillListPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Customer
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Customer"
                 value={formData.customerId}
-                onChange={(e) =>
-                  setFormData({ ...formData, customerId: e.target.value })
+                options={customers.map((c) => ({ value: c.uuid, label: c.name }))}
+                onChange={(val) =>
+                  setFormData({ ...formData, customerId: val })
                 }
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-              >
-                <option value="">Select Customer</option>
-                {customers.map((c) => (
-                  <option key={c.uuid} value={c.uuid}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>
@@ -703,40 +735,30 @@ export default function InvoiceBillListPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Project Type
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Project Type"
                 value={formData.projectTypeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectTypeId: e.target.value })
+                options={projectTypes.map((pt) => ({ value: pt.uuid, label: pt.name }))}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectTypeId: val })
                 }
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-              >
-                <option value="">Select Project Type</option>
-                {projectTypes.map((pt) => (
-                  <option key={pt.uuid} value={pt.uuid}>
-                    {pt.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Project <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
+                label=""
+                placeholder="Select Project"
                 value={formData.projectId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
+                options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectId: val })
                 }
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 
@@ -751,57 +773,45 @@ export default function InvoiceBillListPage() {
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Category
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  label=""
+                  placeholder="Select Category"
                   value={selectedCategoryId}
-                  onChange={(event) => {
-                    setSelectedCategoryId(event.target.value);
+                  options={categories.map((c) => ({ value: c.uuid, label: c.name }))}
+                  onChange={(val) => {
+                    setSelectedCategoryId(val);
                     setSelectedSubCategoryId("");
                   }}
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-emerald-600"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((category) => (
-                    <option key={category.uuid} value={category.uuid}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Sub Category
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  label=""
+                  placeholder="Select Sub Category"
                   value={selectedSubCategoryId}
-                  onChange={(event) =>
-                    setSelectedSubCategoryId(event.target.value)
-                  }
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-emerald-600"
-                >
-                  <option value="">Select Sub Category</option>
-                  {visibleSubCategories.map((subCategory) => (
-                    <option key={subCategory.uuid} value={subCategory.uuid}>
-                      {subCategory.name}
-                    </option>
-                  ))}
-                </select>
+                  options={visibleSubCategories.map((sc) => ({ value: sc.uuid, label: sc.name }))}
+                  onChange={(val) => setSelectedSubCategoryId(val)}
+                />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Select Item (Product / Material) <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 outline-none focus:border-emerald-600"
-                  defaultValue=""
-                  onChange={(event) => {
-                    const selected = items.find(
-                      (item) => item.uuid === event.target.value,
-                    );
+                <PredictiveSearchSelect
+                  label=""
+                  placeholder="+ Choose Item to append..."
+                  value=""
+                  options={items.map((i) => ({ value: i.uuid, label: i.name }))}
+                  onChange={(val) => {
+                    const selected = items.find((item) => item.uuid === val);
                     if (!selected) return;
                     const rawItem = selected.raw || {};
-                    const rate = Number(rawItem.sale_price || 0);
+                    const rate = Number(rawItem.sale_price || rawItem.rate || 100);
                     setInvoiceItems((current) => [
                       ...current,
                       {
@@ -817,16 +827,8 @@ export default function InvoiceBillListPage() {
                         amount: rate,
                       },
                     ]);
-                    event.currentTarget.value = "";
                   }}
-                >
-                  <option value="">+ Choose Item to append...</option>
-                  {items.map((i) => (
-                    <option key={i.uuid} value={i.uuid}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
           </div>

@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { Sparkles, Search, ChevronLeft, ChevronRight, Plus, Edit, Trash2, X, AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 import { crmFetch } from "../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -232,18 +233,21 @@ export default function RequirementTypePage() {
       <div className="p-4 md:p-5 rounded-2xl border border-border/80 bg-white shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-muted-foreground w-full sm:w-auto">
           <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 border rounded-xl bg-background border-border text-foreground font-black text-sm outline-none cursor-pointer"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
+          <div className="w-24">
+            <PredictiveSearchSelect
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              value={String(entriesPerPage)}
+              onChange={(val) => {
+                setEntriesPerPage(Number(val));
+                setCurrentPage(1);
+              }}
+              placeholder="10"
+            />
+          </div>
           <span>entries</span>
         </div>
 

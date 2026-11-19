@@ -5,6 +5,8 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, Search, ChevronLeft, ChevronRight, Navigation } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -12,7 +14,8 @@ const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 const getAuthHeaders = (): Record<string, string> => {
   const token =
     typeof window !== "undefined"
-      ? localStorage.getItem("share-project:access-token") ||
+      ? getStoredAccessToken() ||
+        localStorage.getItem("share-project:access-token") ||
         localStorage.getItem("token") ||
         localStorage.getItem("accessToken")
       : null;
@@ -43,6 +46,7 @@ export default function PropertyRoadPage() {
   const [editingItem, setEditingItem] = useState<ProjectRoad | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [entriesLimit, setEntriesLimit] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -58,15 +62,28 @@ export default function PropertyRoadPage() {
   });
 
   // ====================== FETCH LISTS ======================
-  const fetchRoads = async () => {
+  const fetchRoads = async (userProjectsList?: any[]) => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/land-infrastructure/roads`, {
+      const user = getStoredUser();
+      const cleanEmail = (user?.email || "").toLowerCase().trim();
+      const res = await fetch(`${API_PATH}/land-infrastructure/roads?page=1&limit=100`, {
         headers: getAuthHeaders(),
       });
       const json = await res.json();
-      if (json.success) {
-        setDataList((json.data?.data || json.data || []).filter((item: any) => !item.deletedAt));
+      if (json.success || json.data) {
+        const raw = json.data?.data || json.data || [];
+        const projs = userProjectsList || projects;
+        const validProjectIds = new Set(projs.map((p: any) => p.uuid));
+        const filtered = raw.filter((item: any) => {
+          if (item.deletedAt) return false;
+          if (validProjectIds.has(item.projectId)) return true;
+          const creator = String(item.createdBy || "").toLowerCase().trim();
+          if (creator === cleanEmail) return true;
+          const projCreator = String(item.project?.createdBy || item.project?.email || "").toLowerCase().trim();
+          return projCreator === cleanEmail;
+        });
+        setDataList(filtered);
       }
     } catch (err) {
       toast.error("Failed to load roads");
@@ -78,18 +95,29 @@ export default function PropertyRoadPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resProj = await fetch(`${API_PATH}/project`, {
+      const user = getStoredUser();
+      const cleanEmail = (user?.email || "").toLowerCase().trim();
+      const resProj = await fetch(`${API_PATH}/project?page=1&limit=100`, {
         headers: getAuthHeaders(),
       });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data?.data || jsonProj.data || []);
+      const allProjects = jsonProj.data?.data || jsonProj.data || [];
+      const userProjects = cleanEmail
+        ? allProjects.filter((p: any) => {
+            const creator = String(
+              p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || ""
+            ).toLowerCase().trim();
+            return creator === cleanEmail || creator === String(user?.id);
+          })
+        : [];
+      setProjects(userProjects);
+      fetchRoads(userProjects);
     } catch (err) {
       console.error("Error fetching dropdowns:", err);
     }
   };
 
   useEffect(() => {
-    fetchRoads();
     fetchDropdowns();
   }, []);
 
@@ -98,12 +126,15 @@ export default function PropertyRoadPage() {
     e.preventDefault();
     setSubmitting(true);
 
+    const user = getStoredUser();
+    const cleanEmail = (user?.email || "").toLowerCase().trim();
     const payload = {
       projectId: formData.projectId,
       kind: "road",
       name: formData.name,
       size: formData.size || null,
       details: formData.details || null,
+      createdBy: cleanEmail || "user",
     };
 
     try {
@@ -178,10 +209,14 @@ export default function PropertyRoadPage() {
   };
 
   // ====================== FILTERING & PAGINATION ======================
-  const filteredData = dataList.filter((item) =>
-    item.name?.toLowerCase().includes(search.toLowerCase()) ||
-    item.project?.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredData = dataList.filter((item) => {
+    if (selectedProjectId && item.projectId !== selectedProjectId) return false;
+    const q = search.toLowerCase();
+    return (
+      item.name?.toLowerCase().includes(q) ||
+      item.project?.name?.toLowerCase().includes(q)
+    );
+  });
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / entriesLimit));
   const startIndex = (currentPage - 1) * entriesLimit;
@@ -219,22 +254,42 @@ export default function PropertyRoadPage() {
 
         {/* Filter / Search Card */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-            <span>Show</span>
-            <select 
-              value={entriesLimit} 
-              onChange={(e) => {
-                setEntriesLimit(Number(e.target.value));
-                setCurrentPage(1);
-              }} 
-              className="h-9 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
-            <span>entries</span>
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">Project:</span>
+              <div className="w-56">
+                <PredictiveSearchSelect
+                  placeholder="All Projects"
+                  options={[
+                    { value: "", label: "All Projects" },
+                    ...projects.map((p) => ({ value: p.uuid, label: p.name })),
+                  ]}
+                  value={selectedProjectId}
+                  onChange={(val) => {
+                    setSelectedProjectId(val);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+              <span>Show</span>
+              <select 
+                value={entriesLimit} 
+                onChange={(e) => {
+                  setEntriesLimit(Number(e.target.value));
+                  setCurrentPage(1);
+                }} 
+                className="h-9 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span>entries</span>
+            </label>
+          </div>
 
           <div className="relative w-full sm:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -371,15 +426,13 @@ export default function PropertyRoadPage() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Project Name <span className="text-rose-500">*</span>
                 </label>
-                <select 
+                <PredictiveSearchSelect 
                   required 
+                  placeholder="Select Project..."
+                  options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
                   value={formData.projectId} 
-                  onChange={(e) => setFormData({ ...formData, projectId: e.target.value })} 
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                </select>
+                  onChange={(val) => setFormData({ ...formData, projectId: val })} 
+                />
               </div>
 
               <div>

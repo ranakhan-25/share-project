@@ -1,4 +1,5 @@
 'use client';
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 import React, { useState } from 'react';
 import { 
@@ -130,15 +131,12 @@ export default function GeneralLedger() {
                 Chart Of Account
               </label>
               <div className="relative">
-                <select 
-                  value={chartOfAccount} 
-                  onChange={(e) => setChartOfAccount(e.target.value)}
-                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-                >
-                  <option value="Select Chart Of Account">Select Chart Of Account</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Bank Accounts">Bank Accounts</option>
-                </select>
+                <PredictiveSearchSelect
+                options={[{"value":"Select Chart Of Account","label":"Select Chart Of Account"},{"value":"Cash","label":"Cash"},{"value":"Bank Accounts","label":"Bank Accounts"}]}
+                value={chartOfAccount}
+                onChange={(val: any) => (val)}
+                placeholder="Select Chart Of Account"
+              />
                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
@@ -173,15 +171,12 @@ export default function GeneralLedger() {
                 Project
               </label>
               <div className="relative">
-                <select 
-                  value={project} 
-                  onChange={(e) => setProject(e.target.value)}
-                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-                >
-                  <option value="Select Project">Select Project</option>
-                  <option value="Rifat Eyecon City">Rifat Eyecon City</option>
-                  <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
-                </select>
+                <PredictiveSearchSelect
+                options={[{"value":"Select Project","label":"Select Project"},{"value":"Rifat Eyecon City","label":"Rifat Eyecon City"},{"value":"Sheba Eyecon Tower","label":"Sheba Eyecon Tower"}]}
+                value={project}
+                onChange={(val: any) => (val)}
+                placeholder="Select Project"
+              />
                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
@@ -192,14 +187,12 @@ export default function GeneralLedger() {
                 Sitess
               </label>
               <div className="relative">
-                <select 
-                  value={sitess} 
-                  onChange={(e) => setSitess(e.target.value)}
-                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/50 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-                >
-                  <option value="Select Site">Select Site</option>
-                  <option value="Main Site">Main Site</option>
-                </select>
+                <PredictiveSearchSelect
+                options={[{"value":"Select Site","label":"Select Site"},{"value":"Main Site","label":"Main Site"}]}
+                value={sitess}
+                onChange={(val: any) => (val)}
+                placeholder="Select Site"
+              />
                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>

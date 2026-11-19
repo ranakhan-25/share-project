@@ -12,6 +12,7 @@ import {
   Loader2,
   Building2,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ---------- Types ----------
 export interface Department {
@@ -33,6 +34,17 @@ interface OptionItem {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 async function handleRes(res: Response, action: string) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -51,7 +63,7 @@ async function fetchDepartments(): Promise<{
   console.log("GET departments →", url);
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   const json = await handleRes(res, "fetch departments");
@@ -81,7 +93,7 @@ async function fetchEmployees(): Promise<OptionItem[]> {
 
     const res = await fetch(url, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -109,7 +121,7 @@ async function createDepartment(payload: Record<string, any>) {
   console.log("POST payload →", payload);
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/department`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleRes(res, "create department");
@@ -123,7 +135,7 @@ async function updateDepartment(uuid: string, payload: Record<string, any>) {
     `${API_BASE}/realbizpro/api/v1/department/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
   );
@@ -138,7 +150,7 @@ async function softDeleteDepartment(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/department/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   const json = await handleRes(res, "delete department");
@@ -152,7 +164,7 @@ async function restoreDepartment(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/department/${uuid}/restore`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   const json = await handleRes(res, "restore department");
@@ -232,20 +244,21 @@ function DepartmentFormModal({
             <label className="block text-xs font-medium text-slate-700 mb-1">
               Department Head
             </label>
-            <select
+            <PredictiveSearchSelect
               value={formData.departmentHeadId}
-              onChange={(e) =>
-                setFormData({ ...formData, departmentHeadId: e.target.value })
+              onChange={(value) =>
+                setFormData({ ...formData, departmentHeadId: value })
               }
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-            >
-              <option value="">Select value</option>
-              {employees.map((emp) => (
-                <option key={emp.uuid} value={emp.uuid}>
-                  {emp.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "Select Head (Optional)" },
+                ...employees.map((emp) => ({
+                  value: emp.uuid,
+                  label: emp.name,
+                })),
+              ]}
+              placeholder="Search employee..."
+              className="w-full"
+            />
           </div>
 
           {/* Department */}
@@ -439,18 +452,20 @@ export default function DepartmentListPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/70 p-3 rounded-xl border border-slate-200/60">
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => {
-                setEntriesPerPage(Number(e.target.value));
+            <PredictiveSearchSelect
+              value={String(entriesPerPage)}
+              onChange={(value) => {
+                setEntriesPerPage(Number(value) || 10);
                 setCurrentPage(1);
               }}
-              className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
           </div>
 

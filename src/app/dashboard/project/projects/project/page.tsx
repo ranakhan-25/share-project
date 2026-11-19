@@ -1,101 +1,87 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable prettier/prettier */
 "use client";
 
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ChevronRight, Plus, Search, Edit3, Trash2, Loader2 } from "lucide-react";
+import { ChevronRight, Plus, Edit3, Trash2, Loader2 } from "lucide-react";
 import api from "@/lib/api";
+import { getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import PredictiveSearchInput from "@/components/ui/PredictiveSearchInput";
 
 // ====================== TYPES ======================
 interface Project {
   id: string;
   uuid: string;
-  code: string;
   name: string;
+  code: string;
   projectType: string;
-  projectManager: string | null;
-  customer?: string | null;
-  budget?: number | string | null;
-  numberOfStoreys?: number | null;
-  description?: string | null;
-  location?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
+  areaCategory?: string;
+  location?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  totalBudget?: number;
+  budget?: number;
+  numberOfStoreys?: number;
   status: string;
-  areaCategory?: string | null;
   duration?: string;
+  projectManager?: string;
+  customer?: string;
+  createdBy?: string;
+  clientEmail?: string;
 }
 
 interface ProjectType {
   id: string;
   uuid: string;
-  code: string;
   name: string;
 }
 
-// ====================== STATIC DATA ======================
 const STATUSES = [
-  { label: "Active", value: "ACTIVE" },
-  { label: "Inactive", value: "INACTIVE" },
-  { label: "Complete", value: "COMPLETE" },
-  { label: "On Proposed", value: "ON_PROPOSED" },
-];
-
-const PROJECT_MANAGERS = [
-  "support sm",
-  "Ujjal Howlader",
-  "Md.Nayon",
-  "Md.Yeamin Sarder",
-  "Sheikh Moseddek Ahmed",
-  "Md.Arizul",
-  "Md.Delwar Hossain",
-  "Md.Humayun Kabir",
-  "Md.Rubel Hossain",
-  "Md.Selim Molla",
-  "Saimum Zami",
-  "Md. Afsar Mahmud Dewan",
-  "Md.Moniruzzaman",
-  "A.N.M Abdullah",
-  "Akash Bepari",
-  "Jeawl Haque Thitas",
-  "Md.Kawsar",
-  "Md. Abid Hasan",
-  "Riad Hossen",
+  { value: "PLANNING", label: "Planning" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "ON_HOLD", label: "On Hold" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
 ];
 
 const AREAS = [
-  "Aftab Nagor",
+  "Baridhara",
+  "Bashundhara",
+  "Dhanmondi",
+  "Gulshan",
   "Mirpur",
-  "Basundhara R/A",
-  "Jolshiri Abashon",
-  "Mirpur DOHS",
-  "Bashundhara R/A",
-  "Rayerbagh",
-  "Jolshiri",
+  "Mohakhali",
+  "Uttara",
 ];
 
-const USERS = [
-  "Admin",
-  "Tazmul Reza",
-  "Rasel Hosain",
-  "Mohin",
-  "Sarna",
-  "Rowza",
-  "Sarna11",
-  "Metro Engineering",
+const PROJECT_MANAGERS = [
+  "Rana Khan",
+  "Engr. Tariqul Islam Chowdhury",
+  "Md. Abdul Alim",
+  "Ar. Fahim Ahmed",
+  "Tanvir Hasan",
 ];
 
-// ====================== MAIN PAGE ======================
-export default function ProjectPage() {
+export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectTypes, setProjectTypes] = useState<ProjectType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Filters
+  // Active logged-in user for tenant isolation
+  const [storedUser, setStoredUser] = useState<any>(null);
+
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
+  // Filters State
   const [filters, setFilters] = useState({
     projectType: "",
     status: "",
@@ -104,7 +90,11 @@ export default function ProjectPage() {
     search: "",
   });
 
-  // Form state
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+
+  // Form State
   const [form, setForm] = useState({
     projectType: "",
     projectManager: "",
@@ -113,14 +103,12 @@ export default function ProjectPage() {
     description: "",
     budget: "",
     location: "",
-    status: "",
+    status: "ACTIVE",
     area: "",
     numberOfStoreys: "",
-    assignUser: "",
     startDate: "",
     endDate: "",
   });
-  const [submitting, setSubmitting] = useState(false);
 
   // ====================== FETCH PROJECT TYPES ======================
   const fetchProjectTypes = async () => {
@@ -128,11 +116,11 @@ export default function ProjectPage() {
       const res = await api.get("/project-type?page=1&limit=100");
       const json = res.data;
       if (json && (json.success || json.data)) {
-        const list = Array.isArray(json.data) ? json.data : json.data?.data || [];
-        setProjectTypes(list);
+        const rows = Array.isArray(json.data) ? json.data : json.data?.data || [];
+        setProjectTypes(rows);
       }
     } catch (err) {
-      console.error("Failed to fetch project types:", err);
+      console.error(err);
     }
   };
 
@@ -144,7 +132,27 @@ export default function ProjectPage() {
       const json = res.data;
       if (json && (json.success || json.data)) {
         const rows = Array.isArray(json.data) ? json.data : json.data?.data || [];
-        const mapped = rows.map((p: any) => ({
+
+        // Strict isolation by logged in user email
+        const userScoped = userEmail
+          ? rows.filter((p: any) => {
+              const creator = String(p.createdBy || "").toLowerCase().trim();
+              const client = String(p.clientEmail || "").toLowerCase().trim();
+              const manager = String(p.projectManager || "").toLowerCase().trim();
+              const emailField = String(p.email || p.userEmail || "").toLowerCase().trim();
+              return (
+                creator === userEmail ||
+                client === userEmail ||
+                manager === userEmail ||
+                emailField === userEmail ||
+                creator === String(storedUser?.id) ||
+                (storedUser?.username &&
+                  creator === storedUser.username.toLowerCase())
+              );
+            })
+          : [];
+
+        const mapped = userScoped.map((p: any) => ({
           ...p,
           duration:
             p.startDate || p.endDate
@@ -166,7 +174,7 @@ export default function ProjectPage() {
   useEffect(() => {
     fetchProjects();
     fetchProjectTypes();
-  }, []);
+  }, [userEmail]);
 
   // ====================== HELPERS ======================
   function formatDate(dateStr: string) {
@@ -191,10 +199,9 @@ export default function ProjectPage() {
       description: "",
       budget: "",
       location: "",
-      status: "",
+      status: "ACTIVE",
       area: "",
       numberOfStoreys: "",
-      assignUser: "",
       startDate: "",
       endDate: "",
     });
@@ -210,39 +217,35 @@ export default function ProjectPage() {
       code: project.code || "",
       name: project.name || "",
       description: project.description || "",
-      budget: project.budget ? String(project.budget) : "",
+      budget: project.budget !== undefined && project.budget !== null ? String(project.budget) : "",
       location: project.location || "",
-      status: project.status || "",
+      status: project.status || "ACTIVE",
       area: project.areaCategory || "",
-      numberOfStoreys: project.numberOfStoreys
-        ? String(project.numberOfStoreys)
-        : "",
-      assignUser: "",
-      startDate: project.startDate || "",
-      endDate: project.endDate || "",
+      numberOfStoreys: project.numberOfStoreys !== undefined && project.numberOfStoreys !== null ? String(project.numberOfStoreys) : "",
+      startDate: project.startDate ? project.startDate.split("T")[0] : "",
+      endDate: project.endDate ? project.endDate.split("T")[0] : "",
     });
     setIsModalOpen(true);
   };
 
   // ====================== DELETE ======================
   const handleDelete = async (project: Project) => {
+    if (!confirm(`Are you sure you want to delete "${project.name}"?`)) return;
     try {
       setDeletingId(project.uuid);
       await api.delete(`/project/${project.uuid}`);
       setProjects((prev) => prev.filter((p) => p.uuid !== project.uuid));
     } catch (err: any) {
-      console.error(err);
       alert(err.message || "Failed to delete project");
     } finally {
       setDeletingId(null);
     }
   };
 
-  // ====================== FORM CHANGE ======================
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -253,7 +256,7 @@ export default function ProjectPage() {
     e.preventDefault();
     setSubmitting(true);
 
-    const payload = {
+    const payload: any = {
       code: form.code,
       name: form.name,
       projectType: form.projectType,
@@ -268,9 +271,16 @@ export default function ProjectPage() {
       status: form.status || "ACTIVE",
     };
 
+    if (!editingProject && userEmail) {
+      payload.createdBy = userEmail;
+      payload.clientEmail = userEmail;
+    }
+
     try {
       if (editingProject) {
-        await api.patch(`/project/${editingProject.uuid}`, payload).catch(() => api.put(`/project/${editingProject.uuid}`, payload));
+        await api
+          .patch(`/project/${editingProject.uuid}`, payload)
+          .catch(() => api.put(`/project/${editingProject.uuid}`, payload));
       } else {
         await api.post("/project", payload);
       }
@@ -283,40 +293,57 @@ export default function ProjectPage() {
     }
   };
 
-  // ====================== FILTERED DATA ======================
-  const filtered = projects.filter((p) => {
-    if (filters.projectType && p.projectType !== filters.projectType)
-      return false;
-    if (filters.status && p.status !== filters.status) return false;
-    if (filters.area && p.areaCategory !== filters.area) return false;
-    if (
-      filters.numberOfStoreys &&
-      String(p.numberOfStoreys) !== filters.numberOfStoreys
-    )
-      return false;
-    if (filters.search) {
-      const s = filters.search.toLowerCase();
-      return (
-        p.name?.toLowerCase().includes(s) ||
-        p.code?.toLowerCase().includes(s) ||
-        p.projectManager?.toLowerCase().includes(s)
-      );
-    }
-    return true;
-  });
+  // Predictive search suggestions extracted from live dataset
+  const predictiveSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    projects.forEach((p) => {
+      if (p.name) set.add(p.name);
+      if (p.code) set.add(p.code);
+      if (p.projectManager) set.add(p.projectManager);
+      if (p.location) set.add(p.location);
+    });
+    return Array.from(set).slice(0, 30);
+  }, [projects]);
 
-  // ====================== RENDER ======================
+  // ====================== FILTERED DATA ======================
+  const filtered = useMemo(() => {
+    return projects.filter((p) => {
+      if (filters.projectType && p.projectType !== filters.projectType)
+        return false;
+      if (filters.status && p.status !== filters.status) return false;
+      if (filters.area && p.areaCategory !== filters.area) return false;
+      if (
+        filters.numberOfStoreys &&
+        String(p.numberOfStoreys) !== filters.numberOfStoreys
+      )
+        return false;
+      if (filters.search) {
+        const s = filters.search.toLowerCase();
+        return (
+          p.name?.toLowerCase().includes(s) ||
+          p.code?.toLowerCase().includes(s) ||
+          p.projectManager?.toLowerCase().includes(s) ||
+          p.location?.toLowerCase().includes(s)
+        );
+      }
+      return true;
+    });
+  }, [projects, filters]);
+
   return (
-    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
-              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Home</span>
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">
+                Home
+              </span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Project</span>
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">
+                Project
+              </span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
               <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
                 Project
@@ -325,184 +352,148 @@ export default function ProjectPage() {
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
               Project List
             </h1>
+            {userEmail && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                Filtered for account: <strong className="text-emerald-700">{userEmail}</strong>
+              </p>
+            )}
           </div>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 hover:shadow-sm active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>+ Create Project</span>
           </button>
         </div>
 
-        {/* ====================== FILTERS ====================== */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* ====================== FILTERS WITH PREDICTIVE SEARCH ====================== */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Project Type
             </label>
-            <select
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+            <PredictiveSearchSelect
               value={filters.projectType}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, projectType: e.target.value }))
+              onChange={(val) =>
+                setFilters((prev) => ({ ...prev, projectType: val }))
               }
-            >
-              <option value="">All Types</option>
-              {projectTypes.map((t) => (
-                <option key={t.uuid} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+              placeholder="All Types"
+              options={projectTypes.map((t) => ({
+                value: t.name,
+                label: t.name,
+              }))}
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Status
             </label>
-            <select
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+            <PredictiveSearchSelect
               value={filters.status}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, status: e.target.value }))
+              onChange={(val) =>
+                setFilters((prev) => ({ ...prev, status: val }))
               }
-            >
-              <option value="">All Status</option>
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              placeholder="All Status"
+              options={STATUSES}
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Area
             </label>
-            <select
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
+            <PredictiveSearchSelect
               value={filters.area}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, area: e.target.value }))
-              }
-            >
-              <option value="">Select Area</option>
-              {AREAS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setFilters((prev) => ({ ...prev, area: val }))}
+              placeholder="All Areas"
+              options={AREAS.map((a) => ({ value: a, label: a }))}
+            />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Number Of Storeys
+              Predictive Search
             </label>
-            <select
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-              value={filters.numberOfStoreys}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  numberOfStoreys: e.target.value,
-                }))
+            <PredictiveSearchInput
+              value={filters.search}
+              onChange={(val) =>
+                setFilters((prev) => ({ ...prev, search: val }))
               }
-            >
-              <option value="">All Storeys</option>
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="59">59</option>
-              <option value="70">70</option>
-            </select>
+              placeholder="Type project name, code, manager..."
+              suggestions={predictiveSuggestions}
+            />
           </div>
         </div>
 
-        {/* ====================== TABLE CONTAINER ====================== */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
-          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-blue-700 active:scale-95">
-                Copy
-              </button>
-              <button className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-amber-700 active:scale-95">
-                CSV
-              </button>
-              <span className="text-xs sm:text-sm text-slate-600 ml-2">
-                Show{" "}
-                <select className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-800 outline-none">
-                  <option>10</option>
-                  <option>25</option>
-                  <option>50</option>
-                </select>{" "}
-                entries
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button className="h-9 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50">
-                Select Columns ▾
-              </button>
-              <div className="relative w-48 sm:w-60">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10"
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, search: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
+        {/* ====================== TABLE ====================== */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
           {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto min-h-[300px]">
-                <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
-                  <thead>
-                    <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">ID</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">DURATION</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">PROJECT TYPE</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">PROJECT MANAGER</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">CUSTOMER</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">CODE</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">NAME</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">BUDGET</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">NUMBER OF STOREYS</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">DESCRIPTION</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">LOCATION</th>
-                      <th className="px-4 py-3.5 font-semibold text-white text-center tracking-wide">ACTION</th>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead className="bg-emerald-600 text-[11px] font-semibold uppercase tracking-wider text-white">
+                    <tr>
+                      <th className="px-4 py-3.5">SL</th>
+                      <th className="px-4 py-3.5">Status</th>
+                      <th className="px-4 py-3.5">Duration</th>
+                      <th className="px-4 py-3.5">Project Type</th>
+                      <th className="px-4 py-3.5">Manager</th>
+                      <th className="px-4 py-3.5">Customer</th>
+                      <th className="px-4 py-3.5">Code</th>
+                      <th className="px-4 py-3.5">Project Name</th>
+                      <th className="px-4 py-3.5">Budget (৳)</th>
+                      <th className="px-4 py-3.5">Storeys</th>
+                      <th className="px-4 py-3.5">Description</th>
+                      <th className="px-4 py-3.5">Location</th>
+                      <th className="px-4 py-3.5 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
+                  <tbody className="divide-y divide-slate-100 bg-white">
                     {filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="text-center py-16 text-slate-400">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <p className="text-sm font-medium">No data available in table</p>
-                          </div>
+                        <td
+                          colSpan={13}
+                          className="px-4 py-12 text-center text-slate-400 text-xs"
+                        >
+                          No project records found.
                         </td>
                       </tr>
                     ) : (
-                      filtered.map((p) => (
-                        <tr key={p.uuid} className="hover:bg-indigo-50/30 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-slate-900">{p.id}</td>
-                          <td className="px-4 py-3 text-slate-600">{p.duration || "—"}</td>
-                          <td className="px-4 py-3 text-slate-700">{p.projectType}</td>
-                          <td className="px-4 py-3 text-slate-700">{p.projectManager || "—"}</td>
-                          <td className="px-4 py-3 text-slate-700">{p.customer || "—"}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-600">{p.code}</td>
-                          <td className="px-4 py-3 font-bold text-indigo-600">
+                      filtered.map((p, idx) => (
+                        <tr
+                          key={p.uuid}
+                          className="hover:bg-emerald-50/40 transition-colors"
+                        >
+                          <td className="px-4 py-3 text-slate-500 font-medium">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {p.status || "ACTIVE"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">
+                            {p.duration}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 font-medium">
+                            {p.projectType}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {p.projectManager || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {p.customer || "—"}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs font-semibold text-emerald-800">
+                            {p.code}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-emerald-700">
                             <Link
                               href={`/dashboard/project/projects/project/project-details/${p.uuid}`}
                               className="hover:underline"
@@ -510,29 +501,38 @@ export default function ProjectPage() {
                               {p.name}
                             </Link>
                           </td>
-                          <td className="px-4 py-3 font-bold text-emerald-600">{p.budget ? Number(p.budget).toLocaleString() : "—"}</td>
-                          <td className="px-4 py-3 text-slate-700">{p.numberOfStoreys || "—"}</td>
-                          <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{p.description || "—"}</td>
-                          <td className="px-4 py-3 text-slate-600">{p.location || "—"}</td>
+                          <td className="px-4 py-3 font-bold font-mono text-emerald-700">
+                            {p.budget ? `৳${Number(p.budget).toLocaleString()}` : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {p.numberOfStoreys || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
+                            {p.description || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {p.location || "—"}
+                          </td>
                           <td className="px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-1.5">
-                              {/* Edit Button */}
                               <button
                                 onClick={() => handleEdit(p)}
-                                className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95"
+                                className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600 transition hover:bg-emerald-100 active:scale-95"
                                 title="Edit"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
                               </button>
-
-                              {/* Delete Button */}
                               <button
                                 onClick={() => handleDelete(p)}
                                 disabled={deletingId === p.uuid}
                                 className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95 disabled:opacity-50"
                                 title="Delete"
                               >
-                                {deletingId === p.uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                {deletingId === p.uuid ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
                               </button>
                             </div>
                           </td>
@@ -549,21 +549,9 @@ export default function ProjectPage() {
                   Showing {filtered.length > 0 ? 1 : 0} to {filtered.length} of {filtered.length} entries
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <button
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
-                    disabled
-                  >
-                    Previous
-                  </button>
-                  <button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold shadow-2xs">
-                    1
-                  </button>
-                  <button
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 cursor-not-allowed"
-                    disabled
-                  >
-                    Next
-                  </button>
+                  <span className="rounded-lg bg-emerald-600 px-3 py-1 text-white font-semibold shadow-2xs">
+                    Page 1
+                  </span>
                 </div>
               </div>
             </>
@@ -573,110 +561,75 @@ export default function ProjectPage() {
 
       {/* ====================== MODAL ====================== */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl">
-            {/* Modal Header */}
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 backdrop-blur-2xs">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
             <div className="flex justify-between items-center px-6 py-4 border-b">
-              <h2 className="text-lg font-semibold">
-                {editingProject ? "Edit Project" : "Project Add"}
+              <h2 className="text-lg font-bold text-slate-900">
+                {editingProject ? "Edit Project" : "Add Project"}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
               >
                 ×
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {/* Project Type */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Project Type
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
+                    Project Type * (Predictive Select)
                   </label>
-                  <select
-                    name="projectType"
+                  <PredictiveSearchSelect
                     value={form.projectType}
-                    onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    onChange={(val) => setForm((prev) => ({ ...prev, projectType: val }))}
+                    placeholder="Select Type"
+                    options={projectTypes.map((t) => ({ value: t.name, label: t.name }))}
                     required
-                  >
-                    <option value="">Select Project Type</option>
-                    {projectTypes.map((t) => (
-                      <option key={t.uuid} value={t.name}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
-                {/* Project Manager */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Project Manager
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
+                    Project Manager (Predictive Select)
                   </label>
-                  <select
-                    name="projectManager"
+                  <PredictiveSearchSelect
                     value={form.projectManager}
-                    onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="">Select Project Manager</option>
-                    {PROJECT_MANAGERS.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm((prev) => ({ ...prev, projectManager: val }))}
+                    placeholder="Select Manager"
+                    options={PROJECT_MANAGERS.map((m) => ({ value: m, label: m }))}
+                  />
                 </div>
 
-                {/* Code */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Code</label>
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">Code</label>
                   <input
                     name="code"
                     value={form.code}
                     onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50"
+                    className="h-10 w-full border border-slate-200 rounded-xl px-3 text-xs bg-slate-50 font-mono font-medium"
                     readOnly={!editingProject}
                   />
                 </div>
 
-                {/* Project Name */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Project Name
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
+                    Project Name *
                   </label>
                   <input
                     name="name"
                     value={form.name}
                     onChange={handleChange}
-                    placeholder="Name"
-                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    placeholder="Project Name"
+                    className="h-10 w-full border border-slate-200 rounded-xl px-3 text-xs"
                     required
                   />
                 </div>
 
-                {/* Description */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Description
-                  </label>
-                  <input
-                    name="description"
-                    value={form.description}
-                    onChange={handleChange}
-                    placeholder="Description"
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  />
-                </div>
-
-                {/* Budget */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Budget
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
+                    Budget (৳)
                   </label>
                   <input
                     name="budget"
@@ -684,13 +637,12 @@ export default function ProjectPage() {
                     value={form.budget}
                     onChange={handleChange}
                     placeholder="Budget"
-                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    className="h-10 w-full border border-slate-200 rounded-xl px-3 text-xs font-mono"
                   />
                 </div>
 
-                {/* Location */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
                     Location
                   </label>
                   <input
@@ -698,51 +650,36 @@ export default function ProjectPage() {
                     value={form.location}
                     onChange={handleChange}
                     placeholder="Location"
-                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    className="h-10 w-full border border-slate-200 rounded-xl px-3 text-xs"
                   />
                 </div>
 
-                {/* Status */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Status
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
+                    Status (Predictive Select)
                   </label>
-                  <select
-                    name="status"
+                  <PredictiveSearchSelect
                     value={form.status}
-                    onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="">Select Status</option>
-                    {STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
+                    placeholder="Select Status"
+                    options={STATUSES}
+                  />
                 </div>
 
-                {/* Area */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Area</label>
-                  <select
-                    name="area"
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
+                    Area (Predictive Select)
+                  </label>
+                  <PredictiveSearchSelect
                     value={form.area}
-                    onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="">Select Area</option>
-                    {AREAS.map((a) => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm((prev) => ({ ...prev, area: val }))}
+                    placeholder="Select Area"
+                    options={AREAS.map((a) => ({ value: a, label: a }))}
+                  />
                 </div>
 
-                {/* Number of Storeys */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
                     Number of Storeys
                   </label>
                   <input
@@ -750,75 +687,67 @@ export default function ProjectPage() {
                     type="number"
                     value={form.numberOfStoreys}
                     onChange={handleChange}
-                    placeholder="Number of Storeys"
-                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    placeholder="e.g. 10"
+                    className="h-10 w-full border border-slate-200 rounded-xl px-3 text-xs"
                   />
                 </div>
 
-                {/* Assign User */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Assign User
-                  </label>
-                  <select
-                    name="assignUser"
-                    value={form.assignUser}
-                    onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="">Select User</option>
-                    {USERS.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Start Date */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
                     Start Date
                   </label>
                   <input
-                    name="startDate"
                     type="date"
+                    name="startDate"
                     value={form.startDate}
                     onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    className="h-10 w-full border border-slate-200 rounded-xl px-3 text-xs"
                   />
                 </div>
 
-                {/* End Date */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
                     End Date
                   </label>
                   <input
-                    name="endDate"
                     type="date"
+                    name="endDate"
                     value={form.endDate}
                     onChange={handleChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    className="h-10 w-full border border-slate-200 rounded-xl px-3 text-xs"
+                  />
+                </div>
+
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-semibold mb-1 text-slate-700">
+                    Description
+                  </label>
+                  <textarea
+                    name="description"
+                    value={form.description}
+                    onChange={handleChange}
+                    rows={2}
+                    placeholder="Project description..."
+                    className="w-full border border-slate-200 rounded-xl p-3 text-xs"
                   />
                 </div>
               </div>
 
-              {/* Footer Buttons */}
-              <div className="flex justify-end gap-3 mt-8">
+              <div className="flex justify-end gap-2 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Close
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md disabled:opacity-60"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                 >
-                  {submitting ? "Saving..." : "Submit"}
+                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{submitting ? "Saving..." : "Save Project"}</span>
                 </button>
               </div>
             </form>

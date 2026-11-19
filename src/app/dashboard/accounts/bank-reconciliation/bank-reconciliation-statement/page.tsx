@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { ChevronDown, X, ArrowUpDown, Loader2 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const getAuthHeaders = () => {
   const token = typeof window !== 'undefined'
@@ -53,6 +54,35 @@ export default function BankReconciliationPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
+  const [accountOptions, setAccountOptions] = useState<{ value: string; label: string }[]>([
+    { value: "Cash", label: "Cash" },
+    { value: "Bank", label: "Bank Account" },
+  ]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/backend/chart-of-accounts", {
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => ({}));
+        const list = json?.data?.data || json?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          setAccountOptions([
+            { value: "Cash", label: "Cash" },
+            { value: "Bank", label: "Bank Account" },
+            ...list.map((c: any) => ({
+              value: c.name || c.uuid || String(c.id),
+              label: `${c.name || 'Account'} (${c.code || 'COA'})`,
+            }))
+          ]);
+        }
+      } catch (err) {
+        console.error("Reconciliation COA load error", err);
+      }
+    })();
+  }, []);
 
   const [items, setItems] = useState<ReconciliationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,30 +231,27 @@ export default function BankReconciliationPage() {
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Chart Of Account
               </label>
-              <select
+              <PredictiveSearchSelect
                 value={chartOfAccount}
-                onChange={(e) => setChartOfAccount(e.target.value)}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-              >
-                <option value="">Select value</option>
-                <option value="Cash">Cash</option>
-                <option value="Bank">Bank Account</option>
-              </select>
+                onChange={(val) => setChartOfAccount(val)}
+                options={accountOptions}
+                placeholder="Select value"
+              />
             </div>
 
             <div>
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                 Type
               </label>
-              <select
+              <PredictiveSearchSelect
                 value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-              >
-                <option value="">Select One Option</option>
-                <option value="Deposit">Deposit</option>
-                <option value="Withdrawal">Withdrawal</option>
-              </select>
+                onChange={(val) => setTypeFilter(val)}
+                options={[
+                  { value: "Deposit", label: "Deposit" },
+                  { value: "Withdrawal", label: "Withdrawal" },
+                ]}
+                placeholder="Select One Option"
+              />
             </div>
 
             <div>
@@ -250,15 +277,17 @@ export default function BankReconciliationPage() {
         <div className="bg-white dark:bg-slate-900 rounded-t border border-b-0 border-slate-200 dark:border-slate-800 p-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-              className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-0.5 outline-none"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+            <PredictiveSearchSelect
+              value={String(entriesPerPage)}
+              onChange={(val) => setEntriesPerPage(Number(val))}
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
           </div>
 

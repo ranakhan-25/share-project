@@ -14,7 +14,8 @@ import {
   CheckCircle2, AlertTriangle, Ban, Eye, Edit, Trash2, RefreshCw, 
   Undo2, AlertCircle, Loader2, CalendarDays,
 } from "lucide-react";
-import { getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 /* ==========================================================================
    API CONFIG & TYPES
@@ -167,6 +168,7 @@ function normalize(value: any): ProjectAgreement {
 }
 
 function toPayload(form: AgreementForm, isCreate: boolean) {
+  const user = getStoredUser();
   return {
     // ✅ projectUuid সবসময় পাঠাবে (তৈরির সময়)
     ...(isCreate ? { projectUuid: form.projectUuid.trim(), agreementCode: form.code.trim() } : {}),
@@ -179,6 +181,7 @@ function toPayload(form: AgreementForm, isCreate: boolean) {
     status: form.status,
     ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
     ...(form.agreementFile.trim() ? { agreementFile: form.agreementFile.trim() } : {}),
+    createdBy: user?.email || "sharetest@realbiz.com",
   };
 }
 
@@ -207,11 +210,18 @@ const api = {
   },
 
   // ✅ অটো projectUuid জেনারেট করার জন্য
-  projects: async (): Promise<string | null> => {
+  projects: async (userEmail?: string): Promise<string | null> => {
     try {
-      const response = await request("/project?limit=1");
+      const response = await request("/project?limit=100");
       const list = unwrapList(response);
-      if (list.length > 0) return String(list[0].uuid ?? list[0].id ?? "");
+      const email = (userEmail || getStoredUser()?.email || "").toLowerCase().trim();
+      const userProjects = email
+        ? list.filter((p: any) => {
+            const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || "").toLowerCase().trim();
+            return creator === email;
+          })
+        : list;
+      if (userProjects.length > 0) return String(userProjects[0].uuid ?? userProjects[0].id ?? "");
       return null;
     } catch {
       return null;
@@ -288,6 +298,10 @@ function AgreementsInner() {
   const searchParams = useSearchParams();
   const projectUuid = searchParams.get("projectUuid") || undefined;
 
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [items, setItems] = useState<ProjectAgreement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -312,13 +326,20 @@ function AgreementsInner() {
     setLoading(true);
     setError(null);
     try {
-      setItems(await api.list(projectUuid));
+      const allAgreements = await api.list(projectUuid);
+      const filtered = userEmail
+        ? allAgreements.filter((item: any) => {
+            const creator = String(item.createdBy || item.email || item.userEmail || item.clientEmail || "").toLowerCase().trim();
+            return creator === userEmail || !creator || creator === String(storedUser?.id);
+          })
+        : [];
+      setItems(filtered);
     } catch (err: any) {
       setError(err.message || "Failed to load agreements");
     } finally {
       setLoading(false);
     }
-  }, [projectUuid]);
+  }, [projectUuid, userEmail, storedUser]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -372,7 +393,7 @@ function AgreementsInner() {
     // ✅ অটো projectUuid (যদি ফর্মে ফাঁকা থাকে)
     let finalProjectUuid = form.projectUuid.trim();
     if (!finalProjectUuid) {
-      const autoUuid = await api.projects();
+      const autoUuid = await api.projects(userEmail);
       if (autoUuid) {
         finalProjectUuid = autoUuid;
       } else {
@@ -486,14 +507,28 @@ function AgreementsInner() {
       <div className="overflow-hidden rounded-3xl bg-white shadow-xl shadow-slate-200/60 ring-1 ring-slate-200/70">
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={`${inputCls} !w-auto`}>
-              <option value="All">All Types</option>
-              {Object.keys(typeLabel).map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${inputCls} !w-auto`}>
-              <option value="All">All Statuses</option>
-              {Object.keys(statusMeta).map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <div className="w-36">
+              <PredictiveSearchSelect
+                placeholder="All Types"
+                options={[
+                  { value: 'All', label: 'All Types' },
+                  ...Object.keys(typeLabel).map((t) => ({ value: t, label: t })),
+                ]}
+                value={typeFilter}
+                onChange={(val) => setTypeFilter(val)}
+              />
+            </div>
+            <div className="w-36">
+              <PredictiveSearchSelect
+                placeholder="All Statuses"
+                options={[
+                  { value: 'All', label: 'All Statuses' },
+                  ...Object.keys(statusMeta).map((s) => ({ value: s, label: s })),
+                ]}
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val)}
+              />
+            </div>
           </div>
           <div className="relative w-full lg:w-80">
             <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
@@ -566,25 +601,33 @@ function AgreementsInner() {
               <div><label className={labelCls}>Agreement Code *</label><input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className={inputCls} placeholder="AGR-001" /></div>
               <div>
                 <label className={labelCls}>Status *</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as AgreementStatus })} className={inputCls}>
-                  {Object.keys(statusMeta).map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <PredictiveSearchSelect
+                  placeholder="Select Status..."
+                  options={Object.keys(statusMeta).map((s) => ({ value: s, label: s }))}
+                  value={form.status}
+                  onChange={(val) => setForm({ ...form, status: val as AgreementStatus })}
+                />
               </div>
             </div>
             
             <div>
               <label className={labelCls}>Party *</label>
-              <select required value={form.partyUuid} onChange={(e) => setForm({ ...form, partyUuid: e.target.value })} className={inputCls}>
-                <option value="">Select party...</option>
-                {parties.map((p) => <option key={p.uuid} value={p.uuid}>{p.label}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select party..."
+                options={parties.map((p) => ({ value: p.uuid, label: p.label }))}
+                value={form.partyUuid}
+                onChange={(val) => setForm({ ...form, partyUuid: val })}
+              />
             </div>
 
             <div>
               <label className={labelCls}>Agreement Type *</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AgreementType })} className={inputCls}>
-                {Object.keys(typeLabel).map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                placeholder="Select Agreement Type..."
+                options={Object.keys(typeLabel).map((t) => ({ value: t, label: t }))}
+                value={form.type}
+                onChange={(val) => setForm({ ...form, type: val as AgreementType })}
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-3">

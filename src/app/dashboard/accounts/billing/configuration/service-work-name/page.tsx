@@ -14,6 +14,21 @@ import {
   Loader2,
   Save,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+
+// ==================== CONSTANTS ====================
+const UNIT_OPTIONS = [
+  { value: "Sft", label: "Sft" },
+  { value: "Cft", label: "Cft" },
+  { value: "Rft", label: "Rft" },
+  { value: "Set", label: "Set" },
+  { value: "Bag", label: "Bag" },
+  { value: "Kg", label: "Kg" },
+  { value: "Job", label: "Job" },
+  { value: "Day labour", label: "Day labour" },
+  { value: "Nos", label: "Nos" },
+  { value: "Pcs", label: "Pcs" },
+];
 
 // ==================== TYPES ====================
 export interface ServiceWorkName {
@@ -54,6 +69,19 @@ const CATEGORY_API = `${API_BASE_URL}${API_PREFIX}/category`;
 const SUB_CATEGORY_API = `${API_BASE_URL}${API_PREFIX}/billing-sub-category`;
 const PROJECT_API = `${API_BASE_URL}${API_PREFIX}/project`;
 
+const getAuthHeaders = () => {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("share-project:access-token")
+      : "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ==================== HELPERS ====================
 const generateCode = () => {
   const rand = Math.floor(1000 + Math.random() * 9000);
@@ -73,7 +101,6 @@ const toYMD = (d?: string | null) => {
 };
 
 // ==================== API PAYLOAD BUILDER ====================
-// Backend DTO onujayi — screenshot er schema
 const toApiPayload = (data: {
   projectId: string;
   code: string;
@@ -87,10 +114,10 @@ const toApiPayload = (data: {
   description?: string;
 }) => ({
   projectId: data.projectId,
-  title: data.name, // name → title
+  title: data.name,
   code: data.code,
   recordDate: toYMD(new Date().toISOString()),
-  amount: Number(data.purchasePrice) || 0, // cost → amount
+  amount: Number(data.purchasePrice) || 0,
   status: "active",
   description: data.description || "",
   details: {
@@ -101,7 +128,6 @@ const toApiPayload = (data: {
     unit: data.unit || "",
     brand: data.brand || "",
   },
-  // ❌ additionalProp: {},  — backend ei field reject korche
 });
 
 // ==================== GENERIC OPTIONS FETCHER ====================
@@ -113,7 +139,7 @@ async function fetchRelatedOptions(
     const query = new URLSearchParams({ page: "1", limit: "100" });
     const res = await fetch(`${endpoint}?${query}`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
     if (!res.ok) {
@@ -128,7 +154,7 @@ async function fetchRelatedOptions(
       [];
     return Array.isArray(rows)
       ? rows
-          .filter((row: any) => row?.uuid)
+          .filter((row: any) => row?.uuid && !row.deletedAt && !row.deleted_at)
           .map((row: any) => ({
             uuid: String(row.uuid),
             name: String(
@@ -152,7 +178,7 @@ async function fetchProjects(): Promise<ProjectOption[]> {
     const query = new URLSearchParams({ page: "1", limit: "100" });
     const res = await fetch(`${PROJECT_API}?${query}`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
     if (!res.ok) {
@@ -164,7 +190,7 @@ async function fetchProjects(): Promise<ProjectOption[]> {
       json?.data?.data ?? (Array.isArray(json?.data) ? json.data : null) ?? [];
     return Array.isArray(rows)
       ? rows
-          .filter((p: any) => p?.uuid)
+          .filter((p: any) => p?.uuid && !p.deletedAt && !p.deleted_at)
           .map((p: any) => ({
             uuid: String(p.uuid),
             name: String(p.name || p.projectName || p.code || "Unnamed"),
@@ -181,7 +207,7 @@ async function fetchServiceWorkNames(): Promise<ServiceWorkName[]> {
   const query = new URLSearchParams({ page: "1", limit: "100" });
   const res = await fetch(`${SERVICE_WORK_NAME_API}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -194,41 +220,42 @@ async function fetchServiceWorkNames(): Promise<ServiceWorkName[]> {
   const rows = json?.data?.data ?? json?.data ?? [];
 
   return Array.isArray(rows)
-    ? rows.map((item: any) => {
-        const details = item.details || {};
-        return {
-          id: item.id ?? item.uuid,
-          uuid: item.uuid,
-          projectId: item.projectId || item.project?.uuid || "",
-          productType: item.productType || "Service",
-          code: item.code || "",
-          name: item.title || item.name || "",
-          purchasePrice: Number(details.purchasePrice ?? item.amount ?? 0),
-          salePrice: Number(details.salePrice ?? 0),
-          categoryId: details.categoryId || item.categoryId || "",
-          categoryName:
-            item.category?.name ||
-            details.categoryName ||
-            details.categoryId ||
-            "",
-          subCategoryId: details.subCategoryId || item.subCategoryId || "",
-          subCategoryName:
-            item.subCategory?.name ||
-            details.subCategoryName ||
-            details.subCategoryId ||
-            "",
-          unit: details.unit || item.unit || "",
-          brand: details.brand || item.brand || "",
-        };
-      })
+    ? rows
+        .filter((item: any) => !item.deletedAt && !item.deleted_at)
+        .map((item: any) => {
+          const details = item.details || {};
+          return {
+            id: item.id ?? item.uuid,
+            uuid: item.uuid,
+            projectId: item.projectId || item.project?.uuid || "",
+            productType: item.productType || "Service",
+            code: item.code || "",
+            name: item.title || item.name || "",
+            purchasePrice: Number(details.purchasePrice ?? item.amount ?? 0),
+            salePrice: Number(details.salePrice ?? 0),
+            categoryId: details.categoryId || item.categoryId || "",
+            categoryName:
+              item.category?.name ||
+              details.categoryName ||
+              details.categoryId ||
+              "",
+            subCategoryId: details.subCategoryId || item.subCategoryId || "",
+            subCategoryName:
+              item.subCategory?.name ||
+              details.subCategoryName ||
+              details.subCategoryId ||
+              "",
+            unit: details.unit || item.unit || "",
+            brand: details.brand || item.brand || "",
+          };
+        })
     : [];
 }
 
 async function createServiceWorkName(payload: Record<string, any>) {
-  console.log("POST payload →", payload);
   const res = await fetch(SERVICE_WORK_NAME_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -243,10 +270,9 @@ async function updateServiceWorkName(
   uuid: string,
   payload: Record<string, any>,
 ) {
-  console.log("PATCH", uuid, "payload →", payload);
   const res = await fetch(`${SERVICE_WORK_NAME_API}/${uuid}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -260,7 +286,7 @@ async function updateServiceWorkName(
 async function deleteServiceWorkName(uuid: string) {
   const res = await fetch(`${SERVICE_WORK_NAME_API}/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -524,18 +550,20 @@ export default function ServiceWorkNameListPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between p-3 gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <span>Show</span>
-              <select
-                value={entriesPerPage}
-                onChange={(e) => {
-                  setEntriesPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <div className="w-20">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "10", label: "10" },
+                    { value: "25", label: "25" },
+                    { value: "50", label: "50" },
+                  ]}
+                  value={String(entriesPerPage)}
+                  onChange={(val) => {
+                    setEntriesPerPage(Number(val) || 10);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
               <span>entries</span>
             </div>
             <div className="flex items-center gap-2">
@@ -719,21 +747,17 @@ export default function ServiceWorkNameListPage() {
                   <label className="block font-medium text-slate-700 mb-1">
                     Project <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    required
+                  <PredictiveSearchSelect
+                    options={projects.map((p) => ({
+                      value: p.uuid,
+                      label: p.name,
+                    }))}
                     value={formData.projectId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, projectId: e.target.value })
+                    onChange={(val) =>
+                      setFormData({ ...formData, projectId: val })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map((p) => (
-                      <option key={p.uuid} value={p.uuid}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Project"
+                  />
                 </div>
               </div>
 
@@ -743,47 +767,41 @@ export default function ServiceWorkNameListPage() {
                   <label className="block font-medium text-slate-700 mb-1">
                     Category
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={categories.map((c) => ({
+                      value: c.uuid,
+                      label: c.name,
+                    }))}
                     value={formData.categoryId}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
-                        categoryId: e.target.value,
+                        categoryId: val,
                         subCategoryId: "",
                       })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c.uuid} value={c.uuid}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Category"
+                  />
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
                     Sub Category
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={filteredSubCategories.map((s) => ({
+                      value: s.uuid,
+                      label: s.name,
+                    }))}
                     value={formData.subCategoryId}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
-                        subCategoryId: e.target.value,
+                        subCategoryId: val,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Sub Category</option>
-                    {filteredSubCategories.map((s) => (
-                      <option key={s.uuid} value={s.uuid}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Sub Category"
+                  />
                 </div>
 
                 <div>
@@ -809,25 +827,14 @@ export default function ServiceWorkNameListPage() {
                   <label className="block font-medium text-slate-700 mb-1">
                     Unit
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={UNIT_OPTIONS}
                     value={formData.unit}
-                    onChange={(e) =>
-                      setFormData({ ...formData, unit: e.target.value })
+                    onChange={(val) =>
+                      setFormData({ ...formData, unit: val })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Unit</option>
-                    <option value="Sft">Sft</option>
-                    <option value="Cft">Cft</option>
-                    <option value="Rft">Rft</option>
-                    <option value="Set">Set</option>
-                    <option value="Bag">Bag</option>
-                    <option value="Kg">Kg</option>
-                    <option value="Job">Job</option>
-                    <option value="Day labour">Day labour</option>
-                    <option value="Nos">Nos</option>
-                    <option value="Pcs">Pcs</option>
-                  </select>
+                    placeholder="Select Unit"
+                  />
                 </div>
 
                 <div>
@@ -959,21 +966,17 @@ export default function ServiceWorkNameListPage() {
                   <label className="block font-medium text-slate-700 mb-1">
                     Project <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    required
+                  <PredictiveSearchSelect
+                    options={projects.map((p) => ({
+                      value: p.uuid,
+                      label: p.name,
+                    }))}
                     value={formData.projectId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, projectId: e.target.value })
+                    onChange={(val) =>
+                      setFormData({ ...formData, projectId: val })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map((p) => (
-                      <option key={p.uuid} value={p.uuid}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Project"
+                  />
                 </div>
               </div>
 
@@ -982,47 +985,41 @@ export default function ServiceWorkNameListPage() {
                   <label className="block font-medium text-slate-700 mb-1">
                     Category
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={categories.map((c) => ({
+                      value: c.uuid,
+                      label: c.name,
+                    }))}
                     value={formData.categoryId}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
-                        categoryId: e.target.value,
+                        categoryId: val,
                         subCategoryId: "",
                       })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Category</option>
-                    {categories.map((c) => (
-                      <option key={c.uuid} value={c.uuid}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Category"
+                  />
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
                     Sub Category
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={filteredSubCategories.map((s) => ({
+                      value: s.uuid,
+                      label: s.name,
+                    }))}
                     value={formData.subCategoryId}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
-                        subCategoryId: e.target.value,
+                        subCategoryId: val,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Sub Category</option>
-                    {filteredSubCategories.map((s) => (
-                      <option key={s.uuid} value={s.uuid}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select Sub Category"
+                  />
                 </div>
 
                 <div>
@@ -1046,25 +1043,14 @@ export default function ServiceWorkNameListPage() {
                   <label className="block font-medium text-slate-700 mb-1">
                     Unit
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={UNIT_OPTIONS}
                     value={formData.unit}
-                    onChange={(e) =>
-                      setFormData({ ...formData, unit: e.target.value })
+                    onChange={(val) =>
+                      setFormData({ ...formData, unit: val })
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Select Unit</option>
-                    <option value="Sft">Sft</option>
-                    <option value="Cft">Cft</option>
-                    <option value="Rft">Rft</option>
-                    <option value="Set">Set</option>
-                    <option value="Bag">Bag</option>
-                    <option value="Kg">Kg</option>
-                    <option value="Job">Job</option>
-                    <option value="Day labour">Day labour</option>
-                    <option value="Nos">Nos</option>
-                    <option value="Pcs">Pcs</option>
-                  </select>
+                    placeholder="Select Unit"
+                  />
                 </div>
 
                 <div>

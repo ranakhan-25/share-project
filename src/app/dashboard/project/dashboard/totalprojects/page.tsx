@@ -1,12 +1,15 @@
 /* eslint-disable prettier/prettier */
 // projects/project/page.tsx
+interface ProjectsPageProps {
+  params?: Promise<any>;
+  searchParams?: Promise<{ initialStatusFilter?: string; heading?: string }>;
+}
 
-export default function ProjectsPage() {
-  // আপনার বাকি লজিক
-  
+export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
+  const resolved = await searchParams;
   return (
     <div>
-      {/* বাকি টেবিল বা লিস্ট */}
+      {resolved?.heading && <h2 className="text-2xl font-bold mb-4">{resolved.heading}</h2>}
     </div>
   );
 }

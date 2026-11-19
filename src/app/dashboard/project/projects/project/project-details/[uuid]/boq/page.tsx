@@ -1,6 +1,8 @@
+"use client";
+
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -143,7 +145,14 @@ export default function BoqPage() {
       const json = await res.json();
       if (json.success) {
         const activeBoqs = (json.data.data || []).filter((item: BoqItem) => !item.deletedAt);
-        setBoqList(activeBoqs);
+        const filtered = userEmail
+          ? activeBoqs.filter((b: any) => {
+              const creator = String(b.createdBy || "").toLowerCase().trim();
+              const emailField = String(b.email || b.clientEmail || "").toLowerCase().trim();
+              return creator === userEmail || emailField === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+        setBoqList(filtered);
       }
     } catch (err) {
       console.error(err);
@@ -154,7 +163,7 @@ export default function BoqPage() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/project`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/project`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) setProjects(json.data.data || []);
     } catch (err) {
@@ -164,7 +173,7 @@ export default function BoqPage() {
 
   const fetchProjectTypes = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/project-type`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/project-type`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) setProjectTypes(json.data.data || []);
     } catch (err) {
@@ -174,7 +183,7 @@ export default function BoqPage() {
 
   const fetchProjectSites = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/project-sites`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/project-sites`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) setProjectSites(json.data.data || []);
     } catch (err) {
@@ -185,7 +194,7 @@ export default function BoqPage() {
   // ✅ Task লিস্ট ফেচ
   const fetchTasks = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/task?page=1&limit=100`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/realbizpro/api/v1/task?page=1&limit=100`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       if (json.success) {
         setTasks(json.data.data || []);
@@ -434,16 +443,12 @@ export default function BoqPage() {
               <div>
                 <label className="block text-sm mb-1">Title/Name of Work</label>
                 <div className="flex gap-1">
-                  <select
+                  <PredictiveSearchSelect
+                    placeholder="Select Title/Name of Work..."
+                    options={TITLE_OPTIONS.map((t) => ({ value: t, label: t }))}
                     value={form.titleOfWork}
-                    onChange={(e) => setForm({ ...form, titleOfWork: e.target.value })}
-                    className="w-full border rounded px-3 py-2 text-sm"
-                  >
-                    <option value="">Select Title/Name of Work</option>
-                    {TITLE_OPTIONS.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm({ ...form, titleOfWork: val })}
+                  />
                   <button type="button" className="bg-purple-600 text-white px-3 rounded">+</button>
                 </div>
               </div>
@@ -459,63 +464,45 @@ export default function BoqPage() {
 
               <div>
                 <label className="block text-sm mb-1">Project Type</label>
-                <select
+                <PredictiveSearchSelect
+                  placeholder="Select Project Type..."
+                  options={projectTypes.map((t) => ({ value: t.name, label: t.name }))}
                   value={form.projectType}
-                  onChange={(e) => setForm({ ...form, projectType: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">Select value</option>
-                  {projectTypes.map((t) => (
-                    <option key={t.uuid} value={t.name}>{t.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm({ ...form, projectType: val })}
+                />
               </div>
 
               <div>
                 <label className="block text-sm mb-1">Project</label>
-                <select
+                <PredictiveSearchSelect
+                  placeholder="Select Project..."
+                  options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
                   value={form.projectId}
-                  onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map((p) => (
-                    <option key={p.uuid} value={p.uuid}>{p.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm({ ...form, projectId: val })}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div>
                 <label className="block text-sm mb-1">Site</label>
-                <select
+                <PredictiveSearchSelect
+                  placeholder="Select Site..."
+                  options={projectSites.map((s) => ({ value: s.name, label: s.name, subLabel: s.location }))}
                   value={form.site}
-                  onChange={(e) => setForm({ ...form, site: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">Select Site</option>
-                  {projectSites.map((site) => (
-                    <option key={site.uuid} value={site.name}>
-                      {site.name}{site.location ? ` - ${site.location}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm({ ...form, site: val })}
+                />
               </div>
 
               {/* ✅ API-চালিত Task ড্রপডাউন */}
               <div>
                 <label className="block text-sm mb-1">Task</label>
-                <select
+                <PredictiveSearchSelect
+                  placeholder="Select Task..."
+                  options={tasks.map((t) => ({ value: t.taskName, label: t.taskName }))}
                   value={form.task}
-                  onChange={(e) => setForm({ ...form, task: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">Select Task</option>
-                  {tasks.map((t) => (
-                    <option key={t.uuid} value={t.taskName}>{t.taskName}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm({ ...form, task: val })}
+                />
               </div>
 
               {/* Add Task চেকবক্স থাকলে এখানে রাখতে পারেন, না লাগলে বাদ দিতে পারেন */}

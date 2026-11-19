@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, X, ChevronsLeft, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const getAuthHeaders = () => {
   const token = typeof window !== 'undefined'
@@ -63,6 +64,59 @@ export default function ExpenseAddPage() {
   const [modalAccountName, setModalAccountName] = useState("");
   const [modalDefaultModule, setModalDefaultModule] = useState("");
 
+  const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ value: string; label: string }[]>([]);
+  const [contactOptions, setContactOptions] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    const loadDropdowns = async () => {
+      try {
+        const [projRes, siteRes, custRes, suppRes] = await Promise.all([
+          fetch(`${API_BASE}/project?limit=100`, { headers: getAuthHeaders() }),
+          fetch(`${API_BASE}/project-sites?limit=100`, { headers: getAuthHeaders() }),
+          fetch(`${API_BASE}/customer-account?limit=100`, { headers: getAuthHeaders() }),
+          fetch(`${API_BASE}/supplier-account?limit=100`, { headers: getAuthHeaders() }),
+        ]);
+        const [projJson, siteJson, custJson, suppJson] = await Promise.all([
+          projRes.json().catch(() => ({})),
+          siteRes.json().catch(() => ({})),
+          custRes.json().catch(() => ({})),
+          suppRes.json().catch(() => ({})),
+        ]);
+
+        const pList = projJson?.data?.data || projJson?.data || [];
+        if (Array.isArray(pList)) {
+          setProjectOptions(pList.map((p: any) => ({
+            value: p.name || p.title || p.uuid || String(p.id),
+            label: p.name || p.title || "Project",
+          })));
+        }
+
+        const sList = siteJson?.data?.data || siteJson?.data || [];
+        if (Array.isArray(sList)) {
+          setSiteOptions(sList.map((s: any) => ({
+            value: s.name || s.siteName || s.uuid || String(s.id),
+            label: s.name || s.siteName || "Site",
+          })));
+        }
+
+        const cList = [
+          ...(custJson?.data?.data || custJson?.data || []),
+          ...(suppJson?.data?.data || suppJson?.data || []),
+        ];
+        if (cList.length > 0) {
+          setContactOptions(cList.map((c: any) => ({
+            value: c.name || c.companyName || c.uuid || String(c.id),
+            label: `${c.name || c.companyName || 'Contact'} (${c.phone || c.email || 'N/A'})`,
+          })));
+        }
+      } catch (err) {
+        console.error("Error loading dropdown data:", err);
+      }
+    };
+    loadDropdowns();
+  }, []);
+
   useEffect(() => {
     const loadAccounts = async () => {
       setIsLoadingAccounts(true);
@@ -105,7 +159,9 @@ export default function ExpenseAddPage() {
     if (!editUuid) return;
     const loadExpense = async () => {
       try {
-        const response = await fetch(`${API_BASE}/expenses/${editUuid}`);
+        const response = await fetch(`${API_BASE}/expenses/${editUuid}`, {
+          headers: getAuthHeaders(),
+        });
         const result = await response.json();
         const expense = result.data?.data ?? result.data ?? {};
         setProjectType(expense.projectType ?? "");
@@ -184,7 +240,7 @@ export default function ExpenseAddPage() {
       titleOfWork,
       task,
       site,
-      date,
+      date: date ? (date.includes("T") ? date : new Date(date + "T00:00:00Z").toISOString()) : new Date().toISOString(),
       voucherNo,
       contact,
       cashOrBank: cashBank,
@@ -279,75 +335,82 @@ export default function ExpenseAddPage() {
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Project Type
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "Residential", label: "Residential" },
+                { value: "Commercial", label: "Commercial" },
+                { value: "Industrial", label: "Industrial" },
+              ]}
               value={projectType}
-              onChange={(e) => setProjectType(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select Project Type</option>
-              <option value="Residential">Residential</option>
-              <option value="Commercial">Commercial</option>
-            </select>
+              onChange={(val) => setProjectType(val)}
+              placeholder="Select Project Type"
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Project
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={projectOptions.length ? projectOptions : [
+                { value: "Rifat Eyecon City", label: "Rifat Eyecon City" },
+                { value: "Skyline Tower", label: "Skyline Tower" },
+              ]}
               value={project}
-              onChange={(e) => setProject(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select Project</option>
-              <option value="Rifat Eyecon City">Rifat Eyecon City</option>
-              <option value="Skyline Tower">Skyline Tower</option>
-            </select>
+              onChange={(val) => setProject(val)}
+              placeholder="Select Project"
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Title/Name of Work
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "Foundation Work", label: "Foundation Work" },
+                { value: "Electrical Wiring", label: "Electrical Wiring" },
+                { value: "Civil Works", label: "Civil Works" },
+              ]}
               value={titleOfWork}
-              onChange={(e) => setTitleOfWork(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select Title/Name of Work</option>
-              <option value="Foundation Work">Foundation Work</option>
-              <option value="Electrical Wiring">Electrical Wiring</option>
-            </select>
+              onChange={(val) => setTitleOfWork(val)}
+              placeholder="Select Title/Name of Work"
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               If Task
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "Task 1", label: "Task 1" },
+                { value: "Task 2", label: "Task 2" },
+              ]}
               value={task}
-              onChange={(e) => setTask(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select Task</option>
-              <option value="Task 1">Task 1</option>
-              <option value="Task 2">Task 2</option>
-            </select>
+              onChange={(val) => setTask(val)}
+              placeholder="Select Task"
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Site
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={siteOptions.length ? siteOptions : [
+                { value: "Site A", label: "Site A" },
+                { value: "Site B", label: "Site B" },
+              ]}
               value={site}
-              onChange={(e) => setSite(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select Site</option>
-              <option value="Site A">Site A</option>
-              <option value="Site B">Site B</option>
-            </select>
+              onChange={(val) => setSite(val)}
+              placeholder="Select Site"
+              className="w-full"
+            />
           </div>
         </div>
 
@@ -383,23 +446,16 @@ export default function ExpenseAddPage() {
               Select Accounts<span className="text-red-500">*</span>
             </label>
             <div className="flex items-center gap-1.5">
-              <select
+              <PredictiveSearchSelect
+                options={accounts.map((account, index) => ({
+                  value: String(account.uuid ?? account.id ?? index),
+                  label: account.name ?? `Account ${index + 1}`,
+                }))}
                 value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="">
-                  {isLoadingAccounts ? "Loading accounts..." : "Select Chart Of Account"}
-                </option>
-                {accounts.map((account, index) => (
-                  <option
-                    key={String(account.uuid ?? account.id ?? index)}
-                    value={String(account.uuid ?? account.id ?? "")}
-                  >
-                    {account.name ?? `Account ${index + 1}`}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedAccount(val)}
+                placeholder={isLoadingAccounts ? "Loading accounts..." : "Select Chart Of Account"}
+                className="w-full"
+              />
               <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
@@ -485,45 +541,51 @@ export default function ExpenseAddPage() {
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Contact<span className="text-red-500">*</span>
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={contactOptions.length ? contactOptions : [
+                { value: "John Doe", label: "John Doe" },
+                { value: "Rahim Ali", label: "Rahim Ali" },
+                { value: "Sardar Construction", label: "Sardar Construction" },
+              ]}
               value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select From Contact</option>
-              <option value="John Doe">John Doe</option>
-              <option value="Rahim Ali">Rahim Ali</option>
-            </select>
+              onChange={(val) => setContact(val)}
+              placeholder="Select From Contact"
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Cash/Bank<span className="text-red-500">*</span>
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "Petty Cash", label: "Petty Cash" },
+                { value: "Main Bank Account", label: "Main Bank Account" },
+                { value: "Islami Bank", label: "Islami Bank" },
+              ]}
               value={cashBank}
-              onChange={(e) => setCashBank(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select One Option</option>
-              <option value="Petty Cash">Petty Cash</option>
-              <option value="Main Bank Account">Main Bank Account</option>
-            </select>
+              onChange={(val) => setCashBank(val)}
+              placeholder="Select One Option"
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Cheque/Receipt No
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "CHK-9988", label: "CHK-9988" },
+                { value: "RCT-1122", label: "RCT-1122" },
+                { value: "CASH", label: "Cash Payment" },
+              ]}
               value={chequeNo}
-              onChange={(e) => setChequeNo(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select or type cheque number</option>
-              <option value="CHK-9988">CHK-9988</option>
-              <option value="RCT-1122">RCT-1122</option>
-            </select>
+              onChange={(val) => setChequeNo(val)}
+              placeholder="Select or type cheque number"
+              className="w-full"
+            />
           </div>
 
           <div>
@@ -611,17 +673,18 @@ export default function ExpenseAddPage() {
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                       Chart of Group
                     </label>
-                    <select
+                    <PredictiveSearchSelect
+                      options={[
+                        { value: "Assets", label: "Assets" },
+                        { value: "Liabilities", label: "Liabilities" },
+                        { value: "Expenses", label: "Expenses" },
+                        { value: "Income", label: "Income" },
+                      ]}
                       value={modalChartGroup}
-                      onChange={(e) => setModalChartGroup(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="">Select value</option>
-                      <option value="Assets">Assets</option>
-                      <option value="Liabilities">Liabilities</option>
-                      <option value="Expenses">Expenses</option>
-                      <option value="Income">Income</option>
-                    </select>
+                      onChange={(val) => setModalChartGroup(val)}
+                      placeholder="Select value"
+                      className="w-full"
+                    />
                   </div>
 
                   <div>
@@ -656,15 +719,16 @@ export default function ExpenseAddPage() {
                     <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                       Set Accounts Default Module
                     </label>
-                    <select
+                    <PredictiveSearchSelect
+                      options={[
+                        { value: "Active", label: "Active" },
+                        { value: "Inactive", label: "Inactive" },
+                      ]}
                       value={modalDefaultModule}
-                      onChange={(e) => setModalDefaultModule(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md px-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    >
-                      <option value="">Select Status</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
+                      onChange={(val) => setModalDefaultModule(val)}
+                      placeholder="Select Status"
+                      className="w-full"
+                    />
                   </div>
                 </div>
               </div>

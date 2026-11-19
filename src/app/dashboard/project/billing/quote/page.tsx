@@ -6,19 +6,20 @@ import React, { useState, useEffect, useRef } from "react";
 import { Plus, X, Loader2, Eye, Printer, Edit3, Trash2, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import { useReactToPrint } from "react-to-print";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return { "Content-Type": "application/json" };
-  }
   const token =
-    localStorage.getItem("share-project:access-token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("accessToken") ||
-    "";
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -168,6 +169,12 @@ QuotePrintTemplate.displayName = "QuotePrintTemplate";
 
 
 export default function QuotePage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [dataList, setDataList] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -278,7 +285,17 @@ export default function QuotePage() {
       });
       const json = await res.json();
       if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
+        const rows = json.data.data || [];
+        const userProjUuids = new Set(projects.map((p) => p.uuid));
+        const filtered = rows
+          .filter((item: any) => !item.deletedAt)
+          .filter((item: any) => {
+            if (!userEmail) return false;
+            const belongsToProj = item.projectId && userProjUuids.has(item.projectId);
+            const creator = String(item.createdBy || item.details?.createdBy || "").toLowerCase().trim();
+            return belongsToProj || creator === userEmail;
+          });
+        setDataList(filtered);
         if (json.data.meta) {
            setTotalPages(json.data.meta.totalPages || 1);
            setCurrentPage(json.data.meta.page || 1);
@@ -295,39 +312,78 @@ export default function QuotePage() {
   const fetchDropdowns = async () => {
     try {
       const headers = getAuthHeaders();
-      const resCus = await fetch(`${API_PATH}/customer-account?status=active`, { headers });
+      const currentUser = getStoredUser();
+      const activeEmail = (currentUser?.email || userEmail || "").toLowerCase().trim();
+      const activeId = String(currentUser?.id || storedUser?.id || "");
+
+      const resCus = await fetch(`${API_PATH}/customer-account?page=1&limit=100`, { headers });
       const jsonCus = await resCus.json();
-      if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
+      if (jsonCus.success) {
+        const cusData = jsonCus.data.data || jsonCus.data || [];
+        setCustomers(
+          cusData.map((c: any) => ({
+            ...c,
+            uuid: c.uuid || c.id,
+            name: c.name || c.customerName || c.clientName || "Customer",
+            customerName: c.customerName || c.name || c.clientName || "Customer",
+          }))
+        );
+      }
 
-      const resProj = await fetch(`${API_PATH}/project`, { headers });
+      const resProj = await fetch(`${API_PATH}/project?page=1&limit=100`, { headers });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      if (jsonProj.success) {
+        const allProj = jsonProj.data.data || jsonProj.data || [];
+        const userProjects = activeEmail
+          ? allProj.filter((p: any) => {
+              const raw = p.raw || p || {};
+              const creator = String(
+                raw.createdBy ||
+                  raw.clientEmail ||
+                  raw.email ||
+                  raw.userEmail ||
+                  raw.projectManager ||
+                  ""
+              )
+                .toLowerCase()
+                .trim();
+              return creator === activeEmail || (activeId && creator === activeId);
+            })
+          : [];
+        setProjects(
+          userProjects.map((p: any) => ({
+            ...p,
+            uuid: p.uuid || p.id,
+            name: p.name || p.projectName || "Unnamed Project",
+          }))
+        );
+      }
 
-      const resSite = await fetch(`${API_PATH}/project-sites`, { headers });
+      const resSite = await fetch(`${API_PATH}/project-sites?page=1&limit=100`, { headers });
       const jsonSite = await resSite.json();
       if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
 
-      const resType = await fetch(`${API_PATH}/project-type`, { headers });
+      const resType = await fetch(`${API_PATH}/project-type?page=1&limit=100`, { headers });
       const jsonType = await resType.json();
       if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
 
-      const resCat = await fetch(`${API_PATH}/category`, { headers });
+      const resCat = await fetch(`${API_PATH}/category?page=1&limit=100`, { headers });
       const jsonCat = await resCat.json();
       if (jsonCat.success) setCategories(jsonCat.data.data || jsonCat.data || []);
 
-      const resSubCat = await fetch(`${API_PATH}/billing-sub-category`, { headers });
+      const resSubCat = await fetch(`${API_PATH}/billing-sub-category?page=1&limit=100`, { headers });
       const jsonSubCat = await resSubCat.json();
       if (jsonSubCat.success) setSubCategories(jsonSubCat.data.data || jsonSubCat.data || []);
 
-      const resItem = await fetch(`${API_PATH}/item`, { headers });
+      const resItem = await fetch(`${API_PATH}/item?page=1&limit=100`, { headers });
       const jsonItem = await resItem.json();
       if (jsonItem.success) setItemsList(jsonItem.data.data || jsonItem.data || []);
 
-      const resBrand = await fetch(`${API_PATH}/procurement/brand`, { headers }); 
+      const resBrand = await fetch(`${API_PATH}/procurement/brand?page=1&limit=100`, { headers }); 
       const jsonBrand = await resBrand.json();
       if (jsonBrand.success) setBrands(jsonBrand.data.data || jsonBrand.data || []);
 
-      const resUnit = await fetch(`${API_PATH}/unit`, { headers });
+      const resUnit = await fetch(`${API_PATH}/unit?page=1&limit=100`, { headers });
       const jsonUnit = await resUnit.json();
       if (jsonUnit.success) setUnitsList(jsonUnit.data.data || jsonUnit.data || []);
 
@@ -338,9 +394,14 @@ export default function QuotePage() {
   };
 
   useEffect(() => {
-    fetchQuotes(currentPage);
     fetchDropdowns();
-  }, [currentPage]);
+  }, [userEmail, storedUser?.id]);
+
+  useEffect(() => {
+    if (userEmail) {
+      fetchQuotes(currentPage);
+    }
+  }, [currentPage, projects, userEmail]);
 
   // Filters
   const filteredSubCats = selectedCat 
@@ -370,28 +431,43 @@ export default function QuotePage() {
     setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
   };
 
-  const updateRow = (id: string, field: keyof QuoteItem, value: any) => {
-    const updatedItems = formData.items.map(row => {
-      if (row.id === id) {
-        const updatedRow = { ...row, [field]: value };
-        
-        if (field === "itemName") {
-          const itemData = itemsList.find(i => i.itemName === value);
-          if (itemData) {
-            updatedRow.rate = Number(itemData.salePrice) || 0;
-            updatedRow.unit = itemData.unit || "";
-            updatedRow.amount = Number(updatedRow.quantity) * updatedRow.rate;
-          }
-        }
+  const handleAddItem = (itemName: string) => {
+    if (!itemName) return;
+    const itemData = itemsList.find(i => i.itemName === itemName);
+    const newItem: QuoteItem = {
+      id: Date.now().toString(),
+      itemName: itemName,
+      unit: itemData?.unit || "Pcs",
+      quantity: 1,
+      rate: Number(itemData?.salePrice) || 30000,
+      details: "Item details",
+      image: "",
+      amount: Number(itemData?.salePrice) || 30000,
+    };
+    setFormData(prev => ({ ...prev, items: [...prev.items, newItem] }));
+  };
 
-        if (field === "quantity" || field === "rate") {
-          updatedRow.amount = Number(updatedRow.quantity) * Number(updatedRow.rate);
+  const updateRow = (id: string, field: keyof QuoteItem, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map(row => {
+        if (row.id === id) {
+          const updatedRow = { ...row, [field]: value };
+          if (field === "itemName") {
+            const itemData = itemsList.find(i => i.itemName === value);
+            if (itemData) {
+              updatedRow.rate = Number(itemData.salePrice) || updatedRow.rate || 0;
+              updatedRow.unit = itemData.unit || updatedRow.unit || "";
+            }
+          }
+          const qty = field === "quantity" ? Number(value) : Number(row.quantity);
+          const rt = field === "rate" ? Number(value) : Number(row.rate);
+          updatedRow.amount = (isNaN(qty) ? 0 : qty) * (isNaN(rt) ? 0 : rt);
+          return updatedRow;
         }
-        return updatedRow;
-      }
-      return row;
-    });
-    setFormData(prev => ({ ...prev, items: updatedItems }));
+        return row;
+      })
+    }));
   };
 
   const removeRow = (id: string) => {
@@ -433,6 +509,8 @@ export default function QuotePage() {
         discountAmount,
         grandTotal,
         attachment: formData.attachment,
+        createdBy: userEmail || "Admin",
+        addedBy: userEmail || "USER-001",
       },
     };
 
@@ -638,7 +716,7 @@ export default function QuotePage() {
       date: new Date().toISOString().split("T")[0],
       customerId: "",
       customerName: "",
-      code: `QUO${Math.floor(1000 + Math.random() * 9000)}`,
+      code: `QUO${Date.now().toString().slice(-6)}`,
       projectType: "",
       projectId: "",
       site: "",
@@ -743,25 +821,29 @@ export default function QuotePage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">Project</label>
-            <select 
-              value={filterProject} 
-              onChange={e => setFilterProject(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-            >
-              <option value="">All Projects</option>
-              {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-            </select>
+            <PredictiveSearchSelect
+              label=""
+              placeholder="All Projects"
+              value={filterProject}
+              options={[
+                { value: "", label: "All Projects" },
+                ...projects.map(p => ({ value: p.uuid, label: p.name })),
+              ]}
+              onChange={val => setFilterProject(val)}
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">Project Type</label>
-            <select 
-              value={filterProjectType} 
-              onChange={e => setFilterProjectType(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-            >
-              <option value="">All Project Types</option>
-              {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-            </select>
+            <PredictiveSearchSelect
+              label=""
+              placeholder="All Project Types"
+              value={filterProjectType}
+              options={[
+                { value: "", label: "All Project Types" },
+                ...projectTypes.map(p => ({ value: p.name, label: p.name })),
+              ]}
+              onChange={val => setFilterProjectType(val)}
+            />
           </div>
         </div>
 
@@ -916,13 +998,16 @@ export default function QuotePage() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Customer</label>
-                    <select value={formData.customerId} onChange={(e) => {
-                      const cus = customers.find(c => c.uuid === e.target.value);
-                      setFormData({ ...formData, customerId: e.target.value, customerName: cus?.customerName || "" });
-                    }} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                      <option value="">Select value</option>
-                      {customers.map(c => <option key={c.uuid} value={c.uuid}>{c.customerName}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      label=""
+                      placeholder="Select Customer"
+                      value={formData.customerId}
+                      options={customers.map(c => ({ value: c.uuid, label: c.customerName || c.name }))}
+                      onChange={val => {
+                        const cus = customers.find(c => c.uuid === val);
+                        setFormData({ ...formData, customerId: val, customerName: cus?.customerName || cus?.name || "" });
+                      }}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Code</label>
@@ -930,27 +1015,36 @@ export default function QuotePage() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-                    <select value={formData.projectType} onChange={(e) => setFormData({ ...formData, projectType: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">Select value</option>
-                      {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      label=""
+                      placeholder="Select Project Type"
+                      value={formData.projectType}
+                      options={projectTypes.map(p => ({ value: p.name, label: p.name }))}
+                      onChange={val => setFormData({ ...formData, projectType: val })}
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Project</label>
-                    <select value={formData.projectId} onChange={(e) => setFormData({ ...formData, projectId: e.target.value, site: "" })} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                      <option value="">Select Project</option>
-                      {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      label=""
+                      placeholder="Select Project"
+                      value={formData.projectId}
+                      options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                      onChange={val => setFormData({ ...formData, projectId: val, site: "" })}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Site</label>
-                    <select value={formData.site} onChange={(e) => setFormData({ ...formData, site: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">Select Site</option>
-                      {filteredSites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      label=""
+                      placeholder="Select Site"
+                      value={formData.site}
+                      options={filteredSites.map(s => ({ value: s.name, label: s.name }))}
+                      onChange={val => setFormData({ ...formData, site: val })}
+                    />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-xs text-gray-600 mb-1">Attachment</label>
@@ -969,33 +1063,40 @@ export default function QuotePage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-3 rounded border">
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Category</label>
-                    <select value={selectedCat} onChange={(e) => { setSelectedCat(e.target.value); setSelectedSubCat(""); }} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">All Categories</option>
-                      {categories.map(c => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      label=""
+                      placeholder="All Categories"
+                      value={selectedCat}
+                      options={categories.map(c => ({ value: c.uuid, label: c.name }))}
+                      onChange={val => {
+                        setSelectedCat(val);
+                        setSelectedSubCat("");
+                      }}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Sub Category</label>
-                    <select value={selectedSubCat} onChange={(e) => setSelectedSubCat(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">All Sub Categories</option>
-                      {filteredSubCats.map(sc => <option key={sc.uuid} value={sc.uuid}>{sc.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      label=""
+                      placeholder="All Sub Categories"
+                      value={selectedSubCat}
+                      options={filteredSubCats.map(sc => ({ value: sc.uuid, label: sc.name }))}
+                      onChange={val => setSelectedSubCat(val)}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Select Item (Product / Material) *</label>
-                    <select onChange={(e) => {
-                      if(e.target.value) {
-                        addEmptyRow();
-                        setTimeout(() => {
-                           const lastRowId = formData.items[formData.items.length - 1]?.id;
-                           if(lastRowId) updateRow(lastRowId, "itemName", e.target.value);
-                        }, 0);
-                      }
-                      e.target.value = ""; 
-                    }} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">Search Item / Product / Material...</option>
-                      {filteredItems.map(i => <option key={i.uuid} value={i.itemName}>{i.itemName}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      label=""
+                      placeholder="Search Item / Product / Material..."
+                      value=""
+                      options={filteredItems.map(i => ({ value: i.itemName, label: i.itemName }))}
+                      onChange={val => {
+                        if (val) {
+                          handleAddItem(val);
+                        }
+                      }}
+                    />
                   </div>
                 </div>
 

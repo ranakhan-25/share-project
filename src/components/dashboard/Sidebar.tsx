@@ -139,7 +139,7 @@ function Item({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: bool
         />
       )}
       <item.icon
-        className={`h-[18px] w-[18px] shrink-0 ${
+        className={`h-4.5 w-4.5 shrink-0 ${
           isLeafSelected || (collapsed && childActive)
             ? "text-emerald-600"
             : "text-slate-500 group-hover:text-slate-800"
@@ -184,7 +184,7 @@ function Item({ item, collapsed, onNavigate }: { item: MenuItem; collapsed: bool
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="ml-[26px] mt-1 space-y-0.5 overflow-hidden border-l border-slate-200 pl-3"
+            className="ml-6.5 mt-1 space-y-0.5 overflow-hidden border-l border-slate-200 pl-3"
           >
             {item.children!.map((c, idx) => (
               <SubItem key={c.href ?? idx} item={c} onNavigate={onNavigate} />
@@ -243,7 +243,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: { co
   return (
     <>
       {/* desktop */}
-      <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 bg-white transition-[width] duration-300 lg:block ${collapsed ? "w-[84px]" : "w-[272px]"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 bg-white transition-[width] duration-300 lg:block ${collapsed ? "w-21" : "w-68"}`}>
         <Content collapsed={collapsed} onNavigate={() => {}} onToggle={onToggle} />
       </aside>
 
@@ -257,7 +257,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: { co
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 320, damping: 34 }}
-              className="fixed inset-y-0 left-0 z-50 w-[285px] border-r border-slate-200 bg-white shadow-2xl lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 w-71.25 border-r border-slate-200 bg-white shadow-2xl lg:hidden"
             >
               <Content collapsed={false} onNavigate={onMobileClose} onClose={onMobileClose} />
             </motion.aside>

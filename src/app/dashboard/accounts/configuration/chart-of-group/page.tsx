@@ -19,6 +19,7 @@ import {
   Search,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // API Base URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
@@ -81,9 +82,9 @@ export default function ChartOfGroupPage() {
     reportSection: "",
   });
 
-  // Helper: Auto-generate Group Code (e.g. COG-101, COG-102, ...)
+  // Helper: Auto-generate Group Code (e.g. COG-1001, COG-1002, ...)
   const generateGroupCode = (existingList: ChartOfGroupItem[] = groups) => {
-    let maxNum = 100;
+    let maxNum = 1000;
     if (Array.isArray(existingList)) {
       existingList.forEach((item) => {
         if (item.code) {
@@ -95,7 +96,8 @@ export default function ChartOfGroupPage() {
         }
       });
     }
-    return `COG-${maxNum + 1}`;
+    const rand = Math.floor(100 + Math.random() * 900);
+    return `COG-${maxNum + rand}`;
   };
 
   // Fetch groups
@@ -310,21 +312,16 @@ export default function ChartOfGroupPage() {
             <label className="block text-xs font-semibold text-slate-600 mb-1">
               Under (Category)
             </label>
-            <select
+            <PredictiveSearchSelect
               value={underFilter}
-              onChange={(e) => {
-                setUnderFilter(e.target.value);
+              onChange={(value) => {
+                setUnderFilter(value);
                 setCurrentPage(1);
               }}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">All Categories</option>
-              {UNDER_OPTIONS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
+              options={[{ value: "", label: "All Categories" }, ...UNDER_OPTIONS.map((u) => ({ value: u, label: u }))]}
+              placeholder="Search category..."
+              className="w-full"
+            />
           </div>
 
           <div>
@@ -350,18 +347,20 @@ export default function ChartOfGroupPage() {
             <label className="block text-xs font-semibold text-slate-600 mb-1">
               Show Entries
             </label>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => {
-                setEntriesPerPage(Number(e.target.value));
+            <PredictiveSearchSelect
+              value={String(entriesPerPage)}
+              onChange={(value) => {
+                setEntriesPerPage(Number(value) || 10);
                 setCurrentPage(1);
               }}
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="Entries"
+              className="w-full"
+            />
           </div>
         </div>
       </div>
@@ -540,38 +539,30 @@ export default function ChartOfGroupPage() {
                 <label className="block font-medium text-slate-700 mb-1">
                   Under (Classification) <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <PredictiveSearchSelect
                   name="under"
-                  required
                   value={formData.under}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
-                >
-                  {UNDER_OPTIONS.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => handleInputChange({ target: { name: "under", value } } as React.ChangeEvent<HTMLSelectElement>)}
+                  options={UNDER_OPTIONS.map((u) => ({ value: u, label: u }))}
+                  placeholder="Search classification..."
+                  required
+                  className="w-full"
+                />
               </div>
 
               <div>
                 <label className="block font-medium text-slate-700 mb-1">
                   Chart Of Section <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <PredictiveSearchSelect
                   name="chartOfSection"
-                  required
                   value={formData.chartOfSection}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
-                >
-                  {SECTION_OPTIONS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setFormData((prev) => ({ ...prev, chartOfSection: value }))}
+                  options={SECTION_OPTIONS.map((s) => ({ value: s, label: s }))}
+                  placeholder="Search chart section..."
+                  required
+                  className="w-full"
+                />
               </div>
 
               <div>

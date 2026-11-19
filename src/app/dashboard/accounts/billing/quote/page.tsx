@@ -6,9 +6,25 @@ import React, { useState, useEffect, useRef } from "react";
 import { Plus, X, Loader2, Eye, Printer, Edit3, Trash2, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import { useReactToPrint } from "react-to-print";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 // ✅ Default Units List
 const DEFAULT_UNITS = [
@@ -258,7 +274,9 @@ export default function QuotePage() {
   const fetchQuotes = async (page = 1) => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/project-billing/quotes?page=${page}&limit=${limit}`);
+      const res = await fetch(`${API_PATH}/project-billing/quotes?page=${page}&limit=${limit}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
         setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
@@ -277,41 +295,55 @@ export default function QuotePage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resCus = await fetch(`${API_PATH}/customer-account?status=active`);
+      const resCus = await fetch(`${API_PATH}/customer-account?page=1&limit=100&status=active`, { headers: getAuthHeaders() });
       const jsonCus = await resCus.json();
-      if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
+      const cusList = Array.isArray(jsonCus?.data?.data) ? jsonCus.data.data : Array.isArray(jsonCus?.data) ? jsonCus.data : [];
+      setCustomers(cusList.map((c: any) => ({ uuid: c.uuid || c.id, customerName: c.customerName || c.name || "Customer" })));
 
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      const projList = Array.isArray(jsonProj?.data?.data) ? jsonProj.data.data : Array.isArray(jsonProj?.data) ? jsonProj.data : [];
+      setProjects(projList.map((p: any) => ({ uuid: p.uuid || p.id, name: p.name || p.projectName || "Project" })));
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonSite = await resSite.json();
-      if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
+      const siteList = Array.isArray(jsonSite?.data?.data) ? jsonSite.data.data : Array.isArray(jsonSite?.data) ? jsonSite.data : [];
+      setSites(siteList.map((s: any) => ({ uuid: s.uuid || s.id, name: s.name || s.siteName || "Site", projectId: s.projectId })));
 
-      const resType = await fetch(`${API_PATH}/project-type`);
+      const resType = await fetch(`${API_PATH}/project-type?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonType = await resType.json();
-      if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
+      const typeList = Array.isArray(jsonType?.data?.data) ? jsonType.data.data : Array.isArray(jsonType?.data) ? jsonType.data : [];
+      setProjectTypes(typeList.map((t: any) => ({ uuid: t.uuid || t.id, name: t.name || "Type" })));
 
-      const resCat = await fetch(`${API_PATH}/category`);
+      const resCat = await fetch(`${API_PATH}/category?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonCat = await resCat.json();
-      if (jsonCat.success) setCategories(jsonCat.data.data || jsonCat.data || []);
+      const catList = Array.isArray(jsonCat?.data?.data) ? jsonCat.data.data : Array.isArray(jsonCat?.data) ? jsonCat.data : [];
+      setCategories(catList.map((c: any) => ({ uuid: c.uuid || c.id, name: c.name || "Category" })));
 
-      const resSubCat = await fetch(`${API_PATH}/billing-sub-category`);
+      const resSubCat = await fetch(`${API_PATH}/billing-sub-category?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonSubCat = await resSubCat.json();
-      if (jsonSubCat.success) setSubCategories(jsonSubCat.data.data || jsonSubCat.data || []);
+      const subCatList = Array.isArray(jsonSubCat?.data?.data) ? jsonSubCat.data.data : Array.isArray(jsonSubCat?.data) ? jsonSubCat.data : [];
+      setSubCategories(subCatList.map((sc: any) => ({ uuid: sc.uuid || sc.id, name: sc.name || "SubCategory", categoryId: sc.categoryId })));
 
-      const resItem = await fetch(`${API_PATH}/item`);
+      const resItem = await fetch(`${API_PATH}/project-billing/bill-items?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonItem = await resItem.json();
-      if (jsonItem.success) setItemsList(jsonItem.data.data || jsonItem.data || []);
+      const itemList = Array.isArray(jsonItem?.data?.data) ? jsonItem.data.data : Array.isArray(jsonItem?.data) ? jsonItem.data : [];
+      setItemsList(itemList.map((i: any) => ({
+        uuid: i.uuid || i.id,
+        itemName: i.title || i.itemName || i.name || "Item",
+        unit: i.details?.unit || "Pcs",
+        rate: Number(i.amount || i.details?.salePrice || 0)
+      })));
 
-      const resBrand = await fetch(`${API_PATH}/procurement/brand`); 
+      const resBrand = await fetch(`${API_PATH}/procurement/brand?page=1&limit=100`, { headers: getAuthHeaders() }); 
       const jsonBrand = await resBrand.json();
-      if (jsonBrand.success) setBrands(jsonBrand.data.data || jsonBrand.data || []);
+      const brandList = Array.isArray(jsonBrand?.data?.data) ? jsonBrand.data.data : Array.isArray(jsonBrand?.data) ? jsonBrand.data : [];
+      setBrands(brandList.map((b: any) => ({ uuid: b.uuid || b.id, name: b.name || "Brand" })));
 
-      const resUnit = await fetch(`${API_PATH}/unit`);
+      const resUnit = await fetch(`${API_PATH}/unit?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonUnit = await resUnit.json();
-      if (jsonUnit.success) setUnitsList(jsonUnit.data.data || jsonUnit.data || []);
+      const unitList = Array.isArray(jsonUnit?.data?.data) ? jsonUnit.data.data : Array.isArray(jsonUnit?.data) ? jsonUnit.data : [];
+      setUnitsList(unitList.map((u: any) => ({ uuid: u.uuid || u.id, name: u.name || "Unit" })));
 
     } catch (err) {
       console.error("Error fetching dropdowns:", err);
@@ -427,7 +459,7 @@ export default function QuotePage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -470,7 +502,7 @@ export default function QuotePage() {
     try {
       const res = await fetch(`${API_PATH}/item`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -498,7 +530,7 @@ export default function QuotePage() {
     try {
       const res = await fetch(`${API_PATH}/procurement/brand`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: newBrandName }),
       });
       const json = await res.json();
@@ -526,7 +558,7 @@ export default function QuotePage() {
     try {
       const res = await fetch(`${API_PATH}/unit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ name: newUnitName, status: "active" }),
       });
       const json = await res.json();
@@ -566,7 +598,7 @@ export default function QuotePage() {
     try {
       const res = await fetch(`${API_PATH}/customer-account`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       
@@ -599,7 +631,10 @@ export default function QuotePage() {
   const handleDelete = async (item: Quote) => {
     if (!window.confirm(`Delete "${item.code}"?`)) return;
     try {
-      const res = await fetch(`${API_PATH}/project-billing/quotes/${item.uuid}`, { method: "DELETE" });
+      const res = await fetch(`${API_PATH}/project-billing/quotes/${item.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         toast.success("Deleted successfully!");
         fetchQuotes(currentPage); 
@@ -722,25 +757,21 @@ export default function QuotePage() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">Project</label>
-            <select 
-              value={filterProject} 
-              onChange={e => setFilterProject(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-            >
-              <option value="">All Projects</option>
-              {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-            </select>
+            <PredictiveSearchSelect
+              options={[{ value: "", label: "All Projects" }, ...projects.map(p => ({ value: p.uuid, label: p.name }))]}
+              value={filterProject}
+              onChange={val => setFilterProject(val)}
+              placeholder="All Projects"
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">Project Type</label>
-            <select 
-              value={filterProjectType} 
-              onChange={e => setFilterProjectType(e.target.value)} 
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-            >
-              <option value="">All Project Types</option>
-              {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-            </select>
+            <PredictiveSearchSelect
+              options={[{ value: "", label: "All Project Types" }, ...projectTypes.map(p => ({ value: p.name, label: p.name }))]}
+              value={filterProjectType}
+              onChange={val => setFilterProjectType(val)}
+              placeholder="All Project Types"
+            />
           </div>
         </div>
 
@@ -895,13 +926,15 @@ export default function QuotePage() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Customer</label>
-                    <select value={formData.customerId} onChange={(e) => {
-                      const cus = customers.find(c => c.uuid === e.target.value);
-                      setFormData({ ...formData, customerId: e.target.value, customerName: cus?.customerName || "" });
-                    }} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                      <option value="">Select value</option>
-                      {customers.map(c => <option key={c.uuid} value={c.uuid}>{c.customerName}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={customers.map(c => ({ value: c.uuid, label: c.customerName }))}
+                      value={formData.customerId}
+                      onChange={(val) => {
+                        const cus = customers.find(c => c.uuid === val);
+                        setFormData({ ...formData, customerId: val, customerName: cus?.customerName || "" });
+                      }}
+                      placeholder="Select Customer"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Code</label>
@@ -909,27 +942,33 @@ export default function QuotePage() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-                    <select value={formData.projectType} onChange={(e) => setFormData({ ...formData, projectType: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">Select value</option>
-                      {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={projectTypes.map(p => ({ value: p.name, label: p.name }))}
+                      value={formData.projectType}
+                      onChange={(val) => setFormData({ ...formData, projectType: val })}
+                      placeholder="Select Project Type"
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Project</label>
-                    <select value={formData.projectId} onChange={(e) => setFormData({ ...formData, projectId: e.target.value, site: "" })} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                      <option value="">Select Project</option>
-                      {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                      value={formData.projectId}
+                      onChange={(val) => setFormData({ ...formData, projectId: val, site: "" })}
+                      placeholder="Select Project"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Site</label>
-                    <select value={formData.site} onChange={(e) => setFormData({ ...formData, site: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">Select Site</option>
-                      {filteredSites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={filteredSites.map(s => ({ value: s.name, label: s.name }))}
+                      value={formData.site}
+                      onChange={(val) => setFormData({ ...formData, site: val })}
+                      placeholder="Select Site"
+                    />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-xs text-gray-600 mb-1">Attachment</label>
@@ -948,33 +987,38 @@ export default function QuotePage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-3 rounded border">
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Category</label>
-                    <select value={selectedCat} onChange={(e) => { setSelectedCat(e.target.value); setSelectedSubCat(""); }} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">All Categories</option>
-                      {categories.map(c => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={[{ value: "", label: "All Categories" }, ...categories.map(c => ({ value: c.uuid, label: c.name }))]}
+                      value={selectedCat}
+                      onChange={(val) => { setSelectedCat(val); setSelectedSubCat(""); }}
+                      placeholder="All Categories"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Sub Category</label>
-                    <select value={selectedSubCat} onChange={(e) => setSelectedSubCat(e.target.value)} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">All Sub Categories</option>
-                      {filteredSubCats.map(sc => <option key={sc.uuid} value={sc.uuid}>{sc.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={[{ value: "", label: "All Sub Categories" }, ...filteredSubCats.map(sc => ({ value: sc.uuid, label: sc.name }))]}
+                      value={selectedSubCat}
+                      onChange={(val) => setSelectedSubCat(val)}
+                      placeholder="All Sub Categories"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Select Item (Product / Material) *</label>
-                    <select onChange={(e) => {
-                      if(e.target.value) {
-                        addEmptyRow();
-                        setTimeout(() => {
-                           const lastRowId = formData.items[formData.items.length - 1]?.id;
-                           if(lastRowId) updateRow(lastRowId, "itemName", e.target.value);
-                        }, 0);
-                      }
-                      e.target.value = ""; 
-                    }} className="w-full border rounded px-3 py-1.5 text-sm">
-                      <option value="">Search Item / Product / Material...</option>
-                      {filteredItems.map(i => <option key={i.uuid} value={i.itemName}>{i.itemName}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={[{ value: "", label: "Search Item / Product / Material..." }, ...filteredItems.map(i => ({ value: i.itemName, label: i.itemName }))]}
+                      value=""
+                      onChange={(val) => {
+                        if (val) {
+                          addEmptyRow();
+                          setTimeout(() => {
+                            const lastRowId = formData.items[formData.items.length - 1]?.id;
+                            if (lastRowId) updateRow(lastRowId, "itemName", val);
+                          }, 0);
+                        }
+                      }}
+                      placeholder="Search Item / Product / Material..."
+                    />
                   </div>
                 </div>
 
@@ -983,29 +1027,36 @@ export default function QuotePage() {
                   <table className="w-full text-sm text-left">
                     <thead className="bg-indigo-600 text-white">
                       <tr>
-                        {["ITEM NAME", "UNIT", "QUANTITY", "RATE", "DETAILS", "IMAGE", "AMOUNT", "ACTION"].map(h => (
-                          <th key={h} className="px-2 py-2 font-medium text-xs">{h}</th>
-                        ))}
+                        <th className="px-2 py-2 font-medium text-xs">ITEM NAME</th>
+                        <th className="px-2 py-2 font-medium text-xs">UNIT</th>
+                        <th className="px-2 py-2 font-medium text-xs">QUANTITY</th>
+                        <th className="px-2 py-2 font-medium text-xs">RATE</th>
+                        <th className="px-2 py-2 font-medium text-xs">DETAILS</th>
+                        <th className="px-2 py-2 font-medium text-xs">IMAGE</th>
+                        <th className="px-2 py-2 font-medium text-xs">AMOUNT</th>
+                        <th className="px-2 py-2 font-medium text-xs text-center">
+                          <button type="button" onClick={addEmptyRow} className="bg-green-500 text-white px-2 py-0.5 rounded text-xs font-bold hover:bg-green-600" title="Add Row">+ Row</button>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {formData.items.map((row) => (
                         <tr key={row.id} className="border-b">
-                          <td className="px-2 py-1">
-                            <select value={row.itemName} onChange={e => updateRow(row.id, "itemName", e.target.value)} className="w-40 border rounded px-2 py-1">
-                              <option value="">Select Item</option>
-                              {itemsList.map(i => <option key={i.uuid} value={i.itemName}>{i.itemName}</option>)}
-                            </select>
+                          <td className="px-2 py-1 min-w-[160px]">
+                            <PredictiveSearchSelect
+                              options={itemsList.map(i => ({ value: i.itemName, label: i.itemName }))}
+                              value={row.itemName}
+                              onChange={val => updateRow(row.id, "itemName", val)}
+                              placeholder="Select Item"
+                            />
                           </td>
-                          <td className="px-2 py-1">
-                            <select value={row.unit} onChange={e => updateRow(row.id, "unit", e.target.value)} className="w-24 border rounded px-2 py-1">
-                              <option value="">Select</option>
-                              {unitsList.length > 0 ? (
-                                 unitsList.map(u => <option key={u.uuid} value={u.name}>{u.name}</option>)
-                              ) : (
-                                 DEFAULT_UNITS.map((u, i) => <option key={i} value={u}>{u}</option>)
-                              )}
-                            </select>
+                          <td className="px-2 py-1 min-w-[120px]">
+                            <PredictiveSearchSelect
+                              options={DEFAULT_UNITS.map(u => ({ value: u, label: u }))}
+                              value={row.unit}
+                              onChange={val => updateRow(row.id, "unit", val)}
+                              placeholder="Select Unit"
+                            />
                           </td>
                           <td className="px-2 py-1"><input type="number" value={row.quantity} onChange={e => updateRow(row.id, "quantity", e.target.value)} className="w-20 border rounded px-2 py-1" /></td>
                           <td className="px-2 py-1"><input type="number" value={row.rate} onChange={e => updateRow(row.id, "rate", e.target.value)} className="w-24 border rounded px-2 py-1" /></td>
@@ -1018,7 +1069,11 @@ export default function QuotePage() {
                         </tr>
                       ))}
                       {formData.items.length === 0 && (
-                        <tr><td colSpan={8} className="text-center py-2 text-gray-500">Click + to add item</td></tr>
+                        <tr>
+                          <td colSpan={8} className="text-center py-4 text-gray-500">
+                            <button type="button" onClick={addEmptyRow} className="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-indigo-700 inline-flex items-center gap-1">+ Add Item Row</button>
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                     <tfoot>
@@ -1098,28 +1153,34 @@ export default function QuotePage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Category</label>
-                  <select required value={newItemForm.categoryId} onChange={e => setNewItemForm({...newItemForm, categoryId: e.target.value, subCategoryId: ""})} className="w-full border rounded px-2 py-1.5 text-sm">
-                    <option value="">Select Category</option>
-                    {categories.map(c => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={categories.map(c => ({ value: c.uuid, label: c.name }))}
+                    value={newItemForm.categoryId}
+                    onChange={val => setNewItemForm({...newItemForm, categoryId: val, subCategoryId: ""})}
+                    placeholder="Select Category"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Sub Category</label>
-                  <select value={newItemForm.subCategoryId} onChange={e => setNewItemForm({...newItemForm, subCategoryId: e.target.value})} className="w-full border rounded px-2 py-1.5 text-sm" disabled={!newItemForm.categoryId}>
-                    <option value="">Select Sub Category</option>
-                    {subCategories.filter(sc => sc.categoryId === newItemForm.categoryId).map(sc => (
-                      <option key={sc.uuid} value={sc.uuid}>{sc.name}</option>
-                    ))}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={subCategories.filter(sc => sc.categoryId === newItemForm.categoryId).map(sc => ({ value: sc.uuid, label: sc.name }))}
+                    value={newItemForm.subCategoryId}
+                    onChange={val => setNewItemForm({...newItemForm, subCategoryId: val})}
+                    placeholder="Select Sub Category"
+                  />
                 </div>
                 
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Brand</label>
                   <div className="flex gap-1">
-                    <select value={newItemForm.brand} onChange={e => setNewItemForm({...newItemForm, brand: e.target.value})} className="w-full border rounded px-2 py-1.5 text-sm">
-                      <option value="">Select Brand</option>
-                      {brands.map(b => <option key={b.uuid} value={b.name}>{b.name}</option>)}
-                    </select>
+                    <div className="flex-1">
+                      <PredictiveSearchSelect
+                        options={brands.map(b => ({ value: b.name, label: b.name }))}
+                        value={newItemForm.brand}
+                        onChange={val => setNewItemForm({...newItemForm, brand: val})}
+                        placeholder="Select Brand"
+                      />
+                    </div>
                     <button type="button" onClick={() => setIsBrandModalOpen(true)} className="bg-indigo-600 text-white px-2 rounded hover:bg-indigo-700">+</button>
                   </div>
                 </div>
@@ -1127,14 +1188,14 @@ export default function QuotePage() {
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Unit</label>
                   <div className="flex gap-1">
-                    <select required value={newItemForm.unit} onChange={e => setNewItemForm({...newItemForm, unit: e.target.value})} className="w-full border rounded px-2 py-1.5 text-sm">
-                      <option value="">Select Unit</option>
-                      {unitsList.length > 0 ? (
-                         unitsList.map(u => <option key={u.uuid} value={u.name}>{u.name}</option>)
-                      ) : (
-                         DEFAULT_UNITS.map((u, i) => <option key={i} value={u}>{u}</option>)
-                      )}
-                    </select>
+                    <div className="flex-1">
+                      <PredictiveSearchSelect
+                        options={(unitsList.length > 0 ? unitsList.map(u => ({ value: u.name, label: u.name })) : DEFAULT_UNITS.map(u => ({ value: u, label: u })))}
+                        value={newItemForm.unit}
+                        onChange={val => setNewItemForm({...newItemForm, unit: val})}
+                        placeholder="Select Unit"
+                      />
+                    </div>
                     <button type="button" onClick={() => setIsUnitModalOpen(true)} className="bg-indigo-600 text-white px-2 rounded hover:bg-indigo-700">+</button>
                   </div>
                 </div>

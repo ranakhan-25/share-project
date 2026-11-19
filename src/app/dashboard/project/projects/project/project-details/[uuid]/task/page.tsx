@@ -1,11 +1,14 @@
+"use client";
+
+import { getStoredAccessToken, getStoredUser } from "@/lib/admin-auth/adminAuthStorage";
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Plus, X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface Task {
   id: string | number;
@@ -23,7 +26,7 @@ interface Task {
   cost: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
 // ---------- Main Task Page ----------
 export default function TaskPage() {
@@ -31,17 +34,28 @@ export default function TaskPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
 
   // API থেকে টাস্ক লিস্ট ফেচ
   const fetchTasks = async () => {
     try {
       setLoading(true);
       // আপনার API এন্ডপয়েন্ট
-      const res = await fetch(`${API_BASE}/realbizpro/api/v1/task?page=1&limit=100`);
+      const res = await fetch(`${API_BASE}/realbizpro/api/v1/task?page=1&limit=100`, { headers: { Accept: "application/json", Authorization: `Bearer ${getStoredAccessToken()}` } });
       const json = await res.json();
       
       if (json.success) {
-        setTasks(json.data.data || []);
+        const raw = json.data.data || [];
+        const filtered = userEmail
+          ? raw.filter((t: any) => {
+              const creator = String(t.createdBy || "").toLowerCase().trim();
+              const assigned = String(t.assignedTo || t.assigned || t.email || "").toLowerCase().trim();
+              return creator === userEmail || assigned === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+        setTasks(filtered);
       }
     } catch (err) {
       console.error(err);
@@ -50,9 +64,7 @@ export default function TaskPage() {
     }
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+  useEffect(() => { fetchTasks(); }, [userEmail]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 font-sans text-gray-800">
@@ -182,7 +194,12 @@ function TaskAddModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="block text-xs text-gray-600 mb-1">Under</label>
-            <select className="w-full border rounded px-3 py-2 text-sm"><option>Select Task</option></select>
+            <PredictiveSearchSelect
+              placeholder="Select Task..."
+              options={tasks.map((t) => ({ value: t.uuid, label: t.taskName }))}
+              value=""
+              onChange={() => {}}
+            />
           </div>
           
           <div>
@@ -196,21 +213,33 @@ function TaskAddModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: 
 
           <div>
             <label className="block text-xs text-gray-600 mb-1">Status</label>
-            <select name="status" className="w-full border rounded px-3 py-2 text-sm">
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-              <option value="Pending">Pending</option>
-              <option value="Delayed">Delayed</option>
-            </select>
+            <PredictiveSearchSelect
+              name="status"
+              placeholder="Select status..."
+              options={[
+                { value: 'In Progress', label: 'In Progress' },
+                { value: 'Completed', label: 'Completed' },
+                { value: 'Pending', label: 'Pending' },
+                { value: 'Delayed', label: 'Delayed' },
+              ]}
+              value="In Progress"
+              onChange={() => {}}
+            />
           </div>
           <div>
             <label className="block text-xs text-gray-600 mb-1">Priority</label>
-            <select name="priority" className="w-full border rounded px-3 py-2 text-sm">
-              <option value="None">None</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-            </select>
+            <PredictiveSearchSelect
+              name="priority"
+              placeholder="Select priority..."
+              options={[
+                { value: 'None', label: 'None' },
+                { value: 'Low', label: 'Low' },
+                { value: 'Medium', label: 'Medium' },
+                { value: 'High', label: 'High' },
+              ]}
+              value="None"
+              onChange={() => {}}
+            />
           </div>
 
           <div>

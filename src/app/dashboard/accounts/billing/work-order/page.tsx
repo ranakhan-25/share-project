@@ -18,11 +18,26 @@ import {
   Trash2,
   ChevronRight,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== API CONFIG ====================
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 export default function WorkOrderPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -89,6 +104,7 @@ export default function WorkOrderPage() {
     try {
       const res = await fetch(
         `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) {
         throw new Error(`${endpoint} returned ${res.status}`);
@@ -172,6 +188,7 @@ export default function WorkOrderPage() {
       // ⚠️ Endpoint apnar backend onujayi change korte hobe
       const res = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/work-orders?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error("Failed to load work orders");
       const json = await res.json();
@@ -252,12 +269,25 @@ export default function WorkOrderPage() {
     try {
       setLoading(true);
       if (!formData.projectId) throw new Error("Select a project");
-      const payload = {
-        projectId: formData.projectId,
+      const dateStr = formData.date
+        ? String(formData.date).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const payload: Record<string, any> = {
         title: `Work Order ${formData.code}`,
+        date: dateStr,
+        recordDate: dateStr,
         code: formData.code,
-        recordDate: formData.date,
-        amount: grandTotal,
+        projectId: formData.projectId,
+        items: orderItems.map(({ id, ...item }) => item),
+        subtotal: Number(subtotal || 0),
+        vatPercent: Number(formData.vatPercent || 0),
+        vatInclude: Boolean(formData.vatInclude),
+        vatAmount: Number(vatAmount || 0),
+        aitPercent: Number(formData.aitPercent || 0),
+        aitInclude: Boolean(formData.aitInclude),
+        aitAmount: Number(aitAmount || 0),
+        grandTotal: Number(grandTotal || 0),
+        amount: Number(grandTotal || 0),
         details: {
           ...formData,
           categoryId,
@@ -269,6 +299,14 @@ export default function WorkOrderPage() {
           items: orderItems.map(({ id, ...item }) => item),
         },
       };
+      if (formData.customerId) payload.customerId = formData.customerId;
+      if (formData.clientOrderNo) payload.clientOrderNo = formData.clientOrderNo;
+      if (formData.projectTypeId) payload.projectTypeId = formData.projectTypeId;
+      if (formData.siteId) payload.siteId = formData.siteId;
+      if (formData.attachment) payload.attachment = formData.attachment;
+      if (formData.poNo) payload.poNo = formData.poNo;
+      if (categoryId) payload.categoryId = categoryId;
+      if (subCategoryId) payload.subCategoryId = subCategoryId;
 
       console.log("📤 Sending Work Order Payload:", payload);
 
@@ -279,7 +317,7 @@ export default function WorkOrderPage() {
         }`,
         {
           method: isEditing ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         },
       );
@@ -354,7 +392,10 @@ export default function WorkOrderPage() {
             setLoading(true);
             const res = await fetch(
               `${API_BASE}${API_PREFIX}/project-billing/work-orders/${order.uuid}`,
-              { method: "DELETE" },
+              {
+                method: "DELETE",
+                headers: getAuthHeaders(),
+              },
             );
             if (!res.ok) {
               const errorData = await res.json().catch(() => ({}));
@@ -420,21 +461,18 @@ export default function WorkOrderPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Project</label>
-                <div className="relative">
-                  <select
-                    value={selectedListProjectId}
-                    onChange={(e) => setSelectedListProjectId(e.target.value)}
-                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-                  >
-                    <option value="">All projects</option>
-                    {projects.map((project) => (
-                      <option key={project.uuid} value={project.uuid}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "", label: "All projects" },
+                    ...projects.map((project) => ({
+                      value: project.uuid,
+                      label: project.name,
+                    })),
+                  ]}
+                  value={selectedListProjectId}
+                  onChange={(val) => setSelectedListProjectId(val)}
+                  placeholder="All projects"
+                />
               </div>
             </div>
           </div>
@@ -686,20 +724,17 @@ export default function WorkOrderPage() {
               <label className="block font-semibold text-slate-600 mb-1">
                 Customer
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={customers.map((c) => ({
+                  value: c.uuid,
+                  label: c.name,
+                }))}
                 value={formData.customerId}
-                onChange={(e) =>
-                  setFormData({ ...formData, customerId: e.target.value })
+                onChange={(val) =>
+                  setFormData({ ...formData, customerId: val })
                 }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select One Option</option>
-                {customers.map((c) => (
-                  <option key={c.uuid} value={c.uuid}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select One Option"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
@@ -716,63 +751,55 @@ export default function WorkOrderPage() {
               <label className="block font-semibold text-slate-600 mb-1">
                 Project Type
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={projectTypes.map((t) => ({
+                  value: t.uuid,
+                  label: t.name,
+                }))}
                 value={formData.projectTypeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectTypeId: e.target.value })
+                onChange={(val) =>
+                  setFormData({ ...formData, projectTypeId: val })
                 }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select value</option>
-                {projectTypes.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select value"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Project
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={projects.map((p) => ({
+                  value: p.uuid,
+                  label: p.name,
+                }))}
                 value={formData.projectId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
+                onChange={(val) =>
+                  setFormData({ ...formData, projectId: val })
                 }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Project"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Site
               </label>
-              <select
-                value={formData.siteId}
-                onChange={(e) =>
-                  setFormData({ ...formData, siteId: e.target.value })
-                }
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Site</option>
-                {sites
+              <PredictiveSearchSelect
+                options={sites
                   .filter(
                     (site) =>
-                      !site.projectId || site.projectId === formData.projectId,
+                      !site.projectId ||
+                      site.projectId === formData.projectId,
                   )
-                  .map((site) => (
-                    <option key={site.uuid} value={site.uuid}>
-                      {site.name}
-                    </option>
-                  ))}
-              </select>
+                  .map((site) => ({
+                    value: site.uuid,
+                    label: site.name,
+                  }))}
+                value={formData.siteId}
+                onChange={(val) =>
+                  setFormData({ ...formData, siteId: val })
+                }
+                placeholder="Select Site"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
@@ -829,77 +856,46 @@ export default function WorkOrderPage() {
               <label className="block font-semibold text-slate-600 mb-1">
                 Category
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={categories.map((c) => ({
+                  value: c.uuid,
+                  label: c.name,
+                }))}
                 value={categoryId}
-                onChange={(e) => {
-                  setCategoryId(e.target.value);
+                onChange={(val) => {
+                  setCategoryId(val);
                   setSubCategoryId("");
                 }}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Category</option>
-                {categories.map((c) => (
-                  <option key={c.uuid} value={c.uuid}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Category"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Sub Category
               </label>
-              <select
-                value={subCategoryId}
-                onChange={(e) => setSubCategoryId(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="">Select Sub Category</option>
-                {subCategories
+              <PredictiveSearchSelect
+                options={subCategories
                   .filter(
                     (sc) =>
                       !categoryId ||
                       sc.categoryId === categoryId ||
                       sc.details?.categoryId === categoryId,
                   )
-                  .map((sc) => (
-                  <option key={sc.uuid} value={sc.uuid}>
-                    {sc.name}
-                  </option>
-                  ))}
-              </select>
+                  .map((sc) => ({
+                    value: sc.uuid,
+                    label: sc.name,
+                  }))}
+                value={subCategoryId}
+                onChange={(val) => setSubCategoryId(val)}
+                placeholder="Select Sub Category"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
                 Select Item (Product / Material)
               </label>
-              <select
-                className="w-full border rounded-lg px-3 py-2"
-                value=""
-                onChange={(e) => {
-                  const selected = items.find(
-                    (item) => item.uuid === e.target.value,
-                  );
-                  if (selected)
-                    setOrderItems([
-                      ...orderItems,
-                      {
-                        id: String(Date.now()),
-                        itemId: selected.uuid,
-                        itemName: selected.name,
-                        description: selected.description || "",
-                        unit: selected.unit || "Nos",
-                        quantity: 1,
-                        rate: Number(selected.rate || selected.salePrice || 0),
-                        amount: Number(
-                          selected.rate || selected.salePrice || 0,
-                        ),
-                      },
-                    ]);
-                }}
-              >
-                <option value="">Search Item / Product / Material...</option>
-                {items
+              <PredictiveSearchSelect
+                options={items
                   .filter(
                     (item) =>
                       (!item.projectId ||
@@ -911,12 +907,34 @@ export default function WorkOrderPage() {
                         !item.details?.subCategoryId ||
                         item.details.subCategoryId === subCategoryId),
                   )
-                  .map((i) => (
-                    <option key={i.uuid} value={i.uuid}>
-                      {i.name}
-                    </option>
-                  ))}
-              </select>
+                  .map((i) => ({
+                    value: i.uuid,
+                    label: i.name,
+                  }))}
+                value=""
+                onChange={(val) => {
+                  const selected = items.find((item) => item.uuid === val);
+                  if (selected)
+                    setOrderItems([
+                      ...orderItems,
+                      {
+                        id: String(Date.now()),
+                        itemId: selected.uuid,
+                        itemName: selected.name,
+                        description: selected.description || "",
+                        unit: selected.unit || "Nos",
+                        quantity: 1,
+                        rate: Number(
+                          selected.rate || selected.salePrice || 0,
+                        ),
+                        amount: Number(
+                          selected.rate || selected.salePrice || 0,
+                        ),
+                      },
+                    ]);
+                }}
+                placeholder="Search Item / Product / Material..."
+              />
             </div>
           </div>
 
@@ -971,26 +989,25 @@ export default function WorkOrderPage() {
                         className="w-full border rounded px-2 py-1"
                       />
                     </td>
-                    <td className="py-2 px-3">
-                      <select
+                    <td className="py-2 px-3 w-32">
+                      <PredictiveSearchSelect
+                        options={[
+                          { value: "Nos", label: "Nos" },
+                          { value: "Pcs", label: "Pcs" },
+                          { value: "Kg", label: "Kg" },
+                          { value: "Set", label: "Set" },
+                          { value: "Job", label: "Job" },
+                        ]}
                         value={item.unit}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setOrderItems(
                             orderItems.map((row, i) =>
-                              i === index
-                                ? { ...row, unit: e.target.value }
-                                : row,
+                              i === index ? { ...row, unit: val } : row,
                             ),
                           )
                         }
-                        className="w-full border rounded px-2 py-1"
-                      >
-                        <option>Nos</option>
-                        <option>Pcs</option>
-                        <option>Kg</option>
-                        <option>Set</option>
-                        <option>Job</option>
-                      </select>
+                        placeholder="Unit"
+                      />
                     </td>
                     <td className="py-2 px-3">
                       <input
@@ -1206,15 +1223,27 @@ export default function WorkOrderPage() {
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <label className="block font-semibold mb-1">Category</label>
-                <select className="w-full border rounded px-2 py-1.5">
-                  <option>Select Category</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={categories.map((c) => ({
+                    value: c.uuid,
+                    label: c.name,
+                  }))}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select Category"
+                />
               </div>
               <div>
                 <label className="block font-semibold mb-1">Sub Category</label>
-                <select className="w-full border rounded px-2 py-1.5">
-                  <option>Select Sub Category</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={subCategories.map((sc) => ({
+                    value: sc.uuid,
+                    label: sc.name,
+                  }))}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select Sub Category"
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block font-semibold mb-1">Item Name</label>
@@ -1225,15 +1254,25 @@ export default function WorkOrderPage() {
               </div>
               <div>
                 <label className="block font-semibold mb-1">Brand</label>
-                <select className="w-full border rounded px-2 py-1.5">
-                  <option>Select Brand</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={[]}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select Brand"
+                />
               </div>
               <div>
                 <label className="block font-semibold mb-1">Unit</label>
-                <select className="w-full border rounded px-2 py-1.5">
-                  <option>Select Unit</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Nos", label: "Nos" },
+                    { value: "Pcs", label: "Pcs" },
+                    { value: "Kg", label: "Kg" },
+                  ]}
+                  value="Nos"
+                  onChange={() => {}}
+                  placeholder="Select Unit"
+                />
               </div>
               <div>
                 <label className="block font-semibold mb-1">
@@ -1352,9 +1391,15 @@ export default function WorkOrderPage() {
                 <label className="block font-semibold mb-1">
                   Chart Of Groups
                 </label>
-                <select className="w-full border rounded px-2 py-1.5">
-                  <option>Select One Option</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Customers", label: "Customers" },
+                    { value: "Sundry Debtors", label: "Sundry Debtors" },
+                  ]}
+                  value=""
+                  onChange={() => {}}
+                  placeholder="Select One Option"
+                />
               </div>
             </div>
             <div className="bg-slate-50 px-5 py-3 border-t flex justify-end gap-2">

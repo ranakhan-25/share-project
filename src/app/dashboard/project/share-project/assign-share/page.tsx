@@ -2,6 +2,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import React, { useState, useEffect } from "react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 import {
   Search,
   Plus,
@@ -62,6 +64,7 @@ function getAuthHeaders(): Record<string, string> {
     return { "Content-Type": "application/json" };
   }
   const token =
+    getStoredAccessToken() ||
     localStorage.getItem("share-project:access-token") ||
     localStorage.getItem("token") ||
     localStorage.getItem("accessToken") ||
@@ -155,7 +158,12 @@ async function fetchShareAssignments(projectId?: string): Promise<{
     console.log("After mapping count:", mapped.length);
 
     // ✅ Filter — shudhu inactive/deleted bad
+    const userStored = typeof window !== "undefined" ? getStoredUser() : null;
+    const userEmail = (userStored?.email || "").toLowerCase().trim();
     const filtered = mapped.filter((item) => {
+      if (!userEmail) return false;
+      const creator = String(item.email || item.customerName || "").toLowerCase().trim();
+      // keep if active/not deleted
       if (!item.status) return true;
       const status = item.status.toLowerCase();
       return status !== "inactive" && status !== "deleted";
@@ -171,7 +179,7 @@ async function fetchShareAssignments(projectId?: string): Promise<{
 }
 
 // ---------- PROJECT dropdown ----------
-async function fetchProjects(): Promise<OptionItem[]> {
+async function fetchProjects(userEmail?: string): Promise<OptionItem[]> {
   try {
     const url = `${PROJECT_API}?page=1&limit=100`;
     const res = await fetch(url, {
@@ -182,9 +190,15 @@ async function fetchProjects(): Promise<OptionItem[]> {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return [];
     const list = json?.data?.data || json?.data || [];
-    return list.map((p: any) => ({
+    const email = userEmail || (typeof window !== "undefined" ? getStoredUser()?.email : "");
+    const cleanEmail = (email || "").toLowerCase().trim();
+    const userProjects = cleanEmail ? list.filter((p: any) => {
+      const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || "").toLowerCase().trim();
+      return creator === cleanEmail;
+    }) : [];
+    return userProjects.map((p: any) => ({
       uuid: p.uuid,
-      name: p.name || p.code || "Unnamed",
+      name: p.name || p.projectName || p.code || "Unnamed",
       code: p.code,
     }));
   } catch (err) {
@@ -349,18 +363,18 @@ const toApiPayload = (data: {
   status: string;
 }) => ({
   projectId: data.projectId,
-  projectTypeId: data.projectTypeId,
-  siteId: data.siteId,
-  shareCode: data.shareCode,
+  projectTypeId: data.projectTypeId ? data.projectTypeId : undefined,
+  siteId: data.siteId ? data.siteId : undefined,
+  shareCode: data.shareCode ? data.shareCode : undefined,
   customerName: data.customerName,
   noOfShares: Number(data.noOfShares) || 0,
-  flatLand: data.flatLand,
-  note: data.note || "",
-  email: data.email || "",
-  mobile: data.mobile || "",
-  nid: data.nid || "",
-  address: data.address || "",
-  image: data.image || "",
+  flatLand: data.flatLand ? data.flatLand : undefined,
+  note: data.note || undefined,
+  email: data.email ? data.email : undefined,
+  mobile: data.mobile || undefined,
+  nid: data.nid || undefined,
+  address: data.address || undefined,
+  image: data.image || undefined,
   shareAmount: Number(data.shareAmount) || 0,
   paidAmount: Number(data.paidAmount) || 0,
   totalCost: Number(data.totalCost) || 0,
@@ -368,7 +382,7 @@ const toApiPayload = (data: {
   due: Number(data.due) || 0,
   penaltyAmount: Number(data.penaltyAmount) || 0,
   points: Number(data.points) || 0,
-  assignedAt: data.assignedAt,
+  assignedAt: data.assignedAt ? data.assignedAt : undefined,
   status: data.status || "active",
 });
 
@@ -464,21 +478,13 @@ function AssignShareFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Project <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
                 required
+                placeholder="Select Project..."
+                options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
                 value={formData.projectId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, projectId: val })}
+              />
             </div>
 
             {/* Project Type */}
@@ -486,21 +492,13 @@ function AssignShareFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Project Type <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
                 required
+                placeholder="Select Project Type..."
+                options={projectTypes.map((t) => ({ value: t.uuid, label: t.name }))}
                 value={formData.projectTypeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectTypeId: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select Project Type</option>
-                {projectTypes.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, projectTypeId: val })}
+              />
             </div>
 
             {/* Site */}
@@ -508,21 +506,13 @@ function AssignShareFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Site <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
                 required
+                placeholder="Select Site..."
+                options={projectSites.map((s) => ({ value: s.uuid, label: s.name }))}
                 value={formData.siteId}
-                onChange={(e) =>
-                  setFormData({ ...formData, siteId: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select Site</option>
-                {projectSites.map((s) => (
-                  <option key={s.uuid} value={s.uuid}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, siteId: val })}
+              />
             </div>
 
             {/* Flat/Land */}
@@ -530,26 +520,12 @@ function AssignShareFormModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Flat/Land
               </label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="Select Flat/Land..."
+                options={flatLands.map((f: any) => ({ value: f.uuid || f.flatLandNo || f.name, label: f.flatLandNo || f.name || f.uuid }))}
                 value={formData.flatLand}
-                onChange={(e) =>
-                  setFormData({ ...formData, flatLand: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select Flat/Land</option>
-                {flatLands.length === 0 ? (
-                  <option value="" disabled>
-                    Loading flat/lands...
-                  </option>
-                ) : (
-                  flatLands.map((f) => (
-                    <option key={f.uuid} value={f.name}>
-                      {f.name}
-                    </option>
-                  ))
-                )}
-              </select>
+                onChange={(val) => setFormData({ ...formData, flatLand: val })}
+              />
             </div>
 
             {/* Share Code */}
@@ -957,81 +933,49 @@ function BulkAssignShareModal({
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Project <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
                 required
+                placeholder="Select Project..."
+                options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
                 value={formData.projectId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, projectId: val })}
+              />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Project Type
               </label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="Select Project Type..."
+                options={projectTypes.map((t) => ({ value: t.uuid, label: t.name }))}
                 value={formData.projectTypeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectTypeId: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">Select Project Type</option>
-                {projectTypes.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, projectTypeId: val })}
+              />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Site
               </label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="Select Site..."
+                options={projectSites.map((s) => ({ value: s.uuid, label: s.name }))}
                 value={formData.siteId}
-                onChange={(e) =>
-                  setFormData({ ...formData, siteId: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">Select Site</option>
-                {projectSites.map((s) => (
-                  <option key={s.uuid} value={s.uuid}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, siteId: val })}
+              />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 Flat/Land
               </label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="Select Flat/Land..."
+                options={flatLands.map((f: any) => ({ value: f.uuid || f.flatLandNo || f.name, label: f.flatLandNo || f.name || f.uuid }))}
                 value={formData.flatLand}
-                onChange={(e) =>
-                  setFormData({ ...formData, flatLand: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="">Select Flat/Land</option>
-                {flatLands.map((f) => (
-                  <option key={f.uuid} value={f.name}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFormData({ ...formData, flatLand: val })}
+              />
             </div>
 
             <div>
@@ -1157,7 +1101,17 @@ export default function AssignShareListPage() {
       console.log("Loaded project sites →", siteList.length);
       console.log("Loaded flat lands →", flatLandList.length);
 
-      setAssignments(assignmentRes.data);
+      const userStored = typeof window !== "undefined" ? getStoredUser() : null;
+      const userEmail = (userStored?.email || "").toLowerCase().trim();
+      const validProjectIds = new Set(projectList.map((p) => p.uuid));
+      const userAssignments = assignmentRes.data.filter(
+        (a: any) =>
+          validProjectIds.has(a.projectId) ||
+          (a.email && a.email.toLowerCase().trim() === userEmail) ||
+          (a.createdBy && a.createdBy.toLowerCase().trim() === userEmail)
+      );
+
+      setAssignments(userAssignments);
       setProjects(projectList);
       setProjectTypes(typeList);
       setProjectSites(siteList);
@@ -1265,18 +1219,17 @@ export default function AssignShareListPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span className="whitespace-nowrap">Select Project</span>
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="border border-slate-300 rounded-md px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[180px]"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <div className="min-w-[200px]">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: '', label: 'All Projects' },
+                    ...projects.map((p) => ({ value: p.uuid, label: p.name }))
+                  ]}
+                  value={selectedProjectId}
+                  onChange={(val) => setSelectedProjectId(val)}
+                  placeholder="Select Project"
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-slate-600">

@@ -20,6 +20,8 @@ import {
   Edit2,
   Trash2
 } from 'lucide-react';
+import { getStoredAccessToken, getStoredUser } from '@/lib/admin-auth/adminAuthStorage';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 
 interface ProjectItem {
   id: string | number;
@@ -68,20 +70,14 @@ interface PaginationMeta {
   totalPages: number;
 }
 
-function getStoredAccessToken(): string {
-  if (typeof window === 'undefined') return '';
-  return (
-    localStorage.getItem('access_token') ||
-    localStorage.getItem('token') ||
-    localStorage.getItem('share-project:access-token') ||
-    ''
-  );
-}
-
 export default function ProjectControlsPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
 
   // State
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || '').toLowerCase().trim();
+
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
   const [controls, setControls] = useState<ProjectControl[]>([]);
@@ -125,14 +121,14 @@ export default function ProjectControlsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const authHeaders = () => {
-    const token = getStoredAccessToken();
+    const token = typeof window !== 'undefined' ? getStoredAccessToken() : '';
     return {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     };
   };
 
-  // Load user projects
+  // Load user projects strictly scoped to userEmail
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -140,17 +136,28 @@ export default function ProjectControlsPage() {
           headers: authHeaders()
         });
         const json = await res.json();
-        const list: ProjectItem[] = json?.data?.data || json?.data || (Array.isArray(json) ? json : []);
-        setProjects(list);
-        if (list.length > 0 && !selectedProjectUuid) {
-          setSelectedProjectUuid(list[0].uuid);
+        const list: any[] = json?.data?.data || json?.data || (Array.isArray(json) ? json : []);
+        const userProjects = userEmail
+          ? list.filter((p: any) => {
+              const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || '').toLowerCase().trim();
+              return creator === userEmail || creator === String(storedUser?.id);
+            })
+          : [];
+
+        setProjects(userProjects);
+        if (userProjects.length > 0) {
+          setSelectedProjectUuid(userProjects[0].uuid);
+        } else {
+          setSelectedProjectUuid('');
+          setControls([]);
+          setIsLoading(false);
         }
       } catch (err) {
         console.error('Failed to load user projects:', err);
       }
     };
     fetchProjects();
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, userEmail]);
 
   // 1. FETCH CONTROLS
   const fetchControls = async (page = 1, limit = 10, projUuid = selectedProjectUuid) => {
@@ -425,19 +432,20 @@ export default function ProjectControlsPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Project Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-[260px]">
             <span className="text-sm font-semibold text-slate-600">Project:</span>
-            <select
-              value={selectedProjectUuid}
-              onChange={(e) => { setSelectedProjectUuid(e.target.value); setCurrentPage(1); }}
-              className="bg-white border border-slate-300 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:border-blue-600"
-            >
-              {projects.map((p) => (
-                <option key={p.uuid} value={p.uuid}>
-                  {p.projectName || p.name || `Project ${p.id}`}
-                </option>
-              ))}
-            </select>
+            <div className="flex-1">
+              <PredictiveSearchSelect
+                options={projects.map((p) => ({
+                  value: p.uuid,
+                  label: p.projectName || p.name || `Project ${p.id}`
+                }))}
+                value={selectedProjectUuid}
+                onChange={(val) => { setSelectedProjectUuid(val); setCurrentPage(1); }}
+                placeholder="Select Project..."
+                searchPlaceholder="Search project..."
+              />
+            </div>
           </div>
 
           <button
@@ -524,32 +532,38 @@ export default function ProjectControlsPage() {
         {/* Filters */}
         <div className="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[170px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Type:</label>
-              <select
-                value={selectedType}
-                onChange={(e) => { setSelectedType(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-              >
-                <option value="All">All Types</option>
-                <option value="Cost">Cost</option>
-                <option value="Schedule">Schedule</option>
-                <option value="Quality">Quality</option>
-              </select>
+              <div className="w-36">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: 'All', label: 'All Types' },
+                    { value: 'Cost', label: 'Cost' },
+                    { value: 'Schedule', label: 'Schedule' },
+                    { value: 'Quality', label: 'Quality' }
+                  ]}
+                  value={selectedType}
+                  onChange={(val) => { setSelectedType(val); setCurrentPage(1); }}
+                  placeholder="Select Type"
+                />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[170px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Status:</label>
-              <select
-                value={selectedStatus}
-                onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-              >
-                <option value="All">All Statuses</option>
-                <option value="OK">OK</option>
-                <option value="Warning">Warning</option>
-                <option value="Breach">Breach</option>
-              </select>
+              <div className="w-36">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: 'All', label: 'All Statuses' },
+                    { value: 'OK', label: 'OK' },
+                    { value: 'Warning', label: 'Warning' },
+                    { value: 'Breach', label: 'Breach' }
+                  ]}
+                  value={selectedStatus}
+                  onChange={(val) => { setSelectedStatus(val); setCurrentPage(1); }}
+                  placeholder="Select Status"
+                />
+              </div>
             </div>
           </div>
 
@@ -737,15 +751,16 @@ export default function ProjectControlsPage() {
             <form onSubmit={handleFormSubmit} className="p-4 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Control Type *</label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: 'Cost', label: 'Cost' },
+                    { value: 'Schedule', label: 'Schedule' },
+                    { value: 'Quality', label: 'Quality' }
+                  ]}
                   value={formData.controlType}
-                  onChange={(e) => setFormData({ ...formData, controlType: e.target.value })}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-                >
-                  <option value="Cost">Cost</option>
-                  <option value="Schedule">Schedule</option>
-                  <option value="Quality">Quality</option>
-                </select>
+                  onChange={(val) => setFormData({ ...formData, controlType: val })}
+                  placeholder="Select Control Type"
+                />
               </div>
 
               <div>
@@ -826,15 +841,16 @@ export default function ProjectControlsPage() {
             <form onSubmit={handleEditSubmit} className="p-4 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Control Type *</label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: 'Cost', label: 'Cost' },
+                    { value: 'Schedule', label: 'Schedule' },
+                    { value: 'Quality', label: 'Quality' }
+                  ]}
                   value={editFormData.controlType}
-                  onChange={(e) => setEditFormData({ ...editFormData, controlType: e.target.value })}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-600"
-                >
-                  <option value="Cost">Cost</option>
-                  <option value="Schedule">Schedule</option>
-                  <option value="Quality">Quality</option>
-                </select>
+                  onChange={(val) => setEditFormData({ ...editFormData, controlType: val })}
+                  placeholder="Select Control Type"
+                />
               </div>
 
               <div>

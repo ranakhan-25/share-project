@@ -12,10 +12,14 @@ import {
   Trash2,
   X,
   Calendar,
-  Printer,
   Check,
   Loader2,
+  ChevronRight,
+  Search,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 // ==================== TYPES ====================
 interface LedgerEntry {
@@ -43,14 +47,28 @@ interface LabourWorkBank {
   creditLimit?: number;
   dueDate?: string;
   status?: string;
+  createdBy?: string;
+  addedById?: string;
   ledgerEntries?: LedgerEntry[];
 }
 
 // ==================== API HELPERS ====================
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
-// shared error reader
+function getAuthHeaders(): Record<string, string> {
+  const token =
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 async function handleRes(res: Response, action: string) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -61,22 +79,19 @@ async function handleRes(res: Response, action: string) {
   return json;
 }
 
-async function fetchLabourWorkBanks(): Promise<{
+async function fetchLabourWorkBanks(userEmail: string): Promise<{
   data: LabourWorkBank[];
   meta: any;
 }> {
   const url = `${API_BASE}/realbizpro/api/v1/labour-work-bank?page=1&limit=100&status=active&sortOrder=DESC&withDeleted=false`;
 
-  console.log("GET →", url);
-
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
   const json = await handleRes(res, "fetch labour work banks");
-  console.log("GET response →", json);
 
   const mapped: LabourWorkBank[] = (json?.data?.data || [])
     .map((item: any) => ({
@@ -92,62 +107,57 @@ async function fetchLabourWorkBanks(): Promise<{
       creditLimit: item.creditLimit != null ? Number(item.creditLimit) : 0,
       dueDate: item.dueDate ? String(item.dueDate).slice(0, 10) : "",
       status: item.status || "active",
+      createdBy: item.createdBy || item.addedById || "",
+      addedById: item.addedById || "",
       ledgerEntries: item.ledgerEntries || [],
     }))
-    .filter(
-      (w: LabourWorkBank) =>
-        w.status !== "inactive" && w.status !== "deleted",
-    );
+    .filter((w: LabourWorkBank) => {
+      if (w.status === "inactive" || w.status === "deleted") return false;
+      if (!userEmail) return true;
+      const creator = String(w.createdBy || w.addedById || "").toLowerCase().trim();
+      return creator === userEmail || w.email.toLowerCase().trim() === userEmail;
+    });
 
   return { data: mapped, meta: json?.data?.meta };
 }
 
 async function createLabourWorkBank(payload: Record<string, any>) {
-  console.log("POST payload →", payload);
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/labour-work-bank`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
-  const json = await handleRes(res, "create labour work bank");
-  console.log("POST response →", json);
-  return json;
+  return handleRes(res, "create labour work bank");
 }
 
 async function updateLabourWorkBank(
   uuid: string,
   payload: Record<string, any>,
 ) {
-  console.log("PATCH", uuid, "payload →", payload);
   const res = await fetch(
     `${API_BASE}/realbizpro/api/v1/labour-work-bank/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
   );
-  const json = await handleRes(res, "update labour work bank");
-  console.log("PATCH response →", json);
-  return json;
+  return handleRes(res, "update labour work bank");
 }
 
 async function softDeleteLabourWorkBank(uuid: string) {
-  console.log("DELETE →", uuid);
   const res = await fetch(
     `${API_BASE}/realbizpro/api/v1/labour-work-bank/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
-  const json = await handleRes(res, "delete labour work bank");
-  console.log("DELETE response →", json);
-  return json;
+  return handleRes(res, "delete labour work bank");
 }
 
 // Form data → API payload
-const toApiPayload = (data: Partial<LabourWorkBank>) => {
+const toApiPayload = (data: Partial<LabourWorkBank>, userEmail: string) => {
   let dueDateISO: string | null = null;
   if (data.dueDate) {
     const d = new Date(data.dueDate);
@@ -166,9 +176,23 @@ const toApiPayload = (data: Partial<LabourWorkBank>) => {
     creditLimit: Number(data.creditLimit) || 0,
     dueDate: dueDateISO,
     underGroup: data.under || "Labour",
+    addedById: userEmail || "sharetest@realbiz.com",
     status: "active",
   };
 };
+
+const underOptions = [
+  { value: "Labour", label: "Labour" },
+  { value: "Worker", label: "Worker" },
+  { value: "Contractor", label: "Contractor" },
+];
+
+const entriesOptions = [
+  { value: "10", label: "10 entries" },
+  { value: "13", label: "13 entries" },
+  { value: "20", label: "20 entries" },
+  { value: "50", label: "50 entries" },
+];
 
 // ==================== FORM MODAL ====================
 function LabourFormModal({
@@ -215,22 +239,22 @@ function LabourFormModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden my-8 border border-slate-100 flex flex-col">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
-          <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden my-8 border border-slate-100 flex flex-col">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <h3 className="text-base font-bold text-slate-800">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded-full transition text-slate-500"
+            className="p-1 hover:bg-slate-200 rounded-lg transition text-slate-500"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm bg-white">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs bg-white">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Code
+              <label className="block font-semibold text-slate-700 mb-1">
+                Bank Code
               </label>
               <input
                 type="text"
@@ -239,12 +263,12 @@ function LabourFormModal({
                   setFormData({ ...formData, code: e.target.value })
                 }
                 disabled={!!initialData}
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-70 font-mono"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-70 font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block font-semibold text-slate-700 mb-1">
                 Name *
               </label>
               <input
@@ -255,13 +279,13 @@ function LabourFormModal({
                   setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="Enter Name"
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Business/Organization
+              <label className="block font-semibold text-slate-700 mb-1">
+                Business / Organization
               </label>
               <input
                 type="text"
@@ -270,12 +294,12 @@ function LabourFormModal({
                   setFormData({ ...formData, business: e.target.value })
                 }
                 placeholder="Enter Business Name"
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block font-semibold text-slate-700 mb-1">
                 Email
               </label>
               <input
@@ -285,13 +309,13 @@ function LabourFormModal({
                   setFormData({ ...formData, email: e.target.value })
                 }
                 placeholder="Enter E-mail"
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Phone/Mobile *
+              <label className="block font-semibold text-slate-700 mb-1">
+                Phone / Mobile *
               </label>
               <input
                 type="text"
@@ -301,28 +325,13 @@ function LabourFormModal({
                   setFormData({ ...formData, phone: e.target.value })
                 }
                 placeholder="Enter Phone/Mobile"
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Address
-              </label>
-              <input
-                type="text"
-                value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
-                placeholder="Enter Address"
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Credit Limit
+              <label className="block font-semibold text-slate-700 mb-1">
+                Credit Limit (৳)
               </label>
               <input
                 type="number"
@@ -334,74 +343,81 @@ function LabourFormModal({
                   })
                 }
                 placeholder="Enter Credit Limit"
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block font-semibold text-slate-700 mb-1">
                 Due Date
               </label>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={formData.dueDate ? formData.dueDate.slice(0, 10) : ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, dueDate: e.target.value })
-                  }
-                  className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
+              <input
+                type="date"
+                value={formData.dueDate ? formData.dueDate.slice(0, 10) : ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, dueDate: e.target.value })
+                }
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Under Group
+              </label>
+              <PredictiveSearchSelect
+                options={underOptions}
+                value={formData.under}
+                onChange={(val) => setFormData(prev => ({ ...prev, under: val }))}
+                placeholder="Select Under"
+              />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                Under
+              <label className="block font-semibold text-slate-700 mb-1">
+                Address
               </label>
-              <select
-                value={formData.under}
+              <input
+                type="text"
+                value={formData.address}
                 onChange={(e) =>
-                  setFormData({ ...formData, under: e.target.value })
+                  setFormData({ ...formData, address: e.target.value })
                 }
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="Labour">Labour</option>
-                <option value="Worker">Worker</option>
-                <option value="Contractor">Contractor</option>
-              </select>
+                placeholder="Enter Address"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+              />
             </div>
           </div>
 
           {formError && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-xs">
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-xl text-xs">
               {formError}
             </div>
           )}
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100 mt-6">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100 mt-4">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="px-5 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-md font-medium text-xs transition cursor-pointer shadow-xs disabled:opacity-50"
+              className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-semibold text-xs transition cursor-pointer disabled:opacity-50"
             >
-              Close
+              Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium text-xs transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center"
+              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
             >
               {saving ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Check className="w-3.5 h-3.5 mr-1.5" />
-                  Submit
+                  <Check className="w-3.5 h-3.5" />
+                  Save
                 </>
               )}
             </button>
@@ -414,29 +430,31 @@ function LabourFormModal({
 
 // ==================== MAIN PAGE ====================
 export default function LabourWorkBankListPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
   const [workers, setWorkers] = useState<LabourWorkBank[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
-  const [entriesPerPage, setEntriesPerPage] = useState(13);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [selectedProfile, setSelectedProfile] = useState<LabourWorkBank | null>(
-    null,
-  );
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingWorker, setEditingWorker] = useState<LabourWorkBank | null>(
-    null,
-  );
+  const [editingWorker, setEditingWorker] = useState<LabourWorkBank | null>(null);
 
   const loadWorkers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await fetchLabourWorkBanks();
+      const currentUser = getStoredUser();
+      const activeEmail = (currentUser?.email || userEmail || "").toLowerCase().trim();
+      const { data } = await fetchLabourWorkBanks(activeEmail);
       setWorkers(data);
     } catch (err: any) {
       console.error(err);
@@ -448,7 +466,37 @@ export default function LabourWorkBankListPage() {
 
   useEffect(() => {
     loadWorkers();
-  }, []);
+  }, [userEmail]);
+
+  const handleCreate = async (data: Partial<LabourWorkBank>) => {
+    const payload = toApiPayload(data, userEmail);
+    await createLabourWorkBank(payload);
+    toast.success("Created successfully!");
+    setIsAddModalOpen(false);
+    await loadWorkers();
+  };
+
+  const handleUpdate = async (data: Partial<LabourWorkBank>) => {
+    if (!editingWorker?.uuid) return;
+    const payload = toApiPayload(data, userEmail);
+    await updateLabourWorkBank(editingWorker.uuid, payload);
+    toast.success("Updated successfully!");
+    setEditingWorker(null);
+    await loadWorkers();
+  };
+
+  const handleDelete = async (worker: LabourWorkBank) => {
+    if (!window.confirm(`Delete "${worker.name}"?`)) return;
+
+    try {
+      if (!worker.uuid) throw new Error("Labour Work Bank UUID is missing");
+      await softDeleteLabourWorkBank(worker.uuid);
+      toast.success("Deleted successfully!");
+      setWorkers(prev => prev.filter(w => w.uuid !== worker.uuid));
+    } catch (err: any) {
+      toast.error(err?.message || "Delete failed");
+    }
+  };
 
   const filteredWorkers = workers.filter((w) => {
     const matchesSearch =
@@ -470,480 +518,200 @@ export default function LabourWorkBankListPage() {
     startIndex + entriesPerPage,
   );
 
-  const handleDelete = async (worker: LabourWorkBank) => {
-    if (!confirm(`Delete "${worker.name}"?`)) return;
-
-    try {
-      setActionLoading(true);
-      if (!worker.uuid) throw new Error("Labour Work Bank UUID is missing");
-      await softDeleteLabourWorkBank(worker.uuid);
-      await loadWorkers();
-      if (currentPage > 1 && currentTableData.length === 1) {
-        setCurrentPage(currentPage - 1);
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Delete failed. Please try again.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const filterGroupOptions = [
+    { value: "", label: "All Groups" },
+    { value: "Labour", label: "Labour" },
+    { value: "Worker", label: "Worker" },
+    { value: "Contractor", label: "Contractor" },
+  ];
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 p-4 md:p-6 space-y-4 antialiased">
-      {/* Breadcrumbs & Top Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-2 gap-4">
-        <div className="flex items-center text-sm text-slate-500 space-x-2">
-          <span className="hover:text-indigo-600 cursor-pointer font-medium">
-            Home
-          </span>
-          <span>›</span>
-          <span className="hover:text-indigo-600 cursor-pointer font-medium">
-            Labour/Worker
-          </span>
-          <span>›</span>
-          <span className="text-slate-800 font-semibold">
-            Labour Work Bank List
-          </span>
-        </div>
-
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-md shadow-sm transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4 mr-1" /> Labour/Worker Add
-        </button>
-      </div>
-
-      {/* Filter by Group & Export */}
-      <div className="space-y-3">
-        <div className="text-xs font-medium text-slate-600">
-          Chart Of Group (Under)
-        </div>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="w-full md:w-72">
-            <select
-              value={groupFilter}
-              onChange={(e) => {
-                setGroupFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full border border-slate-200 rounded-md px-3 py-2 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select value</option>
-              <option value="Labour">Labour</option>
-              <option value="Worker">Worker</option>
-              <option value="Contractor">Contractor</option>
-            </select>
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Breadcrumbs & Top Action Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Dashboard</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Project</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Contract</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Labour Work Bank
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Labour Work Bank / লেবার ওয়ার্ক ব্যাংক
+            </h1>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <button className="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded shadow-xs transition">
-              <FileSpreadsheet className="w-3.5 h-3.5 mr-1" /> Excel
-            </button>
-            <button className="inline-flex items-center px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium rounded shadow-xs transition">
-              <FileText className="w-3.5 h-3.5 mr-1" /> PDF
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Show Entries & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-2 gap-4">
-        <div className="flex items-center space-x-2 text-xs text-slate-600">
-          <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-          >
-            <option value={10}>10</option>
-            <option value={13}>13</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </select>
-          <span>entries</span>
-        </div>
-
-        <div className="flex items-center space-x-2 text-xs text-slate-600">
-          <span>Search:</span>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="border border-slate-200 rounded px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white w-48 sm:w-60"
-          />
-        </div>
-      </div>
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-16 text-slate-500">
-          <Loader2 className="w-6 h-6 animate-spin mr-2" />
-          Loading labour work banks...
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm flex items-center justify-between">
-          <span>{error}</span>
           <button
-            onClick={loadWorkers}
-            className="underline text-xs font-medium"
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
           >
-            Retry
+            <Plus className="w-4 h-4" /> + Labour/Worker Add
           </button>
         </div>
-      )}
 
-      {/* Table */}
-      {!loading && !error && (
-        <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-indigo-600 text-white text-xs font-semibold uppercase tracking-wider">
-                  <th className="py-2.5 px-3">ID</th>
-                  <th className="py-2.5 px-3">Code</th>
-                  <th className="py-2.5 px-3">Name</th>
-                  <th className="py-2.5 px-3">Company</th>
-                  <th className="py-2.5 px-3">Phone</th>
-                  <th className="py-2.5 px-3">Email</th>
-                  <th className="py-2.5 px-3">Address</th>
-                  <th className="py-2.5 px-3">Under</th>
-                  <th className="py-2.5 px-3 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                {currentTableData.length > 0 ? (
-                  currentTableData.map((worker, index) => (
-                    <tr
-                      key={worker.uuid || worker.id}
-                      className="hover:bg-indigo-50/30 transition-colors"
-                    >
-                      <td className="py-2.5 px-3 text-slate-500 font-medium">
-                        {startIndex + index + 1}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-indigo-600 font-semibold">
-                        {worker.code}
-                      </td>
-                      <td className="py-2.5 px-3 font-medium text-slate-900">
-                        {worker.name}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600">
-                        {worker.business || "-"}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600">
-                        {worker.phone || "-"}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600">
-                        {worker.email || "-"}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600">
-                        {worker.address || "-"}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600">
-                        {worker.under}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center justify-center space-x-1">
-                          <button
-                            onClick={() => setEditingWorker(worker)}
-                            title="Edit Labour/Worker"
-                            className="p-1 bg-cyan-400 hover:bg-cyan-500 text-white rounded shadow-xs transition cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedProfile(worker)}
-                            title="View Profile & Ledger"
-                            className="p-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded shadow-xs transition cursor-pointer"
-                          >
-                            <User className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(worker)}
-                            title="Delete Labour/Worker"
-                            disabled={actionLoading}
-                            className="p-1 bg-rose-500 hover:bg-rose-600 text-white rounded shadow-xs transition cursor-pointer disabled:opacity-50"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={9} className="text-center py-6 text-slate-400">
-                      No labour/worker records found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        {/* Filter and Table Container */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="w-48">
+                <PredictiveSearchSelect
+                  options={filterGroupOptions}
+                  value={groupFilter}
+                  onChange={(val) => {
+                    setGroupFilter(val);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Filter by Group"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-emerald-700 active:scale-95">
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+                </button>
+                <button className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-2xs transition hover:bg-rose-700 active:scale-95">
+                  <FileText className="w-3.5 h-3.5" /> PDF
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-32">
+                <PredictiveSearchSelect
+                  options={entriesOptions}
+                  value={String(entriesPerPage)}
+                  onChange={(val) => {
+                    setEntriesPerPage(Number(val));
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Show entries"
+                />
+              </div>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search..."
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 bg-white border-t border-slate-100 text-xs text-slate-500">
-            <div>
-              Showing {filteredWorkers.length > 0 ? startIndex + 1 : 0} to{" "}
-              {Math.min(startIndex + entriesPerPage, filteredWorkers.length)} of{" "}
-              {filteredWorkers.length} entries
+          {loading ? (
+            <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+          ) : (
+            <div className="overflow-x-auto min-h-[300px]">
+              <table className="w-full text-xs sm:text-sm text-left border-collapse whitespace-nowrap">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                    {["ID", "CODE", "NAME", "BUSINESS", "PHONE", "EMAIL", "UNDER", "CREDIT LIMIT", "ADDED BY", "ACTION"].map(h => (
+                      <th key={h} className="px-4 py-3.5 font-semibold text-white text-left tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white text-slate-700 font-medium">
+                  {currentTableData.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="text-center py-16 text-slate-400">
+                        No labour work bank records available
+                      </td>
+                    </tr>
+                  ) : (
+                    currentTableData.map((worker, index) => (
+                      <tr key={worker.uuid || worker.id} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900">{startIndex + index + 1}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-indigo-600 font-semibold">{worker.code}</td>
+                        <td className="px-4 py-3 font-bold text-slate-900">{worker.name}</td>
+                        <td className="px-4 py-3 text-slate-600">{worker.business || "-"}</td>
+                        <td className="px-4 py-3 text-slate-600">{worker.phone || "-"}</td>
+                        <td className="px-4 py-3 text-slate-600">{worker.email || "-"}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            {worker.under}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-bold text-emerald-600">৳{Number(worker.creditLimit || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-slate-500">{worker.createdBy || userEmail}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => setEditingWorker(worker)}
+                              className="rounded-lg bg-teal-50 p-1.5 text-teal-600 transition hover:bg-teal-100 active:scale-95"
+                              title="Edit"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(worker)}
+                              className="rounded-lg bg-rose-50 p-1.5 text-rose-600 transition hover:bg-rose-100 active:scale-95"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-            <div className="flex items-center space-x-1 mt-2 sm:mt-0">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 border border-slate-200 rounded ${
-                  currentPage === 1
-                    ? "bg-slate-50 text-slate-300 cursor-not-allowed"
-                    : "hover:bg-slate-50 text-slate-600 cursor-pointer"
-                }`}
+          )}
+
+          {/* Table Footer / Pagination */}
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+            <div>
+              Showing {filteredWorkers.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + entriesPerPage, filteredWorkers.length)} of {filteredWorkers.length} entries
+            </div>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} 
+                disabled={currentPage === 1} 
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
               >
                 Previous
               </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                (page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded font-medium ${
-                      currentPage === page
-                        ? "bg-indigo-600 text-white shadow-xs"
-                        : "border border-slate-200 hover:bg-slate-50 text-slate-600"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ),
-              )}
-
-              <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                }
-                disabled={currentPage === totalPages || totalPages === 0}
-                className={`px-3 py-1 border border-slate-200 rounded ${
-                  currentPage === totalPages || totalPages === 0
-                    ? "bg-slate-50 text-slate-300 cursor-not-allowed"
-                    : "hover:bg-slate-50 text-slate-600 cursor-pointer"
-                }`}
+              <button className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-semibold">{currentPage}</button>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} 
+                disabled={currentPage >= totalPages} 
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
               >
                 Next
               </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* ==================== PROFILE & LEDGER MODAL ==================== */}
-      {selectedProfile && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-5xl rounded-xl shadow-2xl overflow-hidden my-6 border border-slate-100 flex flex-col max-h-[92vh]">
-            <div className="px-6 py-3 border-b border-slate-100 flex justify-between items-center bg-white">
-              <h3 className="text-sm font-semibold text-slate-800">
-                Labour/Worker Profile & Ledger
-              </h3>
-              <div className="flex items-center space-x-2">
-                <button className="inline-flex items-center px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded shadow-xs transition">
-                  <Printer className="w-3.5 h-3.5 mr-1" /> Print
-                </button>
-                <button
-                  onClick={() => setSelectedProfile(null)}
-                  className="p-1 hover:bg-slate-100 rounded-full text-slate-500"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-6 bg-white">
-              <div className="max-w-md mx-auto bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
-                <div className="h-28 bg-gradient-to-r from-cyan-400 to-indigo-600 relative flex items-center justify-center">
-                  <div className="absolute -bottom-6 w-16 h-16 rounded-full border-4 border-white bg-slate-200 flex items-center justify-center text-slate-500 font-semibold shadow-md overflow-hidden">
-                    <User className="w-8 h-8 text-slate-400" />
-                  </div>
-                </div>
-
-                <div className="pt-8 pb-4 px-6 text-center">
-                  <h4 className="text-base font-bold text-slate-800">
-                    {selectedProfile.name}
-                  </h4>
-                  <p className="text-xs text-slate-500 mb-4">
-                    {selectedProfile.business}
-                  </p>
-
-                  <div className="border-t border-slate-100 divide-y divide-slate-100 text-xs text-left">
-                    <div className="py-2 flex justify-between">
-                      <span className="text-slate-400">ID</span>
-                      <span className="font-mono font-medium text-slate-700">
-                        {selectedProfile.code}
-                      </span>
-                    </div>
-                    <div className="py-2 flex justify-between">
-                      <span className="text-slate-400">Phone</span>
-                      <span className="font-medium text-slate-700">
-                        {selectedProfile.phone || "-"}
-                      </span>
-                    </div>
-                    <div className="py-2 flex justify-between">
-                      <span className="text-slate-400">Email</span>
-                      <span className="font-medium text-slate-700">
-                        {selectedProfile.email || "-"}
-                      </span>
-                    </div>
-                    <div className="py-2 flex justify-between">
-                      <span className="text-slate-400">Address</span>
-                      <span className="font-medium text-slate-700">
-                        {selectedProfile.address || "-"}
-                      </span>
-                    </div>
-                    {selectedProfile.creditLimit != null && (
-                      <div className="py-2 flex justify-between">
-                        <span className="text-slate-400">Credit Limit</span>
-                        <span className="font-semibold text-emerald-600">
-                          ৳
-                          {Number(selectedProfile.creditLimit).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    {selectedProfile.dueDate && (
-                      <div className="py-2 flex justify-between">
-                        <span className="text-slate-400">Due Date</span>
-                        <span className="font-medium text-slate-700">
-                          {selectedProfile.dueDate}
-                        </span>
-                      </div>
-                    )}
-                    <div className="py-2 flex justify-between">
-                      <span className="text-slate-400">Under</span>
-                      <span className="font-medium text-slate-700">
-                        {selectedProfile.under || "-"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-800">Ledger</h4>
-                <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-indigo-600 text-white font-semibold uppercase tracking-wider">
-                        <th className="py-2.5 px-3">ID</th>
-                        <th className="py-2.5 px-3">Date</th>
-                        <th className="py-2.5 px-3">Project</th>
-                        <th className="py-2.5 px-3">Description</th>
-                        <th className="py-2.5 px-3">Voucher No</th>
-                        <th className="py-2.5 px-3">Debit</th>
-                        <th className="py-2.5 px-3">Credit</th>
-                        <th className="py-2.5 px-3">Balance</th>
-                        <th className="py-2.5 px-3">Note</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      <tr className="bg-slate-50/50">
-                        <td
-                          colSpan={7}
-                          className="py-2 px-3 font-medium text-slate-600"
-                        >
-                          Opening
-                        </td>
-                        <td className="py-2 px-3 font-semibold text-slate-800">
-                          0.00
-                        </td>
-                        <td></td>
-                      </tr>
-
-                      {selectedProfile.ledgerEntries &&
-                      selectedProfile.ledgerEntries.length > 0 ? (
-                        selectedProfile.ledgerEntries.map((item, idx) => (
-                          <tr key={item.id} className="hover:bg-slate-50">
-                            <td className="py-2.5 px-3">{idx + 1}</td>
-                            <td className="py-2.5 px-3">{item.date}</td>
-                            <td className="py-2.5 px-3">{item.project}</td>
-                            <td className="py-2.5 px-3 text-indigo-600 font-medium">
-                              {item.description}
-                            </td>
-                            <td className="py-2.5 px-3 text-indigo-600 font-mono">
-                              {item.voucherNo}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              {Number(item.debit || 0).toFixed(2)}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              {Number(item.credit || 0).toLocaleString(
-                                "en-US",
-                                { minimumFractionDigits: 2 },
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 font-semibold">
-                              {Number(item.balance || 0).toLocaleString(
-                                "en-US",
-                                { minimumFractionDigits: 2 },
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3">{item.note || ""}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td
-                            colSpan={9}
-                            className="text-center py-6 text-slate-400"
-                          >
-                            No ledger transactions found.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== ADD MODAL ==================== */}
+      {/* Add Modal */}
       {isAddModalOpen && (
         <LabourFormModal
-          title="Add Labour/Worker"
+          title="New Labour / Worker Bank"
           onClose={() => setIsAddModalOpen(false)}
-          onSubmit={async (newData) => {
-            await createLabourWorkBank(toApiPayload(newData));
-            setIsAddModalOpen(false);
-            await loadWorkers();
-          }}
+          onSubmit={handleCreate}
         />
       )}
 
-      {/* ==================== EDIT MODAL ==================== */}
+      {/* Edit Modal */}
       {editingWorker && (
         <LabourFormModal
-          title="Edit Labour/Worker Details"
+          title="Edit Labour / Worker Bank"
           initialData={editingWorker}
           onClose={() => setEditingWorker(null)}
-          onSubmit={async (updatedData) => {
-            if (!editingWorker.uuid)
-              throw new Error("Labour Work Bank UUID is missing");
-            await updateLabourWorkBank(
-              editingWorker.uuid,
-              toApiPayload(updatedData),
-            );
-            setEditingWorker(null);
-            await loadWorkers();
-          }}
+          onSubmit={handleUpdate}
         />
       )}
     </div>

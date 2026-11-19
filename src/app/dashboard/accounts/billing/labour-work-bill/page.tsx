@@ -4,10 +4,25 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, ArrowLeft, X, Eye, Printer, Mail, Edit, Trash2, Search, Loader2, Save } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== API CONFIG ====================
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 export default function LabourWorkerBillPage() {
   const [bills, setBills] = useState<any[]>([]);
@@ -54,7 +69,9 @@ export default function LabourWorkerBillPage() {
   // ==================== API CALLS ====================
   const fetchOptions = async (endpoint: string) => {
     try {
-      const res = await fetch(`${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`);
+      const res = await fetch(`${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) return [];
       const json = await res.json();
       const rows = Array.isArray(json?.data?.data) ? json.data.data : Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
@@ -97,7 +114,9 @@ export default function LabourWorkerBillPage() {
       setLoading(true);
       setError(null);
       // ⚠️ API endpoint ta apnar backend onujayi change korun
-      const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/labour-work-bills?page=1&limit=100`);
+      const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/labour-work-bills?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to load labour work bills");
       const json = await res.json();
       const rows = json?.data?.data || json?.data || [];
@@ -137,7 +156,7 @@ export default function LabourWorkerBillPage() {
       };
       const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/labour-work-bills${editingBillUuid ? `/${editingBillUuid}` : ""}`, {
         method: editingBillUuid ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -170,7 +189,7 @@ export default function LabourWorkerBillPage() {
   const handleDelete = async (bill: any) => {
     if (!confirm("Are you sure?")) return;
     setActiveDropdown(null);
-    try { const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/labour-work-bills/${bill.uuid}`, { method: "DELETE" }); if (!res.ok) throw new Error("Failed to delete bill"); await loadBills(); } catch (err: any) { setError(err.message || "Failed to delete bill"); }
+    try { const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/labour-work-bills/${bill.uuid}`, { method: "DELETE", headers: getAuthHeaders() }); if (!res.ok) throw new Error("Failed to delete bill"); await loadBills(); } catch (err: any) { setError(err.message || "Failed to delete bill"); }
   };
 
   // ==================== RENDER ====================
@@ -276,28 +295,127 @@ export default function LabourWorkerBillPage() {
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">Contractor</label>
-              <select value={formData.contractorId} onChange={(e) => setFormData({...formData, contractorId: e.target.value})} className="w-full border rounded-lg px-3 py-2">
-                <option value="">Select One Option</option>
-                {contractors.map(c => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                options={contractors.map((c) => ({
+                  value: c.uuid,
+                  label: c.name,
+                }))}
+                value={formData.contractorId}
+                onChange={(val) =>
+                  setFormData({ ...formData, contractorId: val })
+                }
+                placeholder="Select One Option"
+              />
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">Project</label>
-              <select value={formData.projectId} onChange={(e) => setFormData({...formData, projectId: e.target.value})} className="w-full border rounded-lg px-3 py-2">
-                <option value="">Select Project</option>
-                {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                options={projects.map((p) => ({
+                  value: p.uuid,
+                  label: p.name,
+                }))}
+                value={formData.projectId}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectId: val })
+                }
+                placeholder="Select Project"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-            <label className="font-semibold text-slate-600">Project Type<select value={formData.projectTypeId} onChange={(e) => setFormData({...formData, projectTypeId: e.target.value})} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"><option value="">Select Project Type</option>{projectTypes.map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}</select></label>
-            <label className="font-semibold text-slate-600">Title/Name of Work<select value={formData.titleOfWork} onChange={(e) => setFormData({...formData, titleOfWork: e.target.value})} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"><option value="">Select Work</option>{workNames.filter((row) => !row.projectId || row.projectId === formData.projectId).map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}</select></label>
-            <label className="font-semibold text-slate-600">Site<select value={formData.site} onChange={(e) => setFormData({...formData, site: e.target.value})} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"><option value="">Select Site</option>{sites.filter((row) => !row.projectId || row.projectId === formData.projectId).map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}</select></label>
-            <label className="font-semibold text-slate-600">Ref WO No.<input value={formData.refWoNo} onChange={(e) => setFormData({...formData, refWoNo: e.target.value})} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
-            <label className="font-semibold text-slate-600">If Task<select value={formData.taskId} onChange={(e) => setFormData({...formData, taskId: e.target.value})} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"><option value="">Select Task</option>{tasks.map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}</select></label>
-            <label className="font-semibold text-slate-600">Category<select value={formData.categoryId} onChange={(e) => setFormData({...formData, categoryId: e.target.value})} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"><option value="">Select Category</option>{categories.map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}</select></label>
-            <label className="font-semibold text-slate-600">Select Item<select value={formData.itemId} onChange={(e) => setFormData({...formData, itemId: e.target.value})} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"><option value="">Select Item</option>{items.map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}</select></label>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Project Type</label>
+              <PredictiveSearchSelect
+                options={projectTypes.map((row) => ({
+                  value: row.uuid,
+                  label: row.name,
+                }))}
+                value={formData.projectTypeId}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectTypeId: val })
+                }
+                placeholder="Select Project Type"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Title/Name of Work</label>
+              <PredictiveSearchSelect
+                options={workNames
+                  .filter(
+                    (row) =>
+                      !row.projectId || row.projectId === formData.projectId,
+                  )
+                  .map((row) => ({
+                    value: row.uuid,
+                    label: row.name,
+                  }))}
+                value={formData.titleOfWork}
+                onChange={(val) =>
+                  setFormData({ ...formData, titleOfWork: val })
+                }
+                placeholder="Select Work"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Site</label>
+              <PredictiveSearchSelect
+                options={sites
+                  .filter(
+                    (row) =>
+                      !row.projectId || row.projectId === formData.projectId,
+                  )
+                  .map((row) => ({
+                    value: row.uuid,
+                    label: row.name,
+                  }))}
+                value={formData.site}
+                onChange={(val) => setFormData({ ...formData, site: val })}
+                placeholder="Select Site"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Ref WO No.</label>
+              <input value={formData.refWoNo} onChange={(e) => setFormData({...formData, refWoNo: e.target.value})} className="w-full border rounded-lg px-3 py-2 font-normal" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">If Task</label>
+              <PredictiveSearchSelect
+                options={tasks.map((row) => ({
+                  value: row.uuid,
+                  label: row.name,
+                }))}
+                value={formData.taskId}
+                onChange={(val) => setFormData({ ...formData, taskId: val })}
+                placeholder="Select Task"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Category</label>
+              <PredictiveSearchSelect
+                options={categories.map((row) => ({
+                  value: row.uuid,
+                  label: row.name,
+                }))}
+                value={formData.categoryId}
+                onChange={(val) =>
+                  setFormData({ ...formData, categoryId: val })
+                }
+                placeholder="Select Category"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">Select Item</label>
+              <PredictiveSearchSelect
+                options={items.map((row) => ({
+                  value: row.uuid,
+                  label: row.name,
+                }))}
+                value={formData.itemId}
+                onChange={(val) => setFormData({ ...formData, itemId: val })}
+                placeholder="Select Item"
+              />
+            </div>
           </div>
 
           <div className="overflow-x-auto border rounded-xl">
@@ -318,9 +436,52 @@ export default function LabourWorkerBillPage() {
               <tbody className="divide-y divide-slate-100">
                 {billItems.map((item, index) => (
                   <tr key={item.id}>
-                    <td className="py-2 px-3"><select value={item.workerId || ""} onChange={(e) => { const worker = workers.find((row) => row.uuid === e.target.value); setBillItems((rows) => rows.map((r, i) => i === index ? {...r, workerId: e.target.value, workerName: worker?.name || ""} : r)); }} className="w-full border rounded px-2 py-1"><option value="">Select Worker</option>{workers.map((worker) => <option key={worker.uuid} value={worker.uuid}>{worker.name}</option>)}</select></td>
+                    <td className="py-2 px-3 w-48">
+                      <PredictiveSearchSelect
+                        options={workers.map((worker) => ({
+                          value: worker.uuid,
+                          label: worker.name,
+                        }))}
+                        value={item.workerId || ""}
+                        onChange={(val) => {
+                          const worker = workers.find(
+                            (row) => row.uuid === val,
+                          );
+                          setBillItems((rows) =>
+                            rows.map((r, i) =>
+                              i === index
+                                ? {
+                                    ...r,
+                                    workerId: val,
+                                    workerName: worker?.name || "",
+                                  }
+                                : r,
+                            ),
+                          );
+                        }}
+                        placeholder="Select Worker"
+                      />
+                    </td>
                     <td className="py-2 px-3"><input value={item.description || ""} onChange={(e) => setBillItems((rows) => rows.map((r, i) => i === index ? {...r, description: e.target.value} : r))} type="text" className="w-full border rounded px-2 py-1" /></td>
-                    <td className="py-2 px-3"><select value={item.unit || "Day"} onChange={(e) => setBillItems((rows) => rows.map((r, i) => i === index ? {...r, unit: e.target.value} : r))} className="w-full border rounded px-2 py-1"><option>Day</option><option>Hour</option><option>Shift</option><option>Piece</option></select></td>
+                    <td className="py-2 px-3 w-32">
+                      <PredictiveSearchSelect
+                        options={[
+                          { value: "Day", label: "Day" },
+                          { value: "Hour", label: "Hour" },
+                          { value: "Shift", label: "Shift" },
+                          { value: "Piece", label: "Piece" },
+                        ]}
+                        value={item.unit || "Day"}
+                        onChange={(val) =>
+                          setBillItems((rows) =>
+                            rows.map((r, i) =>
+                              i === index ? { ...r, unit: val } : r,
+                            ),
+                          )
+                        }
+                        placeholder="Unit"
+                      />
+                    </td>
                     <td className="py-2 px-3"><input value={item.qtyDays ?? 1} min="0" type="number" onChange={(e) => setBillItems((rows) => rows.map((r, i) => { if (i !== index) return r; const qtyDays = Number(e.target.value); const gross = qtyDays * Number(r.rate || 0); return {...r, qtyDays, gross, netPayable: Math.max(gross - Number(r.security || 0), 0)}; }))} className="w-full border rounded px-2 py-1" /></td>
                     <td className="py-2 px-3 text-right"><input value={item.rate ?? 0} min="0" type="number" onChange={(e) => setBillItems((rows) => rows.map((r, i) => { if (i !== index) return r; const rate = Number(e.target.value); const gross = Number(r.qtyDays || 0) * rate; return {...r, rate, gross, netPayable: Math.max(gross - Number(r.security || 0), 0)}; }))} className="w-full border rounded px-2 py-1" /></td>
                     <td className="py-2 px-3 text-right">{Number(item.gross || 0).toFixed(2)}</td>
@@ -343,7 +504,19 @@ export default function LabourWorkerBillPage() {
             </div>
             <div className="bg-slate-50 p-4 rounded-xl border space-y-2">
               <label className="block font-semibold">Payment Method</label>
-              <select value={formData.paymentMethod} onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})} className="w-full border rounded px-2 py-1"><option>Cash</option><option>Bank</option><option>Cheque</option><option>Mobile Banking</option></select>
+              <PredictiveSearchSelect
+                options={[
+                  { value: "Cash", label: "Cash" },
+                  { value: "Bank", label: "Bank" },
+                  { value: "Cheque", label: "Cheque" },
+                  { value: "Mobile Banking", label: "Mobile Banking" },
+                ]}
+                value={formData.paymentMethod}
+                onChange={(val) =>
+                  setFormData({ ...formData, paymentMethod: val })
+                }
+                placeholder="Payment Method"
+              />
               <label className="block font-semibold">Paid Amount</label>
               <input type="number" min="0" value={formData.paidAmount} onChange={(e) => setFormData({...formData, paidAmount: Number(e.target.value)})} className="w-full border rounded px-2 py-1" />
             </div>
@@ -367,9 +540,37 @@ export default function LabourWorkerBillPage() {
               <button onClick={() => setIsItemModalOpen(false)} className="text-slate-500 hover:text-slate-700"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="sm:col-span-2"><label className="block font-semibold mb-1">Worker Name</label><select value={newItem.workerId} onChange={(e) => setNewItem({...newItem, workerId: e.target.value})} className="w-full border rounded px-2 py-1.5"><option value="">Select Worker</option>{workers.map((worker) => <option key={worker.uuid} value={worker.uuid}>{worker.name}</option>)}</select></div>
+              <div className="sm:col-span-2">
+                <label className="block font-semibold mb-1">Worker Name</label>
+                <PredictiveSearchSelect
+                  options={workers.map((worker) => ({
+                    value: worker.uuid,
+                    label: worker.name,
+                  }))}
+                  value={newItem.workerId}
+                  onChange={(val) =>
+                    setNewItem({ ...newItem, workerId: val })
+                  }
+                  placeholder="Select Worker"
+                />
+              </div>
               <div className="sm:col-span-2"><label className="block font-semibold mb-1">Description</label><input value={newItem.description} onChange={(e) => setNewItem({...newItem, description: e.target.value})} className="w-full border rounded px-2 py-1.5" /></div>
-              <div><label className="block font-semibold mb-1">Unit</label><select value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})} className="w-full border rounded px-2 py-1.5"><option>Day</option><option>Hour</option><option>Shift</option><option>Piece</option></select></div>
+              <div>
+                <label className="block font-semibold mb-1">Unit</label>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Day", label: "Day" },
+                    { value: "Hour", label: "Hour" },
+                    { value: "Shift", label: "Shift" },
+                    { value: "Piece", label: "Piece" },
+                  ]}
+                  value={newItem.unit}
+                  onChange={(val) =>
+                    setNewItem({ ...newItem, unit: val })
+                  }
+                  placeholder="Select Unit"
+                />
+              </div>
               <div><label className="block font-semibold mb-1">Qty/Days</label><input type="number" min="0" value={newItem.qtyDays} onChange={(e) => setNewItem({...newItem, qtyDays: Number(e.target.value)})} className="w-full border rounded px-2 py-1.5" /></div>
               <div><label className="block font-semibold mb-1">Rate</label><input type="number" min="0" value={newItem.rate} onChange={(e) => setNewItem({...newItem, rate: Number(e.target.value)})} className="w-full border rounded px-2 py-1.5" /></div>
               <div><label className="block font-semibold mb-1">Security</label><input type="number" min="0" value={newItem.security} onChange={(e) => setNewItem({...newItem, security: Number(e.target.value)})} className="w-full border rounded px-2 py-1.5" /></div>

@@ -22,7 +22,8 @@ import {
   Edit,
   Trash2
 } from 'lucide-react';
-import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
+import { getStoredAccessToken, getStoredUser } from '@/lib/admin-auth/adminAuthStorage';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 
 // Backend Response Type
 interface ApiBudget {
@@ -74,6 +75,10 @@ export default function ProjectBudgetPage() {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/realbizpro/api/v1';
 
   // State
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => { setStoredUser(getStoredUser()); }, []);
+  const userEmail = (storedUser?.email || '').toLowerCase().trim();
+
   const [budgets, setBudgets] = useState<ProjectBudget[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [selectedProjectUuid, setSelectedProjectUuid] = useState<string>('');
@@ -124,13 +129,24 @@ export default function ProjectBudgetPage() {
       if (!res.ok) return;
       const data = await res.json();
       const list = Array.isArray(data) ? data : data?.data?.data || data?.data?.items || data?.data || [];
-      const opts: ProjectOption[] = list.map((p: any) => ({
+      const userProjects = userEmail
+        ? list.filter((p: any) => {
+            const creator = String(p.createdBy || p.clientEmail || p.email || p.userEmail || p.projectManager || '').toLowerCase().trim();
+            return creator === userEmail || creator === String(storedUser?.id);
+          })
+        : [];
+
+      const opts: ProjectOption[] = userProjects.map((p: any) => ({
         uuid: p.uuid,
         name: p.projectName || p.name || 'Unnamed Project'
       }));
       setProjects(opts);
       if (opts.length > 0) {
         setSelectedProjectUuid(opts[0].uuid);
+      } else {
+        setSelectedProjectUuid('');
+        setBudgets([]);
+        setIsLoading(false);
       }
     } catch (e) {
       console.error('Failed to load projects', e);
@@ -139,7 +155,7 @@ export default function ProjectBudgetPage() {
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, [userEmail]);
 
   // 2. FETCH BUDGETS (GET)
   const fetchBudgets = async (page = 1, limit = 10, projectUuid = selectedProjectUuid) => {
@@ -365,18 +381,15 @@ export default function ProjectBudgetPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Project Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-[200px]">
             <label className="text-xs font-semibold text-slate-500 uppercase">Project:</label>
-            <select
+            <PredictiveSearchSelect
+              placeholder="Select Project..."
+              options={projects.map((p) => ({ value: p.uuid, label: p.name }))}
               value={selectedProjectUuid}
-              onChange={(e) => setSelectedProjectUuid(e.target.value)}
-              className="bg-white border border-slate-200 text-slate-800 text-sm font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-            >
-              {projects.length === 0 && <option value="">No Projects Found</option>}
-              {projects.map((p) => (
-                <option key={p.uuid} value={p.uuid}>{p.name}</option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedProjectUuid(val)}
+              className="w-48"
+            />
           </div>
 
           <button
@@ -454,34 +467,38 @@ export default function ProjectBudgetPage() {
         {/* Filters */}
         <div className="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[150px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Category:</label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="All Categories"
+                options={[
+                  { value: 'All', label: 'All Categories' },
+                  { value: 'Material', label: 'Material' },
+                  { value: 'Labour', label: 'Labour' },
+                  { value: 'Equipment', label: 'Equipment' },
+                  { value: 'Overhead', label: 'Overhead' },
+                  { value: 'Subcontractor', label: 'Subcontractor' },
+                ]}
                 value={selectedCategory}
-                onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer capitalize"
-              >
-                <option value="All">All Categories</option>
-                <option value="Material">Material</option>
-                <option value="Labour">Labour</option>
-                <option value="Equipment">Equipment</option>
-                <option value="Overhead">Overhead</option>
-                <option value="Subcontractor">Subcontractor</option>
-              </select>
+                onChange={(val) => { setSelectedCategory(val); setCurrentPage(1); }}
+                className="w-36"
+              />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[140px]">
               <label className="text-xs font-semibold text-slate-500 uppercase">Status:</label>
-              <select
+              <PredictiveSearchSelect
+                placeholder="All Statuses"
+                options={[
+                  { value: 'All', label: 'All Statuses' },
+                  { value: 'On Track', label: 'On Track' },
+                  { value: 'Warning', label: 'Warning' },
+                  { value: 'Exceeded', label: 'Exceeded' },
+                ]}
                 value={selectedStatus}
-                onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-                className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-600 shadow-sm cursor-pointer"
-              >
-                <option value="All">All Statuses</option>
-                <option value="On Track">On Track</option>
-                <option value="Warning">Warning</option>
-                <option value="Exceeded">Exceeded</option>
-              </select>
+                onChange={(val) => { setSelectedStatus(val); setCurrentPage(1); }}
+                className="w-32"
+              />
             </div>
           </div>
 
@@ -636,13 +653,18 @@ export default function ProjectBudgetPage() {
             <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Category *</label>
-                <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm capitalize">
-                  <option value="Material">Material</option>
-                  <option value="Labour">Labour</option>
-                  <option value="Equipment">Equipment</option>
-                  <option value="Overhead">Overhead</option>
-                  <option value="Subcontractor">Subcontractor</option>
-                </select>
+                <PredictiveSearchSelect
+                  placeholder="Select Category..."
+                  options={[
+                    { value: 'Material', label: 'Material' },
+                    { value: 'Labour', label: 'Labour' },
+                    { value: 'Equipment', label: 'Equipment' },
+                    { value: 'Overhead', label: 'Overhead' },
+                    { value: 'Subcontractor', label: 'Subcontractor' },
+                  ]}
+                  value={formData.category}
+                  onChange={(val) => setFormData({ ...formData, category: val })}
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Planned Amount ($) *</label>
@@ -687,11 +709,16 @@ export default function ProjectBudgetPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-500 mb-1">Status</label>
-                <select value={editingBudget.status} onChange={(e) => setEditingBudget({ ...editingBudget, status: e.target.value as any })} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-xl px-3.5 py-2.5 w-full focus:outline-none focus:border-blue-600 shadow-sm">
-                  <option value="On Track">On Track</option>
-                  <option value="Warning">Warning</option>
-                  <option value="Exceeded">Exceeded</option>
-                </select>
+                <PredictiveSearchSelect
+                  placeholder="Select Status..."
+                  options={[
+                    { value: 'On Track', label: 'On Track' },
+                    { value: 'Warning', label: 'Warning' },
+                    { value: 'Exceeded', label: 'Exceeded' },
+                  ]}
+                  value={editingBudget.status}
+                  onChange={(val) => setEditingBudget({ ...editingBudget, status: val as any })}
+                />
               </div>
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button type="button" onClick={() => setEditingBudget(null)} className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl">Cancel</button>

@@ -7,6 +7,7 @@ import {
   Home, ChevronRight, Plus, Search, Layers, Grid, X, Eye, Edit, Trash2,
   Building2, RefreshCw, Undo2, AlertCircle, CheckCircle2, Loader2, ArrowUpDown,
 } from 'lucide-react';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 import { getStoredAccessToken } from '@/lib/admin-auth/adminAuthStorage';
 
 /* ----------------------------------------------------------------------------
@@ -408,12 +409,13 @@ function FloorsListInner() {
               ) : buildings.length === 0 ? (
                 <div className="text-sm text-rose-600 py-2 bg-rose-50 px-3 rounded-lg">No buildings found. Please create a building first.</div>
               ) : (
-                <select required value={formData.buildingUuid} onChange={(e) => setFormData({ ...formData, buildingUuid: e.target.value })} className={inputCls}>
-                  <option value="">-- Select a Building --</option>
-                  {buildings.map((b) => (
-                    <option key={b.uuid} value={b.uuid}>{b.buildingName} ({b.buildingCode})</option>
-                  ))}
-                </select>
+                <PredictiveSearchSelect
+                  required
+                  placeholder="Select a Building..."
+                  options={buildings.map((b) => ({ value: b.uuid, label: b.buildingName, subLabel: b.buildingCode }))}
+                  value={formData.buildingUuid}
+                  onChange={(val) => setFormData({ ...formData, buildingUuid: val })}
+                />
               )}
             </div>
             <div><label className={labelCls}>Floor Code *</label><input required placeholder="e.g. FL-01" value={formData.floorCode} onChange={(e) => setFormData({ ...formData, floorCode: e.target.value })} className={inputCls} /></div>
@@ -438,17 +440,13 @@ function FloorsListInner() {
               {isLoadingBuildings ? (
                 <div className="flex items-center gap-2 text-sm text-slate-500 py-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading buildings...</div>
               ) : (
-                <select 
-                  required 
-                  value={editFloor.buildingUuid || ''} 
-                  onChange={(e) => setEditFloor({ ...editFloor, buildingUuid: e.target.value })} 
-                  className={inputCls}
-                >
-                  <option value="">-- Select a Building --</option>
-                  {buildings.map((b) => (
-                    <option key={b.uuid} value={b.uuid}>{b.buildingName} ({b.buildingCode})</option>
-                  ))}
-                </select>
+                <PredictiveSearchSelect
+                  required
+                  placeholder="Select a Building..."
+                  options={buildings.map((b) => ({ value: b.uuid, label: b.buildingName, subLabel: b.buildingCode }))}
+                  value={editFloor.buildingUuid || ''}
+                  onChange={(val) => setEditFloor({ ...editFloor, buildingUuid: val })}
+                />
               )}
             </div>
             <div><label className={labelCls}>Floor Code</label><input required value={editFloor.floorCode} onChange={(e) => setEditFloor({ ...editFloor, floorCode: e.target.value })} className={inputCls} /></div>

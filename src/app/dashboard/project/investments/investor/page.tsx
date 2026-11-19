@@ -1,20 +1,21 @@
-/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
   Plus,
-  Edit3,
-  User,
+  Edit,
   Trash2,
   X,
-  Upload,
-  FileText,
   Check,
   Loader2,
+  ChevronRight,
+  Eye,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+import { getStoredUser, getStoredAccessToken } from "@/lib/admin-auth/adminAuthStorage";
 
 // ---------- Types ----------
 export interface Nominee {
@@ -39,6 +40,8 @@ export interface Investor {
   chartOfGroups: string;
   under: string;
   status: string;
+  createdBy?: string;
+  addedById?: string;
   nominees: Nominee[];
 }
 
@@ -52,147 +55,198 @@ type InvestorFormData = {
   chartOfGroups: string;
   under: string;
   nominees: Nominee[];
-  imageFile?: File | null;
 };
 
-// ---------- API helpers ----------
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002").replace(/\/+$/, "");
+const API_PREFIX = "/realbizpro/api/v1";
+const INVESTOR_API = `${API_BASE}${API_PREFIX}/investor`;
 
-async function fetchInvestors(): Promise<{ data: Investor[]; meta: any }> {
-  const res = await fetch(
-    `${API_BASE}/realbizpro/api/v1/investor?page=1&limit=100&skip=0&sortBy=createdAt&sortOrder=DESC&withDeleted=false&status=active`,
-    {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    },
-  );
-  if (!res.ok) throw new Error(`Failed to fetch investors: ${res.status}`);
-  const json = await res.json();
-
-  const mapped: Investor[] = (json?.data?.data || []).map((item: any) => ({
-    id: Number(item.id) || item.uuid,
-    uuid: item.uuid,
-    code: item.code || "",
-    name: item.name || "",
-    mobile: item.mobileNo || "",
-    email: item.email || "",
-    nid: item.nid || "",
-    address: item.address || "",
-    image: item.image || "",
-    chartOfGroups: item.groupTier || "",
-    under: item.underGroup || "",
-    status: item.status || "active",
-    nominees: (item.nominees || []).map((n: any) => ({
-      id: n.id,
-      uuid: n.uuid,
-      nomineeName: n.nomineeName || "",
-      nomineeNid: n.nomineeNid || "",
-      relation: n.relation || "",
-      percentage: String(n.percentage ?? ""),
-    })),
-  }));
-
-  return { data: mapped, meta: json?.data?.meta };
+function getAuthHeaders(): Record<string, string> {
+  const token =
+    getStoredAccessToken() ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("share-project:access-token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("accessToken")
+      : null);
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
-function buildFormData(payload: Record<string, any>, imageFile?: File | null) {
-  const fd = new FormData();
-  Object.entries(payload).forEach(([key, value]) => {
-    if (key === "nominees") {
-      fd.append(key, JSON.stringify(value));
-    } else if (value !== undefined && value !== null) {
-      fd.append(key, String(value));
-    }
-  });
-  if (imageFile) fd.append("image", imageFile);
-  return fd;
-}
+const TIER_OPTIONS = [
+  { value: "Tier 1 - Primary Investor", label: "Tier 1 - Primary Investor" },
+  { value: "Tier 2 - Strategic Partner", label: "Tier 2 - Strategic Partner" },
+  { value: "Tier 3 - Regional Affiliate", label: "Tier 3 - Regional Affiliate" },
+];
 
-async function createInvestor(payload: Record<string, any>, imageFile?: File | null) {
-  const res = await fetch(`${API_BASE}/realbizpro/api/v1/investor`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    let msg = "Create failed";
-    try {
-      const body = await res.json();
-      msg = body?.message || body?.error || msg;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(msg);
-  }
-  return res.json();
-}
+const UNDER_OPTIONS = [
+  { value: "Corporate", label: "Corporate" },
+  { value: "General Group", label: "General Group" },
+  { value: "Individual", label: "Individual" },
+];
 
-async function updateInvestor(uuid: string, payload: Record<string, any>, imageFile?: File | null) {
-  const res = await fetch(`${API_BASE}/realbizpro/api/v1/investor/${uuid}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    let msg = "Update failed";
-    try {
-      const body = await res.json();
-      msg = body?.message || body?.error || msg;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(msg);
-  }
-  return res.json();
-}
+const entriesOptions = [
+  { value: "10", label: "10 entries" },
+  { value: "25", label: "25 entries" },
+  { value: "50", label: "50 entries" },
+];
 
-async function softDeleteInvestor(uuid: string) {
-  const res = await fetch(`${API_BASE}/realbizpro/api/v1/investor/${uuid}`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) throw new Error("Delete failed");
-  return res.json().catch(() => ({}));
-}
+const generateInvestorCode = () => {
+  const rand = Math.floor(100 + Math.random() * 900);
+  return `INV-${new Date().getFullYear()}-${rand}`;
+};
 
-// ---------- Form Modal ----------
-function InvestorFormModal({
-  title,
-  initialData,
-  onClose,
-  onSubmit,
-}: {
-  title: string;
-  initialData?: Investor;
-  onClose: () => void;
-  onSubmit: (data: InvestorFormData) => Promise<void>;
-}) {
+// ---------- Main Page ----------
+export default function InvestorManagementPage() {
+  const [storedUser, setStoredUser] = useState<any>(null);
+  useEffect(() => {
+    setStoredUser(getStoredUser());
+  }, []);
+  const userEmail = (storedUser?.email || "").toLowerCase().trim();
+
+  const [investors, setInvestors] = useState<Investor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Modals
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
+  const [viewingInvestor, setViewingInvestor] = useState<Investor | null>(null);
+
+  // Form State
   const [formData, setFormData] = useState<InvestorFormData>({
-    code:
-      initialData?.code ||
-      `INV-${new Date().getFullYear()}-${String(
-        Math.floor(100 + Math.random() * 900),
-      ).padStart(3, "0")}`,
-    name: initialData?.name || "",
-    mobile: initialData?.mobile || "",
-    email: initialData?.email || "",
-    nid: initialData?.nid || "",
-    address: initialData?.address || "",
-    chartOfGroups: initialData?.chartOfGroups || "",
-    under: initialData?.under || "Corporate",
-    nominees: initialData?.nominees?.length
-      ? initialData.nominees
-      : [{ nomineeName: "", nomineeNid: "", relation: "", percentage: "" }],
-    imageFile: null,
+    code: generateInvestorCode(),
+    name: "",
+    mobile: "",
+    email: "",
+    nid: "",
+    address: "",
+    chartOfGroups: "Tier 1 - Primary Investor",
+    under: "Corporate",
+    nominees: [{ nomineeName: "", nomineeNid: "", relation: "", percentage: "100" }],
   });
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const handleNomineeChange = (
-    index: number,
-    field: keyof Nominee,
-    value: string,
-  ) => {
+  // Load Data
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`${INVESTOR_API}?page=1&limit=100&sortBy=createdAt&sortOrder=DESC`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || `Failed to fetch investors: ${res.status}`);
+      }
+      const json = await res.json();
+      const rows = json?.data?.data ?? json?.data ?? [];
+      const activeEmail = (getStoredUser()?.email || userEmail || "").toLowerCase().trim();
+
+      const mapped: Investor[] = (Array.isArray(rows) ? rows : [])
+        .filter((item: any) => !item.deletedAt)
+        .filter((item: any) => {
+          if (!activeEmail) return true;
+          const creator = String(item.createdBy || item.addedById || "").toLowerCase().trim();
+          const email = String(item.email || "").toLowerCase().trim();
+          return !creator || creator === activeEmail || email === activeEmail;
+        })
+        .map((item: any) => ({
+          id: item.id || item.uuid,
+          uuid: item.uuid,
+          code: item.code || "",
+          name: item.name || "",
+          mobile: item.mobileNo || "",
+          email: item.email || "",
+          nid: item.nid || "",
+          address: item.address || "",
+          image: item.image || "",
+          chartOfGroups: item.groupTier || "",
+          under: item.underGroup || "",
+          status: item.status || "active",
+          createdBy: item.createdBy || activeEmail,
+          addedById: item.addedById || activeEmail,
+          nominees: (item.nominees || []).map((n: any) => ({
+            id: n.id,
+            uuid: n.uuid,
+            nomineeName: n.nomineeName || "",
+            nomineeNid: n.nomineeNid || "",
+            relation: n.relation || "",
+            percentage: String(n.percentage ?? ""),
+          })),
+        }));
+
+      setInvestors(mapped);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Failed to load investors");
+    } finally {
+      setLoading(false);
+    }
+  }, [userEmail]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const filteredInvestors = investors.filter(
+    (inv) =>
+      inv.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.mobile.includes(searchQuery) ||
+      inv.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.nid.includes(searchQuery)
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredInvestors.length / entriesPerPage));
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const paginatedInvestors = filteredInvestors.slice(startIndex, startIndex + entriesPerPage);
+
+  const resetForm = () => {
+    setFormData({
+      code: generateInvestorCode(),
+      name: "",
+      mobile: "",
+      email: "",
+      nid: "",
+      address: "",
+      chartOfGroups: "Tier 1 - Primary Investor",
+      under: "Corporate",
+      nominees: [{ nomineeName: "", nomineeNid: "", relation: "", percentage: "100" }],
+    });
+    setFormError(null);
+  };
+
+  const handleOpenAdd = () => {
+    resetForm();
+    setIsAddOpen(true);
+  };
+
+  const handleOpenEdit = (inv: Investor) => {
+    setEditingInvestor(inv);
+    setFormData({
+      code: inv.code,
+      name: inv.name,
+      mobile: inv.mobile,
+      email: inv.email,
+      nid: inv.nid,
+      address: inv.address,
+      chartOfGroups: inv.chartOfGroups || "Tier 1 - Primary Investor",
+      under: inv.under || "Corporate",
+      nominees: inv.nominees?.length
+        ? inv.nominees
+        : [{ nomineeName: "", nomineeNid: "", relation: "", percentage: "100" }],
+    });
+    setFormError(null);
+  };
+
+  const handleNomineeChange = (index: number, field: keyof Nominee, value: string) => {
     const updated = [...formData.nominees];
     updated[index] = { ...updated[index], [field]: value };
     setFormData({ ...formData, nominees: updated });
@@ -201,839 +255,524 @@ function InvestorFormModal({
   const addNomineeRow = () => {
     setFormData({
       ...formData,
-      nominees: [
-        ...formData.nominees,
-        {
-          nomineeName: formData.name || "", // uporer Name copy
-          nomineeNid: formData.nid || "", // uporer NID copy
-          relation: "",
-          percentage: "",
-        },
-      ],
+      nominees: [...formData.nominees, { nomineeName: "", nomineeNid: "", relation: "", percentage: "0" }],
     });
   };
 
-  const removeNomineeRow = (index: number) => {
+  const removeNomineeRow = (idx: number) => {
     setFormData({
       ...formData,
-      nominees: formData.nominees.filter((_, i) => i !== index),
+      nominees: formData.nominees.filter((_, i) => i !== idx),
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Submit Create
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    if (!formData.name.trim() || !formData.mobile.trim() || !formData.nid.trim()) {
+      setFormError("Name, Mobile number and NID are required.");
+      return;
+    }
+
     try {
-      await onSubmit(formData);
+      setSubmitting(true);
+      setFormError(null);
+      const activeEmail = (getStoredUser()?.email || userEmail || "sharetest@realbiz.com").toLowerCase().trim();
+
+      const payload = {
+        code: formData.code,
+        name: formData.name,
+        mobileNo: formData.mobile,
+        email: formData.email || undefined,
+        nid: formData.nid,
+        address: formData.address || undefined,
+        groupTier: formData.chartOfGroups,
+        underGroup: formData.under,
+        status: "active",
+        addedById: activeEmail,
+        createdBy: activeEmail,
+        nominees: formData.nominees
+          .filter((n) => n.nomineeName.trim())
+          .map((n) => ({
+            nomineeName: n.nomineeName,
+            nomineeNid: n.nomineeNid || "N/A",
+            relation: n.relation || "Nominee",
+            percentage: Number(n.percentage) || 100,
+          })),
+      };
+
+      const res = await fetch(INVESTOR_API, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || "Create investor failed");
+      }
+
+      toast.success("Investor created successfully!");
+      setIsAddOpen(false);
+      resetForm();
+      await loadData();
+    } catch (err: any) {
+      setFormError(err?.message || "Create failed");
     } finally {
       setSubmitting(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white border border-slate-200 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden my-8">
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-900 text-base">{title}</h3>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-            type="button"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Code <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.code}
-                onChange={(e) =>
-                  setFormData({ ...formData, code: e.target.value })
-                }
-                disabled={!!initialData}
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50 disabled:opacity-70"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Name <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Mobile <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Mobile"
-                value={formData.mobile}
-                onChange={(e) =>
-                  setFormData({ ...formData, mobile: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                E-mail
-              </label>
-              <input
-                type="email"
-                placeholder="E-mail"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                NID <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="NID"
-                value={formData.nid}
-                onChange={(e) =>
-                  setFormData({ ...formData, nid: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Address
-              </label>
-              <input
-                type="text"
-                placeholder="Address"
-                value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Image
-              </label>
-              <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white">
-                <label className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-3 py-2 cursor-pointer border-r border-slate-300 transition-colors flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5 text-slate-500" /> Choose File
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        imageFile: e.target.files?.[0] || null,
-                      })
-                    }
-                  />
-                </label>
-                <span className="px-3 text-xs text-slate-400 truncate max-w-[140px]">
-                  {formData.imageFile
-                    ? formData.imageFile.name
-                    : initialData?.image
-                      ? "Current image"
-                      : "No file chosen"}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Chart Of Groups <span className="text-rose-500">*</span>
-              </label>
-              <select
-                required
-                value={formData.chartOfGroups}
-                onChange={(e) =>
-                  setFormData({ ...formData, chartOfGroups: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="">Select One Option</option>
-                <option value="Tier 1 - Primary Investor">
-                  Tier 1 - Primary Investor
-                </option>
-                <option value="Tier 2 - Strategic Partner">
-                  Tier 2 - Strategic Partner
-                </option>
-                <option value="Tier 3 - Regional Affiliate">
-                  Tier 3 - Regional Affiliate
-                </option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Under Group
-              </label>
-              <select
-                value={formData.under}
-                onChange={(e) =>
-                  setFormData({ ...formData, under: e.target.value })
-                }
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="Corporate">Corporate</option>
-                <option value="General Group">General Group</option>
-                <option value="Individual">Individual</option>
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={addNomineeRow}
-              className="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-semibold self-end"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Item
-            </button>
-          </div>
-
-          {/* Nominee Details */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
-            <div className="bg-indigo-600 text-white font-medium px-4 py-2 text-sm">
-              Nominee Details
-            </div>
-            <div className="p-4 space-y-3">
-              {formData.nominees.map((nominee, idx) => (
-                <div
-                  key={idx}
-                  className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center pt-2 first:pt-0"
-                >
-                  <div className="sm:col-span-3">
-                    <label className="block text-xs text-slate-500 mb-1">
-                      Nominee Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nominee Name"
-                      value={nominee.nomineeName}
-                      onChange={(e) =>
-                        handleNomineeChange(idx, "nomineeName", e.target.value)
-                      }
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="block text-xs text-slate-500 mb-1">
-                      Nominee NID
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nominee NID"
-                      value={nominee.nomineeNid}
-                      onChange={(e) =>
-                        handleNomineeChange(idx, "nomineeNid", e.target.value)
-                      }
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="block text-xs text-slate-500 mb-1">
-                      Relation
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Relation"
-                      value={nominee.relation}
-                      onChange={(e) =>
-                        handleNomineeChange(idx, "relation", e.target.value)
-                      }
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs text-slate-500 mb-1">
-                      Percentage (%)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Percentage"
-                      value={nominee.percentage}
-                      onChange={(e) =>
-                        handleNomineeChange(idx, "percentage", e.target.value)
-                      }
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="sm:col-span-1 flex items-end justify-center pt-5">
-                    {idx === 0 ? (
-                      <button
-                        type="button"
-                        onClick={addNomineeRow}
-                        className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-xs"
-                        title="Add Nominee"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => removeNomineeRow(idx)}
-                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors"
-                        title="Remove Nominee"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 bg-slate-400 hover:bg-slate-500 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              Close
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-1.5"
-            >
-              {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Check className="w-4 h-4" />
-              )}
-              Submit
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Main Page ----------
-export default function InvestorManagementPage() {
-  const [investors, setInvestors] = useState<Investor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [entriesPerPage, setEntriesPerPage] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
-  const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(
-    null,
-  );
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const { data } = await fetchInvestors();
-      setInvestors(data);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Failed to load investors");
-    } finally {
-      setLoading(false);
+  // Submit Update
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvestor?.uuid) return;
+    if (!formData.name.trim() || !formData.mobile.trim() || !formData.nid.trim()) {
+      setFormError("Name, Mobile number and NID are required.");
+      return;
     }
-  };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Reset to first page when search or entries change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, entriesPerPage]);
-
-  const filteredInvestors = investors.filter(
-    (inv) =>
-      inv.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.mobile.includes(searchQuery) ||
-      inv.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.nid.includes(searchQuery),
-  );
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredInvestors.length / entriesPerPage),
-  );
-  const startIndex = (currentPage - 1) * entriesPerPage;
-  const paginatedInvestors = filteredInvestors.slice(
-    startIndex,
-    startIndex + entriesPerPage,
-  );
-
-  const handleDelete = async (investor: Investor) => {
-    if (!confirm(`Delete ${investor.name}?`)) return;
     try {
-      if (investor.uuid) {
-        await softDeleteInvestor(investor.uuid);
+      setSubmitting(true);
+      setFormError(null);
+      const activeEmail = (getStoredUser()?.email || userEmail || "sharetest@realbiz.com").toLowerCase().trim();
+
+      const payload = {
+        name: formData.name,
+        mobileNo: formData.mobile,
+        email: formData.email || undefined,
+        nid: formData.nid,
+        address: formData.address || undefined,
+        groupTier: formData.chartOfGroups,
+        underGroup: formData.under,
+        updatedBy: activeEmail,
+        nominees: formData.nominees
+          .filter((n) => n.nomineeName.trim())
+          .map((n) => ({
+            nomineeName: n.nomineeName,
+            nomineeNid: n.nomineeNid || "N/A",
+            relation: n.relation || "Nominee",
+            percentage: Number(n.percentage) || 100,
+          })),
+      };
+
+      const res = await fetch(`${INVESTOR_API}/${editingInvestor.uuid}`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || "Update investor failed");
       }
-      setInvestors((prev) => prev.filter((i) => i.uuid !== investor.uuid));
-    } catch (err) {
-      console.error(err);
-      alert("Delete failed. Please try again.");
+
+      toast.success("Investor updated successfully!");
+      setEditingInvestor(null);
+      resetForm();
+      await loadData();
+    } catch (err: any) {
+      setFormError(err?.message || "Update failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Form → API payload
-  const toApiPayload = (data: InvestorFormData) => ({
-    code: data.code || "",
-    name: data.name || "",
-    mobileNo: data.mobile || "",
-    email: data.email || "",
-    nid: data.nid || "",
-    address: data.address || "",
-    groupTier: data.chartOfGroups || "",
-    underGroup: data.under || "Corporate",
-    status: "active",
-    nominees: (data.nominees || [])
-      .filter((n) => n.nomineeName.trim())
-      .map((n) => ({
-        nomineeName: n.nomineeName,
-        nomineeNid: n.nomineeNid,
-        relation: n.relation,
-        percentage: n.percentage || "0",
-      })),
-  });
+  // Delete
+  const handleDelete = async (inv: Investor) => {
+    if (!inv.uuid) return;
+    if (!window.confirm(`Delete investor "${inv.name}"?`)) return;
+    try {
+      const res = await fetch(`${INVESTOR_API}/${inv.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      toast.success("Investor deleted successfully!");
+      setInvestors((prev) => prev.filter((i) => i.uuid !== inv.uuid));
+    } catch (err: any) {
+      toast.error(err?.message || "Delete failed");
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 p-4 sm:p-6 flex flex-col justify-between">
-      <div className="space-y-4">
-        {/* Breadcrumb & Top Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+    <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        
+        {/* Top Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs text-slate-500 flex items-center gap-1 mb-1">
-              <span>Home</span> /{" "}
-              <span className="text-indigo-600 font-medium">Investor</span>
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              Investor Management
+            <nav className="flex items-center text-xs sm:text-sm text-slate-500 gap-1.5 sm:gap-2 mb-1">
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Dashboard</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Project</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hover:text-emerald-700 cursor-pointer font-medium transition">Investments</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200/80 shadow-2xs">
+                Investor
+              </span>
+            </nav>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+              Investor Management / ইনভেস্টর ম্যানেজমেন্ট
             </h1>
           </div>
+
           <button
-            onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-sm transition-all"
+            onClick={handleOpenAdd}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition hover:bg-indigo-700 hover:shadow-sm active:scale-95"
           >
-            <Plus className="w-4 h-4" />
-            Add New Investor
+            <Plus className="w-4 h-4" /> + Add New Investor
           </button>
         </div>
 
-        {/* Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/70 p-3 rounded-xl border border-slate-200/60">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-              className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
-            <span>entries</span>
-          </div>
+        {/* Table Container */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="w-36">
+                <PredictiveSearchSelect
+                  options={entriesOptions}
+                  value={String(entriesPerPage)}
+                  onChange={(val) => {
+                    setEntriesPerPage(Number(val));
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Show entries"
+                />
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm text-slate-600">Search:</span>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
+            <div className="relative w-full md:w-72">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
+                placeholder="Search investors..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search investor records..."
-                className="w-full pl-9 pr-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
           </div>
-        </div>
 
-        {/* Loading / Error */}
-        {loading && (
-          <div className="flex items-center justify-center py-16 text-slate-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" />
-            Loading investors...
-          </div>
-        )}
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Table */}
-        {!loading && !error && (
-          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs bg-white">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-indigo-600 text-white font-medium text-xs tracking-wider uppercase">
-                    <th className="py-3 px-4">SL</th>
-                    <th className="py-3 px-4">Code</th>
-                    <th className="py-3 px-4">Name</th>
-                    <th className="py-3 px-4">Mobile</th>
-                    <th className="py-3 px-4">Email</th>
-                    <th className="py-3 px-4">NID</th>
-                    <th className="py-3 px-4">Under</th>
-                    <th className="py-3 px-4 text-center">Image</th>
-                    <th className="py-3 px-4 text-center">Action</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-slate-100/80 text-slate-700 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">#</th>
+                  <th className="py-3 px-4">CODE</th>
+                  <th className="py-3 px-4">INVESTOR NAME</th>
+                  <th className="py-3 px-4">MOBILE</th>
+                  <th className="py-3 px-4">EMAIL</th>
+                  <th className="py-3 px-4">GROUP TIER</th>
+                  <th className="py-3 px-4">STATUS</th>
+                  <th className="py-3 px-4">ADDED BY</th>
+                  <th className="py-3 px-4 text-center">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-normal">
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginatedInvestors.length > 0 ? (
-                    paginatedInvestors.map((investor, index) => (
-                      <tr
-                        key={investor.uuid || investor.id}
-                        className="hover:bg-slate-50/80 transition-colors"
-                      >
-                        <td className="py-3 px-4 font-medium text-slate-600">
-                          {startIndex + index + 1}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs text-indigo-600 font-semibold">
-                          {investor.code}
-                        </td>
-                        <td className="py-3 px-4 font-medium text-slate-900">
-                          {investor.name}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600">
-                          {investor.mobile}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600">
-                          {investor.email || "—"}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-600">
-                          {investor.nid}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            {investor.under || "—"}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {investor.image ? (
-                            <img
-                              src={
-                                investor.image.startsWith("http")
-                                  ? investor.image
-                                  : `${API_BASE}/${investor.image}`
-                              }
-                              alt={investor.name}
-                              className="w-9 h-9 rounded-full object-cover mx-auto border border-slate-200 shadow-xs"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-slate-200 mx-auto flex items-center justify-center text-xs font-bold text-slate-500">
-                              {investor.name?.charAt(0) || "?"}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="inline-flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => setSelectedInvestor(investor)}
-                              title="View Profile / Details"
-                              className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors"
-                            >
-                              <User className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setEditingInvestor(investor)}
-                              title="Edit Investor"
-                              className="p-1.5 bg-sky-50 text-sky-600 hover:bg-sky-100 rounded-md transition-colors"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(investor)}
-                              title="Delete Investor"
-                              className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-md transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={9}
-                        className="text-center py-10 text-slate-400 font-medium"
-                      >
-                        No matching records found
+                ) : paginatedInvestors.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                      No investor records available
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedInvestors.map((inv, idx) => (
+                    <tr key={inv.uuid} className="hover:bg-slate-50/70 transition">
+                      <td className="py-3 px-4 font-medium text-slate-500">{startIndex + idx + 1}</td>
+                      <td className="py-3 px-4 font-mono font-medium text-slate-800">{inv.code}</td>
+                      <td className="py-3 px-4 font-semibold text-slate-900">{inv.name}</td>
+                      <td className="py-3 px-4 text-slate-700">{inv.mobile}</td>
+                      <td className="py-3 px-4 text-slate-700">{inv.email || "-"}</td>
+                      <td className="py-3 px-4 text-slate-700 text-xs">{inv.chartOfGroups || "-"}</td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 text-xs">{inv.createdBy || "-"}</td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(inv)}
+                            title="Edit"
+                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(inv)}
+                            title="Delete"
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between p-3 border-t border-slate-200 bg-white gap-2 text-xs text-slate-500">
-              <div>
-                Showing {filteredInvestors.length === 0 ? 0 : startIndex + 1} to{" "}
-                {Math.min(
-                  startIndex + entriesPerPage,
-                  filteredInvestors.length,
-                )}{" "}
-                of {filteredInvestors.length} entries
-              </div>
-              <div className="inline-flex items-center gap-1">
+          <div className="p-4 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm text-slate-500">
+            <div>
+              Showing {filteredInvestors.length === 0 ? 0 : startIndex + 1} to{" "}
+              {Math.min(startIndex + entriesPerPage, filteredInvestors.length)} of {filteredInvestors.length} entries
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition font-medium"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 rounded border border-slate-200 bg-slate-50 text-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed hover:bg-slate-100"
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  className={`w-8 h-8 rounded-lg font-medium transition ${
+                    currentPage === p
+                      ? "bg-indigo-600 text-white shadow-2xs"
+                      : "border border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                  }`}
                 >
-                  Previous
+                  {p}
                 </button>
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`px-3 py-1 rounded border font-medium ${
-                      currentPage === i + 1
-                        ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <button
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 rounded border border-slate-200 bg-slate-50 text-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed hover:bg-slate-100"
-                >
-                  Next
-                </button>
-              </div>
+              ))}
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition font-medium"
+              >
+                Next
+              </button>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Add Modal */}
-      {isAddOpen && (
-        <InvestorFormModal
-          title="Add New Investor"
-          onClose={() => setIsAddOpen(false)}
-          onSubmit={async (data) => {
-            try {
-              await createInvestor(toApiPayload(data), data.imageFile);
-              setIsAddOpen(false);
-              await loadData();
-            } catch (err: any) {
-              alert(err.message || "Create failed");
-            }
-          }}
-        />
-      )}
-
-      {/* Edit Modal */}
-      {editingInvestor && (
-        <InvestorFormModal
-          title="Edit Investor"
-          initialData={editingInvestor}
-          onClose={() => setEditingInvestor(null)}
-          onSubmit={async (data) => {
-            try {
-              await updateInvestor(
-                editingInvestor.uuid,
-                toApiPayload(data),
-                data.imageFile,
-              );
-              setEditingInvestor(null);
-              await loadData();
-            } catch (err: any) {
-              alert(err.message || "Update failed");
-            }
-          }}
-        />
-      )}
-
-      {/* Profile Modal */}
-      {selectedInvestor && (
+      {/* ==================== ADD / EDIT MODAL ==================== */}
+      {(isAddOpen || editingInvestor) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden my-8">
             <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
-              <span className="font-semibold text-slate-800 text-sm flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-600" /> Investor Full
-                Profile Details
-              </span>
+              <h3 className="font-bold text-slate-900 text-base">
+                {editingInvestor ? `Edit Investor: ${editingInvestor.name}` : "Add New Investor"}
+              </h3>
               <button
-                onClick={() => setSelectedInvestor(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                onClick={() => {
+                  setIsAddOpen(false);
+                  setEditingInvestor(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-6 bg-white">
-              <div className="flex flex-col sm:flex-row items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-2xl">
-                {selectedInvestor.image ? (
-                  <img
-                    src={
-                      selectedInvestor.image.startsWith("http")
-                        ? selectedInvestor.image
-                        : `${API_BASE}/${selectedInvestor.image}`
-                    }
-                    alt={selectedInvestor.name}
-                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
+            <form onSubmit={editingInvestor ? handleEditSubmit : handleCreateSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Investor Code</label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    disabled
+                    className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-600 cursor-not-allowed"
                   />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center text-2xl font-bold text-slate-500 border-4 border-white shadow-md">
-                    {selectedInvestor.name?.charAt(0) || "?"}
-                  </div>
-                )}
-                <div className="space-y-1 text-center sm:text-left">
-                  <h2 className="text-xl font-bold text-slate-900">
-                    {selectedInvestor.name}
-                  </h2>
-                  <p className="text-xs font-mono text-indigo-600 font-semibold">
-                    {selectedInvestor.code}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {selectedInvestor.address}
-                  </p>
-                  <div className="pt-2 flex flex-wrap gap-2 justify-center sm:justify-start">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      Group: {selectedInvestor.chartOfGroups || "—"}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Under: {selectedInvestor.under || "—"}
-                    </span>
-                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Investor Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Full Name"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  />
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-                <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200 font-bold text-xs text-slate-700 uppercase tracking-wider">
-                  Contact & Identification Info
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Mobile <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.mobile}
+                    onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                    placeholder="017xxxxxxxx"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 text-xs">
-                  <div className="p-4 space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Mobile:</span>
-                      <span className="font-medium text-slate-800">
-                        {selectedInvestor.mobile}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Email:</span>
-                      <span className="font-medium text-slate-800">
-                        {selectedInvestor.email || "—"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">NID Number:</span>
-                      <span className="font-mono font-medium text-slate-800">
-                        {selectedInvestor.nid}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Address:</span>
-                      <span className="font-medium text-slate-800">
-                        {selectedInvestor.address || "—"}
-                      </span>
-                    </div>
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="investor@example.com"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    NID <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nid}
+                    onChange={(e) => setFormData({ ...formData, nid: e.target.value })}
+                    placeholder="National ID"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-slate-800">
-                  Nominee Information
-                </h3>
-                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-indigo-600 text-white font-medium uppercase tracking-wider">
-                        <th className="py-2.5 px-3">SL</th>
-                        <th className="py-2.5 px-3">Nominee Name</th>
-                        <th className="py-2.5 px-3">Nominee NID</th>
-                        <th className="py-2.5 px-3">Relation</th>
-                        <th className="py-2.5 px-3">Percentage (%)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {selectedInvestor.nominees?.length > 0 ? (
-                        selectedInvestor.nominees.map((nom, idx) => (
-                          <tr
-                            key={idx}
-                            className="hover:bg-slate-50 transition-colors"
-                          >
-                            <td className="py-2.5 px-3 font-medium text-slate-600">
-                              {idx + 1}
-                            </td>
-                            <td className="py-2.5 px-3 font-medium text-slate-900">
-                              {nom.nomineeName}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono text-slate-600">
-                              {nom.nomineeNid}
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-600">
-                              {nom.relation}
-                            </td>
-                            <td className="py-2.5 px-3 font-semibold text-indigo-600">
-                              {nom.percentage}%
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td
-                            colSpan={5}
-                            className="text-center py-6 text-slate-400"
-                          >
-                            No nominee records registered.
-                          </td>
-                        </tr>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Chart Of Groups (Group Tier) <span className="text-rose-500">*</span>
+                  </label>
+                  <PredictiveSearchSelect
+                    options={TIER_OPTIONS}
+                    value={formData.chartOfGroups}
+                    onChange={(val) => setFormData({ ...formData, chartOfGroups: val })}
+                    placeholder="Select Group Tier"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Under Group</label>
+                  <PredictiveSearchSelect
+                    options={UNDER_OPTIONS}
+                    value={formData.under}
+                    onChange={(val) => setFormData({ ...formData, under: val })}
+                    placeholder="Select Under Group"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Address</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Street / Area, City"
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                />
+              </div>
+
+              {/* Nominee details */}
+              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">Nominee Details</span>
+                  <button
+                    type="button"
+                    onClick={addNomineeRow}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Nominee
+                  </button>
+                </div>
+
+                {formData.nominees.map((nominee, idx) => (
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Nominee Name"
+                      value={nominee.nomineeName}
+                      onChange={(e) => handleNomineeChange(idx, "nomineeName", e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Nominee NID"
+                      value={nominee.nomineeNid}
+                      onChange={(e) => handleNomineeChange(idx, "nomineeNid", e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Relation"
+                      value={nominee.relation}
+                      onChange={(e) => handleNomineeChange(idx, "relation", e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        placeholder="%"
+                        min="0"
+                        max="100"
+                        value={nominee.percentage}
+                        onChange={(e) => handleNomineeChange(idx, "percentage", e.target.value)}
+                        className="w-16 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                      />
+                      {idx > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => removeNomineeRow(idx)}
+                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       )}
-                    </tbody>
-                  </table>
-                </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                  {formError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddOpen(false);
+                    setEditingInvestor(null);
+                  }}
+                  className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  {editingInvestor ? "Update Investor" : "Save Investor"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -5,9 +5,25 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, ChevronRight, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("accessToken") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 // ====================== TYPES ======================
 interface BudgetRow {
@@ -126,11 +142,12 @@ export default function InvoiceBillPage() {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/project-billing/period-billings`);
+      const res = await fetch(`${API_PATH}/project-billing/period-billings?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
-      if (json.success) {
-        setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
-      }
+      const rows = Array.isArray(json?.data?.data) ? json.data.data : Array.isArray(json?.data) ? json.data : [];
+      setDataList(rows.filter((item: any) => !item.deletedAt));
     } catch (err) {
       toast.error("Failed to load invoices");
     } finally {
@@ -141,29 +158,35 @@ export default function InvoiceBillPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resCus = await fetch(`${API_PATH}/customer-account`);
+      const resCus = await fetch(`${API_PATH}/customer-account?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonCus = await resCus.json();
-      if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
+      const cusList = Array.isArray(jsonCus?.data?.data) ? jsonCus.data.data : Array.isArray(jsonCus?.data) ? jsonCus.data : [];
+      setCustomers(cusList.map((c: any) => ({ uuid: c.uuid || c.id, customerName: c.customerName || c.name || "Customer" })));
 
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonProj = await resProj.json();
-      if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
+      const projList = Array.isArray(jsonProj?.data?.data) ? jsonProj.data.data : Array.isArray(jsonProj?.data) ? jsonProj.data : [];
+      setProjects(projList.map((p: any) => ({ uuid: p.uuid || p.id, name: p.name || p.projectName || "Project" })));
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonSite = await resSite.json();
-      if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
+      const siteList = Array.isArray(jsonSite?.data?.data) ? jsonSite.data.data : Array.isArray(jsonSite?.data) ? jsonSite.data : [];
+      setSites(siteList.map((s: any) => ({ uuid: s.uuid || s.id, name: s.name || s.siteName || "Site", projectId: s.projectId })));
 
-      const resType = await fetch(`${API_PATH}/project-type`);
+      const resType = await fetch(`${API_PATH}/project-type?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonType = await resType.json();
-      if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
+      const typeList = Array.isArray(jsonType?.data?.data) ? jsonType.data.data : Array.isArray(jsonType?.data) ? jsonType.data : [];
+      setProjectTypes(typeList.map((t: any) => ({ uuid: t.uuid || t.id, name: t.name || "Type" })));
 
-      const resCat = await fetch(`${API_PATH}/category`);
+      const resCat = await fetch(`${API_PATH}/category?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonCat = await resCat.json();
-      if (jsonCat.success) setCategories(jsonCat.data.data || jsonCat.data || []);
+      const catList = Array.isArray(jsonCat?.data?.data) ? jsonCat.data.data : Array.isArray(jsonCat?.data) ? jsonCat.data : [];
+      setCategories(catList.map((c: any) => ({ uuid: c.uuid || c.id, name: c.name || "Category" })));
 
-      const resBrand = await fetch(`${API_PATH}/procurement/brand`);
+      const resBrand = await fetch(`${API_PATH}/procurement/brand?page=1&limit=100`, { headers: getAuthHeaders() });
       const jsonBrand = await resBrand.json();
-      if (jsonBrand.success) setBrands(jsonBrand.data.data || jsonBrand.data || []);
+      const brandList = Array.isArray(jsonBrand?.data?.data) ? jsonBrand.data.data : Array.isArray(jsonBrand?.data) ? jsonBrand.data : [];
+      setBrands(brandList.map((b: any) => ({ uuid: b.uuid || b.id, name: b.name || "Brand" })));
       
     } catch (err) {
       console.error("Error fetching dropdowns:", err);
@@ -272,7 +295,7 @@ export default function InvoiceBillPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -296,7 +319,10 @@ export default function InvoiceBillPage() {
   const handleDelete = async (item: InvoiceBill) => {
     if (!window.confirm(`Delete "${item.code}"?`)) return;
     try {
-      const res = await fetch(`${API_PATH}/project-billing/period-billings/${item.uuid}`, { method: "DELETE" });
+      const res = await fetch(`${API_PATH}/project-billing/period-billings/${item.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         toast.success("Deleted successfully!");
         setDataList((prev) => prev.filter((row) => row.uuid !== item.uuid));
@@ -314,7 +340,7 @@ export default function InvoiceBillPage() {
     try {
       const res = await fetch(`${API_PATH}/customer-account`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ ...newCustomer, status: "active" }),
       });
       if (res.ok) {
@@ -350,7 +376,7 @@ export default function InvoiceBillPage() {
     try {
       const res = await fetch(`${API_PATH}/item`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -591,20 +617,24 @@ export default function InvoiceBillPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Customer</label>
-                  <select value={formData.customerId} onChange={(e) => {
-                    const cus = customers.find(c => c.uuid === e.target.value);
-                    setFormData({ ...formData, customerId: e.target.value, customerName: cus?.customerName || "" });
-                  }} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                    <option value="">Select value</option>
-                    {customers.map(c => <option key={c.uuid} value={c.uuid}>{c.customerName}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={customers.map(c => ({ value: c.uuid, label: c.customerName }))}
+                    value={formData.customerId}
+                    onChange={(val) => {
+                      const cus = customers.find(c => c.uuid === val);
+                      setFormData({ ...formData, customerId: val, customerName: cus?.customerName || "" });
+                    }}
+                    placeholder="Select Customer"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Ledger</label>
-                  <select value={formData.ledger} onChange={(e) => setFormData({ ...formData, ledger: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Ledger</option>
-                    {ledgers.map(l => <option key={l.uuid} value={l.name}>{l.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={ledgers.map(l => ({ value: l.name, label: l.name }))}
+                    value={formData.ledger}
+                    onChange={(val) => setFormData({ ...formData, ledger: val })}
+                    placeholder="Select Ledger"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Code</label>
@@ -616,24 +646,30 @@ export default function InvoiceBillPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-                  <select value={formData.projectType} onChange={(e) => setFormData({ ...formData, projectType: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select value</option>
-                    {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={projectTypes.map(p => ({ value: p.name, label: p.name }))}
+                    value={formData.projectType}
+                    onChange={(val) => setFormData({ ...formData, projectType: val })}
+                    placeholder="Select Project Type"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project</label>
-                  <select value={formData.projectId} onChange={(e) => setFormData({ ...formData, projectId: e.target.value, site: "" })} className="w-full border rounded px-3 py-1.5 text-sm" required>
-                    <option value="">Select Project</option>
-                    {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                    value={formData.projectId}
+                    onChange={(val) => setFormData({ ...formData, projectId: val, site: "" })}
+                    placeholder="Select Project"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Site</label>
-                  <select value={formData.site} onChange={(e) => setFormData({ ...formData, site: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Site</option>
-                    {filteredSites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={filteredSites.map(s => ({ value: s.name, label: s.name }))}
+                    value={formData.site}
+                    onChange={(val) => setFormData({ ...formData, site: val })}
+                    placeholder="Select Site"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Ref W/O No.</label>
@@ -655,7 +691,10 @@ export default function InvoiceBillPage() {
 
               {/* PROPOSED BUDGET */}
               <div className="mt-6">
-                <div className="bg-orange-400 text-white text-center py-1 font-bold rounded-t">PROPOSED BUDGET</div>
+                <div className="bg-orange-400 text-white py-1 font-bold rounded-t flex justify-between px-4 items-center">
+                  <span>PROPOSED BUDGET</span>
+                  <button type="button" onClick={() => addBudgetRow("proposed")} className="bg-green-600 text-white px-2.5 py-1 rounded text-xs font-semibold hover:bg-green-700">+ Add Item</button>
+                </div>
                 <div className="border-x border-b rounded-b overflow-x-auto bg-white">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-indigo-500 text-white">
@@ -680,7 +719,7 @@ export default function InvoiceBillPage() {
                         </tr>
                       ))}
                       {formData.proposedBudget.length === 0 && (
-                        <tr><td colSpan={8} className="text-center py-2 text-gray-500">Click + to add item</td></tr>
+                        <tr><td colSpan={8} className="text-center py-2 text-gray-500">No items added. Click + Add Item above.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -689,7 +728,10 @@ export default function InvoiceBillPage() {
 
               {/* ADJUSTMENT BUDGET */}
               <div className="mt-4">
-                <div className="bg-orange-400 text-white text-center py-1 font-bold rounded-t">ADJUSTMENT BUDGET</div>
+                <div className="bg-orange-400 text-white py-1 font-bold rounded-t flex justify-between px-4 items-center">
+                  <span>ADJUSTMENT BUDGET</span>
+                  <button type="button" onClick={() => addBudgetRow("adjustment")} className="bg-green-600 text-white px-2.5 py-1 rounded text-xs font-semibold hover:bg-green-700">+ Add Item</button>
+                </div>
                 <div className="border-x border-b rounded-b overflow-x-auto bg-white">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-indigo-500 text-white">
@@ -714,7 +756,7 @@ export default function InvoiceBillPage() {
                         </tr>
                       ))}
                       {formData.adjustmentBudget.length === 0 && (
-                        <tr><td colSpan={8} className="text-center py-2 text-gray-500">Click + to add item</td></tr>
+                        <tr><td colSpan={8} className="text-center py-2 text-gray-500">No items added. Click + Add Item above.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -775,17 +817,21 @@ export default function InvoiceBillPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs mb-1">Category</label>
-                  <select required value={newItem.categoryId} onChange={(e) => setNewItem({...newItem, categoryId: e.target.value})} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Category</option>
-                    {categories.map(c => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={categories.map(c => ({ value: c.uuid, label: c.name }))}
+                    value={newItem.categoryId}
+                    onChange={(val) => setNewItem({ ...newItem, categoryId: val })}
+                    placeholder="Select Category"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs mb-1">Brand</label>
-                  <select required value={newItem.brand} onChange={(e) => setNewItem({...newItem, brand: e.target.value})} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Brand</option>
-                    {brands.map(b => <option key={b.uuid} value={b.name}>{b.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={brands.map(b => ({ value: b.name, label: b.name }))}
+                    value={newItem.brand}
+                    onChange={(val) => setNewItem({ ...newItem, brand: val })}
+                    placeholder="Select Brand"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs mb-1">Item Name</label>

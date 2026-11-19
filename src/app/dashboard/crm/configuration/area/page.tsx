@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { Sparkles, Search, ChevronLeft, ChevronRight, Plus, Edit, Trash2, X, AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 import { crmFetch } from "../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -284,18 +285,21 @@ export default function AreaPage() {
       <div className="p-4 md:p-5 rounded-2xl border border-border/80 bg-white shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-muted-foreground w-full sm:w-auto">
           <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 border rounded-xl bg-background border-border text-foreground font-black text-sm outline-none cursor-pointer"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
+          <div className="w-24">
+            <PredictiveSearchSelect
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              value={String(entriesPerPage)}
+              onChange={(val) => {
+                setEntriesPerPage(Number(val));
+                setCurrentPage(1);
+              }}
+              placeholder="10"
+            />
+          </div>
           <span>entries</span>
         </div>
 
@@ -476,14 +480,15 @@ export default function AreaPage() {
 
               <div>
                 <label className="block text-slate-500 mb-1.5">Status (লোকাল স্টোরেজে সেভ হবে)</label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "active", label: "Active" },
+                    { value: "inactive", label: "Inactive" },
+                  ]}
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-extrabold outline-none cursor-pointer"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
+                  onChange={(val) => setFormData({ ...formData, status: val })}
+                  placeholder="Select status..."
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
