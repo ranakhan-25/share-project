@@ -1,4 +1,5 @@
 'use client';
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 import React, { useState } from 'react';
 import { 
@@ -117,15 +118,12 @@ export default function ReceivableReport() {
             {/* Customer Dropdown */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Customer</label>
-              <select 
-                value={customer} 
-                onChange={(e) => setCustomer(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Customer">Select Customer</option>
-                <option value="Nexus Developers">Nexus Developers</option>
-                <option value="Cityscape Holdings">Cityscape Holdings</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Customer","label":"Select Customer"},{"value":"Nexus Developers","label":"Nexus Developers"},{"value":"Cityscape Holdings","label":"Cityscape Holdings"}]}
+                value={customer}
+                onChange={(val: any) => (val)}
+                placeholder="Select Customer"
+              />
             </div>
 
             {/* Company with Clear Action */}
@@ -150,15 +148,12 @@ export default function ReceivableReport() {
             {/* Select Project */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Select Project</label>
-              <select 
-                value={selectProject} 
-                onChange={(e) => setSelectProject(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Project">Select Project</option>
-                <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
-                <option value="Lake Garden">Lake Garden</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Project","label":"Select Project"},{"value":"Sheba Eyecon Tower","label":"Sheba Eyecon Tower"},{"value":"Lake Garden","label":"Lake Garden"}]}
+                value={selectProject}
+                onChange={(val: any) => (val)}
+                placeholder="Select Project"
+              />
             </div>
 
           </div>

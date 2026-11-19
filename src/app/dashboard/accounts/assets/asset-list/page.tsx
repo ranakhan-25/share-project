@@ -13,6 +13,7 @@ import {
   RotateCcw,
   X
 } from 'lucide-react';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 
 interface AssetListItem {
   uuid: string;
@@ -325,15 +326,17 @@ export default function AssetManagementSystem() {
               <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center text-xs sm:text-sm text-slate-600 space-x-2">
                   <span>Show</span>
-                  <select 
+                  <PredictiveSearchSelect 
                     value={entries} 
-                    onChange={(e) => setEntries(e.target.value)}
-                    className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-                  >
-                    <option value="10">10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                  </select>
+                    onChange={(val) => setEntries(val)}
+                    options={[
+                      { value: "10", label: "10" },
+                      { value: "25", label: "25" },
+                      { value: "50", label: "50" },
+                    ]}
+                    placeholder="10"
+                    className="w-20"
+                  />
                   <span>entries</span>
                 </div>
 
@@ -509,16 +512,14 @@ export default function AssetManagementSystem() {
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Item Name</label>
                     <div className="flex gap-2">
-                      <select 
-                        value={itemName} 
-                        onChange={(e) => setItemName(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-                      >
-                        <option value="Select Item">Select Item</option>
-                        {itemList.map((itm, idx) => (
-                          <option key={idx} value={itm}>{itm}</option>
-                        ))}
-                      </select>
+                      <div className="flex-1">
+                        <PredictiveSearchSelect 
+                          value={itemName} 
+                          onChange={(val) => setItemName(val)}
+                          options={itemList.map((itm) => ({ value: itm, label: itm }))}
+                          placeholder="Select Item"
+                        />
+                      </div>
                       <button 
                         type="button"
                         onClick={() => { setModalType('item'); setIsModalOpen(true); }}
@@ -568,16 +569,14 @@ export default function AssetManagementSystem() {
                   <div>
                     <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Project</label>
                     <div className="flex gap-2">
-                      <select 
-                        value={project} 
-                        onChange={(e) => setProject(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-                      >
-                        <option value="Select a project">Select a project</option>
-                        {projectList.map((prj, idx) => (
-                          <option key={idx} value={prj}>{prj}</option>
-                        ))}
-                      </select>
+                      <div className="flex-1">
+                        <PredictiveSearchSelect 
+                          value={project} 
+                          onChange={(val) => setProject(val)}
+                          options={projectList.map((prj) => ({ value: prj, label: prj }))}
+                          placeholder="Select a project"
+                        />
+                      </div>
                       <button 
                         type="button"
                         onClick={() => { setModalType('project'); setIsModalOpen(true); }}
@@ -596,15 +595,15 @@ export default function AssetManagementSystem() {
                   <div className="space-y-4 text-sm">
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Method</label>
-                      <select 
+                      <PredictiveSearchSelect 
                         value={method} 
-                        onChange={(e) => setMethod(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-                      >
-                        <option value="Select">Select</option>
-                        <option value="Straight Line">Straight Line</option>
-                        <option value="Reducing Balance">Reducing Balance</option>
-                      </select>
+                        onChange={(val) => setMethod(val)}
+                        options={[
+                          { value: "Straight Line", label: "Straight Line" },
+                          { value: "Reducing Balance", label: "Reducing Balance" },
+                        ]}
+                        placeholder="Select"
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
@@ -624,16 +623,16 @@ export default function AssetManagementSystem() {
 
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Computation</label>
-                      <select 
+                      <PredictiveSearchSelect 
                         value={computation} 
-                        onChange={(e) => setComputation(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-                      >
-                        <option value="Select">Select</option>
-                        <option value="Daily">Daily</option>
-                        <option value="Monthly">Monthly</option>
-                        <option value="Yearly">Yearly</option>
-                      </select>
+                        onChange={(val) => setComputation(val)}
+                        options={[
+                          { value: "Daily", label: "Daily" },
+                          { value: "Monthly", label: "Monthly" },
+                          { value: "Yearly", label: "Yearly" },
+                        ]}
+                        placeholder="Select"
+                      />
                     </div>
                   </div>
                 </div>
@@ -664,27 +663,28 @@ export default function AssetManagementSystem() {
                   <div className="space-y-4 text-sm">
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1.5 text-xs">Expense Account</label>
-                      <select 
+                      <PredictiveSearchSelect 
                         value={expenseAccount} 
-                        onChange={(e) => setExpenseAccount(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-                      >
-                        <option value="Select Account">Select Account</option>
-                        <option value="Depreciation Expense">Depreciation Expense</option>
-                      </select>
+                        onChange={(val) => setExpenseAccount(val)}
+                        options={[
+                          { value: "Depreciation Expense", label: "Depreciation Expense" },
+                          { value: "Operating Expense", label: "Operating Expense" },
+                        ]}
+                        placeholder="Select Account"
+                      />
                     </div>
 
                     <div>
                       <label className="block text-slate-700 font-semibold mb-1.5 text-xs">If Tag Voucher No</label>
-                      <select 
+                      <PredictiveSearchSelect 
                         value={voucherNo} 
-                        onChange={(e) => setVoucherNo(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 cursor-pointer"
-                      >
-                        <option value="Select Voucher No">Select Voucher No</option>
-                        <option value="VCH-2025-001">VCH-2025-001</option>
-                        <option value="VCH-2025-002">VCH-2025-002</option>
-                      </select>
+                        onChange={(val) => setVoucherNo(val)}
+                        options={[
+                          { value: "VCH-2025-001", label: "VCH-2025-001" },
+                          { value: "VCH-2025-002", label: "VCH-2025-002" },
+                        ]}
+                        placeholder="Select Voucher No"
+                      />
                     </div>
                   </div>
                 </div>

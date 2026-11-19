@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { showAlert } from "@/lib/swal";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface CrmOption {
   id: number;
@@ -566,22 +567,38 @@ export default function CrmLeadDirectory() {
             <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, code, phone, email..." className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
           </label>
-          <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm">
-            <option value="all">All stages</option>
-            {stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
-          </select>
-          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm">
-            <option value="all">All categories</option>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-          </select>
-          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm">
-            <option value="all">All sources</option>
-            {sources.map((source) => <option key={source.id} value={source.id}>{source.name}</option>)}
-          </select>
-          <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm">
-            <option value="all">All priorities</option>
-            {["urgent", "high", "medium", "low"].map((priority) => <option key={priority} value={priority}>{priority[0].toUpperCase() + priority.slice(1)}</option>)}
-          </select>
+          <div className="w-40 min-w-36">
+            <PredictiveSearchSelect
+              options={[{ value: "all", label: "All stages" }, ...stages.map((s) => ({ value: String(s.id), label: s.name }))]}
+              value={stageFilter}
+              onChange={(val) => setStageFilter(val)}
+              placeholder="Stage"
+            />
+          </div>
+          <div className="w-40 min-w-36">
+            <PredictiveSearchSelect
+              options={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: String(c.id), label: c.name }))]}
+              value={categoryFilter}
+              onChange={(val) => setCategoryFilter(val)}
+              placeholder="Category"
+            />
+          </div>
+          <div className="w-40 min-w-36">
+            <PredictiveSearchSelect
+              options={[{ value: "all", label: "All sources" }, ...sources.map((s) => ({ value: String(s.id), label: s.name }))]}
+              value={sourceFilter}
+              onChange={(val) => setSourceFilter(val)}
+              placeholder="Source"
+            />
+          </div>
+          <div className="w-40 min-w-36">
+            <PredictiveSearchSelect
+              options={[{ value: "all", label: "All priorities" }, ...["urgent", "high", "medium", "low"].map((p) => ({ value: p, label: p[0].toUpperCase() + p.slice(1) }))]}
+              value={priorityFilter}
+              onChange={(val) => setPriorityFilter(val)}
+              placeholder="Priority"
+            />
+          </div>
           <input type="date" value={dateFromFilter} onChange={(event) => setDateFromFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm" placeholder="From" />
           <input type="date" value={dateToFilter} onChange={(event) => setDateToFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm" placeholder="To" />
           <span className="text-sm text-muted-foreground">{filteredLeads.length} shown</span>
@@ -631,7 +648,15 @@ export default function CrmLeadDirectory() {
               <SelectField label="Lead source" value={form.lead_source_id} options={sources} onChange={(value) => setForm({ ...form, lead_source_id: value })} />
               <SelectField label="Campaign" value={form.campaign_id} options={campaigns} onChange={(value) => setForm({ ...form, campaign_id: value })} />
               <SelectField label="Profession" value={form.profession_id} options={professions} onChange={(value) => setForm({ ...form, profession_id: value })} />
-              <Field label="Priority"><select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>{["low", "medium", "high", "urgent"].map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>
+              <div className="space-y-1">
+                <label className="block text-sm font-bold">Priority</label>
+                <PredictiveSearchSelect
+                  options={["low", "medium", "high", "urgent"].map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }))}
+                  value={form.priority}
+                  onChange={(val) => setForm({ ...form, priority: val })}
+                  placeholder="Select priority..."
+                />
+              </div>
               <Field label="Job title"><input value={form.designation} onChange={(event) => setForm({ ...form, designation: event.target.value })} /></Field>
               <Field label="Company"><input value={form.organization} onChange={(event) => setForm({ ...form, organization: event.target.value })} /></Field>
               <Field label="Assigned representative"><input value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} placeholder="Employee ID or name" /></Field>
@@ -656,11 +681,15 @@ export default function CrmLeadDirectory() {
               <Detail label="Organization" value={selectedLead.organization} /><Detail label="Owner" value={selectedLead.assigned_to} />
               <Detail label="Created" value={formatDate(selectedLead.createdAt)} /><Detail label="Status" value={selectedLead.status} />
             </div>
-            <label className="block text-sm font-bold">Pipeline stage
-              <select className="mt-1 w-full rounded-xl border border-border bg-card p-2.5" value={selectedLead.lead_stage_id || ""} onChange={(event) => void updateStage(selectedLead, Number(event.target.value))}>
-                <option value="" disabled>Select stage</option>{stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
-              </select>
-            </label>
+            <div className="space-y-1">
+              <label className="block text-sm font-bold">Pipeline stage</label>
+              <PredictiveSearchSelect
+                options={stages.map((stage) => ({ value: String(stage.id), label: stage.name }))}
+                value={String(selectedLead.lead_stage_id || "")}
+                onChange={(val) => void updateStage(selectedLead, Number(val))}
+                placeholder="Select stage..."
+              />
+            </div>
             {selectedLead.notes && <p className="my-5 whitespace-pre-wrap rounded-xl bg-muted/50 p-4 text-sm">{selectedLead.notes}</p>}
             <section className="mt-7 border-t border-border pt-5">
               <h3 className="mb-3 text-lg font-black">Property interests</h3>
@@ -689,7 +718,15 @@ export default function CrmLeadDirectory() {
             <section className="mt-7 border-t border-border pt-5">
               <h3 className="mb-4 text-lg font-black">Log an activity</h3>
               <form onSubmit={(event) => void addActivity(event)} className="space-y-3">
-                <label className="block text-sm font-bold">Activity type<select required value={activityType} onChange={(event) => setActivityType(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-card p-2.5">{["call", "meeting", "visit", "whatsapp", "email", "follow_up"].map((type) => <option key={type} value={type}>{type.replace("_", " ")}</option>)}</select></label>
+                <div className="space-y-1">
+                  <label className="block text-sm font-bold">Activity type</label>
+                  <PredictiveSearchSelect
+                    options={["call", "meeting", "visit", "whatsapp", "email", "follow_up"].map((type) => ({ value: type, label: type.replace("_", " ") }))}
+                    value={activityType}
+                    onChange={(val) => setActivityType(val)}
+                    placeholder="Select activity type..."
+                  />
+                </div>
                 <label className="block text-sm font-bold">Summary<textarea required rows={2} value={activitySummary} onChange={(event) => setActivitySummary(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-card p-2.5" placeholder="What happened?" /></label>
                 <label className="block text-sm font-bold">Feedback<textarea rows={2} value={activityFeedback} onChange={(event) => setActivityFeedback(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-card p-2.5" placeholder="Outcome or next step" /></label>
                 <label className="block text-sm font-bold">Schedule follow-up<input type="datetime-local" value={nextFollowup} onChange={(event) => setNextFollowup(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-card p-2.5" /></label>
@@ -751,7 +788,17 @@ function Field({ label, required, children }: { label: string; required?: boolea
 }
 
 function SelectField({ label, value, options, onChange }: { label: string; value: string; options: CrmOption[]; onChange: (value: string) => void }) {
-  return <label className="block text-sm font-bold">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background p-2.5 text-sm"><option value="">Not specified</option>{options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>;
+  return (
+    <div className="space-y-1">
+      <label className="block text-sm font-bold">{label}</label>
+      <PredictiveSearchSelect
+        options={[{ value: "", label: "Not specified" }, ...options.map((option) => ({ value: String(option.id), label: option.name }))]}
+        value={String(value || "")}
+        onChange={(val) => onChange(val)}
+        placeholder={`Select ${label}...`}
+      />
+    </div>
+  );
 }
 
 function Detail({ label, value }: { label: string; value?: string }) {

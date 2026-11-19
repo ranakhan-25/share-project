@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Loader2, Save, Plus, Edit3, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -312,19 +313,21 @@ export default function SaleOfferPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project</label>
-                  <select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Select Project</option>
-                    {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect 
+                    value={form.projectId} 
+                    onChange={(val) => setForm({ ...form, projectId: val })} 
+                    options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                    placeholder="Select Project"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Flat/Land/Share No</label>
-                  <select value={form.flatLandId} onChange={(e) => setForm({ ...form, flatLandId: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Select Flat/Land/Share No</option>
-                    {flats.map(f => (
-                      <option key={f.uuid} value={f.uuid}>{f.flatLandNo}</option>
-                    ))}
-                  </select>
+                  <PredictiveSearchSelect 
+                    value={form.flatLandId} 
+                    onChange={(val) => setForm({ ...form, flatLandId: val })} 
+                    options={flats.map(f => ({ value: f.uuid, label: f.flatLandNo }))}
+                    placeholder="Select Flat/Land/Share No"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Attachment</label>
@@ -336,31 +339,39 @@ export default function SaleOfferPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Customer</label>
-                  <select value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Select One Option</option>
-                    {customers.map(c => <option key={c.uuid} value={c.customerName}>{c.customerName}</option>)}
-                  </select>
+                  <PredictiveSearchSelect 
+                    value={form.customerName} 
+                    onChange={(val) => setForm({ ...form, customerName: val })} 
+                    options={customers.map(c => ({ value: c.customerName, label: c.customerName }))}
+                    placeholder="Select One Option"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-                  <select value={form.projectType} onChange={(e) => setForm({ ...form, projectType: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Select Project Type</option>
-                    {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect 
+                    value={form.projectType} 
+                    onChange={(val) => setForm({ ...form, projectType: val })} 
+                    options={projectTypes.map(p => ({ value: p.name, label: p.name }))}
+                    placeholder="Select Project Type"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Site</label>
-                  <select value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Select Site</option>
-                    {sites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect 
+                    value={form.site} 
+                    onChange={(val) => setForm({ ...form, site: val })} 
+                    options={sites.map(s => ({ value: s.name, label: s.name }))}
+                    placeholder="Select Site"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Sales By</label>
-                  <select value={form.salesBy} onChange={(e) => setForm({ ...form, salesBy: e.target.value })} className="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Select Sales Person</option>
-                    {salesUsers.map(u => <option key={u.uuid} value={u.name}>{u.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect 
+                    value={form.salesBy} 
+                    onChange={(val) => setForm({ ...form, salesBy: val })} 
+                    options={salesUsers.map(u => ({ value: u.name, label: u.name }))}
+                    placeholder="Select Sales Person"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Collection Officer</label>
@@ -412,36 +423,30 @@ export default function SaleOfferPage() {
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Sales By</label>
-          <select 
+          <PredictiveSearchSelect 
             value={filters.salesBy} 
-            onChange={(e) => setFilters({ ...filters, salesBy: e.target.value })} 
-            className="w-full border rounded px-3 py-2 text-sm"
-          >
-            <option value="">Select value</option>
-            {salesUsers.map(u => <option key={u.uuid} value={u.name}>{u.name}</option>)}
-          </select>
+            onChange={(val) => setFilters({ ...filters, salesBy: val })} 
+            options={salesUsers.map(u => ({ value: u.name, label: u.name }))}
+            placeholder="Select value"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Team</label>
-          <select 
+          <PredictiveSearchSelect 
             value={filters.team} 
-            onChange={(e) => setFilters({ ...filters, team: e.target.value })} 
-            className="w-full border rounded px-3 py-2 text-sm"
-          >
-            <option value="">Select value</option>
-            {teams.map(t => <option key={t.uuid} value={t.name}>{t.name}</option>)}
-          </select>
+            onChange={(val) => setFilters({ ...filters, team: val })} 
+            options={teams.map(t => ({ value: t.name, label: t.name }))}
+            placeholder="Select value"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Project</label>
-          <select 
+          <PredictiveSearchSelect 
             value={filters.project} 
-            onChange={(e) => setFilters({ ...filters, project: e.target.value })} 
-            className="w-full border rounded px-3 py-2 text-sm"
-          >
-            <option value="">Select Project</option>
-            {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-          </select>
+            onChange={(val) => setFilters({ ...filters, project: val })} 
+            options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+            placeholder="Select Project"
+          />
         </div>
       </div>
 
@@ -450,7 +455,16 @@ export default function SaleOfferPage() {
         <div className="flex justify-between items-center p-4 border-b">
           <div className="flex items-center gap-2 text-sm">
             <span>Show</span>
-            <select className="border rounded px-2 py-1"><option>10</option><option>50</option></select>
+            <PredictiveSearchSelect 
+              value="10"
+              onChange={() => {}}
+              options={[
+                { value: "10", label: "10" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
           </div>
           <div className="flex items-center gap-2 text-sm">

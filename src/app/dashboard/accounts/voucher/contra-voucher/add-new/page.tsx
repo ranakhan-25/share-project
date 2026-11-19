@@ -12,6 +12,7 @@ import {
   Trash2,
   CheckCircle2,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // Types
 export interface TableRowItem {
@@ -61,6 +62,8 @@ export default function ContraVoucherCreatePage() {
 
   // --- Dynamic Chart of Accounts Options State ---
   const [accountOptions, setAccountOptions] = useState<ChartOfAccountOption[]>([]);
+  const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ value: string; label: string }[]>([]);
 
   // --- Entry Form Inputs State ---
   const [entryType, setEntryType] = useState<"DEBIT" | "CREDIT">("DEBIT");
@@ -92,11 +95,18 @@ export default function ContraVoucherCreatePage() {
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetch("/api/backend/chart-of-accounts", {
-          headers: getAuthHeaders(),
-          cache: "no-store",
-        });
+        const [response, projRes, siteRes] = await Promise.all([
+          fetch("/api/backend/chart-of-accounts", {
+            headers: getAuthHeaders(),
+            cache: "no-store",
+          }),
+          fetch("/api/backend/project?limit=100", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project-sites?limit=100", { headers: getAuthHeaders() }),
+        ]);
         const result = await response.json();
+        const projJson = await projRes.json().catch(() => ({}));
+        const siteJson = await siteRes.json().catch(() => ({}));
+
         const records = Array.isArray(result.data)
           ? result.data
           : Array.isArray(result.data?.data)
@@ -108,6 +118,22 @@ export default function ContraVoucherCreatePage() {
             code: String(account.code ?? ""),
             name: String(account.name ?? account.accountName ?? ""),
             group: String(account.group ?? account.under ?? ""),
+          })));
+        }
+
+        const pList = projJson?.data?.data || projJson?.data || [];
+        if (Array.isArray(pList)) {
+          setProjectOptions(pList.map((p: any) => ({
+            value: p.name || p.title || p.uuid || String(p.id),
+            label: p.name || p.title || "Project",
+          })));
+        }
+
+        const sList = siteJson?.data?.data || siteJson?.data || [];
+        if (Array.isArray(sList)) {
+          setSiteOptions(sList.map((s: any) => ({
+            value: s.name || s.siteName || s.uuid || String(s.id),
+            label: s.name || s.siteName || "Site",
           })));
         }
       } catch (error) {
@@ -383,40 +409,46 @@ export default function ContraVoucherCreatePage() {
                 <label className="w-32 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Project Type
                 </label>
-                <select
-                  value={headerState.projectType}
-                  onChange={(e) =>
-                    setHeaderState({
-                      ...headerState,
-                      projectType: e.target.value,
-                    })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Project Type</option>
-                  <option value="Commercial">Commercial</option>
-                  <option value="Residential">Residential</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    value={headerState.projectType}
+                    onChange={(val) =>
+                      setHeaderState({
+                        ...headerState,
+                        projectType: val,
+                      })
+                    }
+                    options={[
+                      { value: "Commercial", label: "Commercial" },
+                      { value: "Residential", label: "Residential" },
+                    ]}
+                    placeholder="Select Project Type"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center">
                 <label className="w-32 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Title/Name of Work
                 </label>
-                <select
-                  value={headerState.titleOfWork}
-                  onChange={(e) =>
-                    setHeaderState({
-                      ...headerState,
-                      titleOfWork: e.target.value,
-                    })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Title/Name of Work</option>
-                  <option value="Cash Transfer">Cash Transfer</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    value={headerState.titleOfWork}
+                    onChange={(val) =>
+                      setHeaderState({
+                        ...headerState,
+                        titleOfWork: val,
+                      })
+                    }
+                    options={[
+                      { value: "Cash Transfer", label: "Cash Transfer" },
+                      { value: "Bank Transfer", label: "Bank Transfer" },
+                      { value: "Civil Work", label: "Civil Work" },
+                      { value: "Electrical Work", label: "Electrical Work" },
+                    ]}
+                    placeholder="Select Title/Name of Work"
+                  />
+                </div>
               </div>
             </div>
 
@@ -426,53 +458,53 @@ export default function ContraVoucherCreatePage() {
                 <label className="w-24 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Project
                 </label>
-                <select
-                  value={headerState.project}
-                  onChange={(e) =>
-                    setHeaderState({ ...headerState, project: e.target.value })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Project</option>
-                  <option value="Project Alpha">Project Alpha</option>
-                  <option value="Project Beta">Project Beta</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    value={headerState.project}
+                    onChange={(val) =>
+                      setHeaderState({ ...headerState, project: val })
+                    }
+                    options={projectOptions}
+                    placeholder="Select Project"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center">
                 <label className="w-24 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Site
                 </label>
-                <select
-                  value={headerState.site}
-                  onChange={(e) =>
-                    setHeaderState({ ...headerState, site: e.target.value })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Site</option>
-                  <option value="Main Branch">Main Branch</option>
-                  <option value="Site Office">Site Office</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    value={headerState.site}
+                    onChange={(val) =>
+                      setHeaderState({ ...headerState, site: val })
+                    }
+                    options={siteOptions}
+                    placeholder="Select Site"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center">
                 <label className="w-24 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   If Task
                 </label>
-                <select
-                  value={headerState.task}
-                  onChange={(e) =>
-                    setHeaderState({ ...headerState, task: e.target.value })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Task</option>
-                  <option value="Fund Allocation">Fund Allocation</option>
-                  <option value="Inter-account Transfer">
-                    Inter-account Transfer
-                  </option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    value={headerState.task}
+                    onChange={(val) =>
+                      setHeaderState({ ...headerState, task: val })
+                    }
+                    options={[
+                      { value: "Fund Allocation", label: "Fund Allocation" },
+                      { value: "Inter-account Transfer", label: "Inter-account Transfer" },
+                      { value: "Foundation", label: "Foundation" },
+                      { value: "Casting", label: "Casting" },
+                    ]}
+                    placeholder="Select Task"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -481,31 +513,33 @@ export default function ContraVoucherCreatePage() {
         {/* Dynamic Entry Inputs Section */}
         <div className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 p-2.5 mb-3 shadow-xs">
           <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
-            <select
-              value={entryType}
-              onChange={(e) =>
-                setEntryType(e.target.value as "DEBIT" | "CREDIT")
-              }
-              className="w-full md:w-44 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 font-medium"
-            >
-              <option value="DEBIT">Debit</option>
-              <option value="CREDIT">Credit</option>
-            </select>
+            <div className="w-full md:w-44">
+              <PredictiveSearchSelect
+                value={entryType}
+                onChange={(val) =>
+                  setEntryType(val as "DEBIT" | "CREDIT")
+                }
+                options={[
+                  { value: "DEBIT", label: "Debit" },
+                  { value: "CREDIT", label: "Credit" },
+                ]}
+                placeholder="Debit"
+              />
+            </div>
 
             {/* Account Selector + PLUS BUTTON TO OPEN MODAL */}
             <div className="flex-1 flex items-center gap-1 min-w-[220px]">
-              <select
-                value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Chart Of Account</option>
-                {accountOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.name} ({opt.code})
-                  </option>
-                ))}
-              </select>
+              <div className="flex-1">
+                <PredictiveSearchSelect
+                  value={selectedAccountId}
+                  onChange={(val) => setSelectedAccountId(val)}
+                  options={accountOptions.map((opt) => ({
+                    value: opt.id,
+                    label: `${opt.name} (${opt.code})`,
+                  }))}
+                  placeholder="Select Chart Of Account"
+                />
+              </div>
 
               {/* GREEN PLUS BUTTON (MODAL TRIGGER) */}
               <button
@@ -699,19 +733,19 @@ export default function ContraVoucherCreatePage() {
                 <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Chart of Group
                 </label>
-                <select
+                <PredictiveSearchSelect
                   value={modalData.group}
-                  onChange={(e) =>
-                    setModalData({ ...modalData, group: e.target.value })
+                  onChange={(val) =>
+                    setModalData({ ...modalData, group: val })
                   }
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select value</option>
-                  <option value="Assets">Assets</option>
-                  <option value="Liabilities">Liabilities</option>
-                  <option value="Expenses">Expenses</option>
-                  <option value="Income">Income</option>
-                </select>
+                  options={[
+                    { value: "Assets", label: "Assets" },
+                    { value: "Liabilities", label: "Liabilities" },
+                    { value: "Expenses", label: "Expenses" },
+                    { value: "Income", label: "Income" },
+                  ]}
+                  placeholder="Select value"
+                />
               </div>
 
               <div>
@@ -748,17 +782,17 @@ export default function ContraVoucherCreatePage() {
                 <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Set Accounts Default Module
                 </label>
-                <select
+                <PredictiveSearchSelect
                   value={modalData.status}
-                  onChange={(e) =>
-                    setModalData({ ...modalData, status: e.target.value })
+                  onChange={(val) =>
+                    setModalData({ ...modalData, status: val })
                   }
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Status</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
+                  options={[
+                    { value: "Active", label: "Active" },
+                    { value: "Inactive", label: "Inactive" },
+                  ]}
+                  placeholder="Select Status"
+                />
               </div>
 
               {/* Modal Buttons */}

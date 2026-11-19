@@ -23,6 +23,7 @@ import {
   Trash2,
   CheckCircle2,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ---------- Types ----------
 export interface TableRowItem {
@@ -116,6 +117,9 @@ export default function JournalVoucherCreatePage() {
     status: "",
   });
 
+  const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ value: string; label: string }[]>([]);
+
   // Totals
   const totalDebit =
     Math.round(rows.reduce((s, r) => s + r.debit, 0) * 100) / 100;
@@ -127,11 +131,32 @@ export default function JournalVoucherCreatePage() {
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetch("/api/backend/chart-of-accounts", {
-          headers: getAuthHeaders(),
-          cache: "no-store",
-        });
+        const [response, projRes, siteRes] = await Promise.all([
+          fetch("/api/backend/chart-of-accounts", {
+            headers: getAuthHeaders(),
+            cache: "no-store",
+          }),
+          fetch("/api/backend/project?limit=100", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project-sites?limit=100", { headers: getAuthHeaders() }),
+        ]);
         const result = await response.json();
+        const projJson = await projRes.json().catch(() => ({}));
+        const siteJson = await siteRes.json().catch(() => ({}));
+
+        const pList = projJson?.data?.data || projJson?.data || [];
+        if (Array.isArray(pList)) {
+          setProjectOptions(pList.map((p: any) => ({
+            value: p.name || p.title || p.uuid || String(p.id),
+            label: p.name || p.title || "Project",
+          })));
+        }
+        const sList = siteJson?.data?.data || siteJson?.data || [];
+        if (Array.isArray(sList)) {
+          setSiteOptions(sList.map((s: any) => ({
+            value: s.name || s.siteName || s.uuid || String(s.id),
+            label: s.name || s.siteName || "Site",
+          })));
+        }
         const data = Array.isArray(result.data)
           ? result.data
           : Array.isArray(result.data?.data)
@@ -567,40 +592,47 @@ export default function JournalVoucherCreatePage() {
                 <label className="w-32 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Project Type
                 </label>
-                <select
-                  value={headerState.projectType}
-                  onChange={(e) =>
-                    setHeaderState({
-                      ...headerState,
-                      projectType: e.target.value,
-                    })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Project Type</option>
-                  <option value="Commercial">Commercial</option>
-                  <option value="Residential">Residential</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Commercial", label: "Commercial" },
+                      { value: "Residential", label: "Residential" },
+                    ]}
+                    value={headerState.projectType}
+                    onChange={(val) =>
+                      setHeaderState({
+                        ...headerState,
+                        projectType: val,
+                      })
+                    }
+                    placeholder="Select Project Type"
+                    className="w-full text-[11px]"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center">
                 <label className="w-32 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Title/Name of Work
                 </label>
-                <select
-                  value={headerState.titleOfWork}
-                  onChange={(e) =>
-                    setHeaderState({
-                      ...headerState,
-                      titleOfWork: e.target.value,
-                    })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Title/Name of Work</option>
-                  <option value="Civil Work">Civil Work</option>
-                  <option value="Electrical Work">Electrical Work</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Civil Work", label: "Civil Work" },
+                      { value: "Electrical Work", label: "Electrical Work" },
+                      { value: "General Construction", label: "General Construction" },
+                    ]}
+                    value={headerState.titleOfWork}
+                    onChange={(val) =>
+                      setHeaderState({
+                        ...headerState,
+                        titleOfWork: val,
+                      })
+                    }
+                    placeholder="Select Title/Name of Work"
+                    className="w-full text-[11px]"
+                  />
+                </div>
               </div>
             </div>
 
@@ -609,51 +641,60 @@ export default function JournalVoucherCreatePage() {
                 <label className="w-24 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Project
                 </label>
-                <select
-                  value={headerState.project}
-                  onChange={(e) =>
-                    setHeaderState({ ...headerState, project: e.target.value })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Project</option>
-                  <option value="Tower A">Tower A</option>
-                  <option value="Plaza B">Plaza B</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    options={projectOptions.length ? projectOptions : [
+                      { value: "Tower A", label: "Tower A" },
+                      { value: "Plaza B", label: "Plaza B" },
+                    ]}
+                    value={headerState.project}
+                    onChange={(val) =>
+                      setHeaderState({ ...headerState, project: val })
+                    }
+                    placeholder="Select Project"
+                    className="w-full text-[11px]"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center">
                 <label className="w-24 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   Site
                 </label>
-                <select
-                  value={headerState.site}
-                  onChange={(e) =>
-                    setHeaderState({ ...headerState, site: e.target.value })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Site</option>
-                  <option value="Dhaka Site">Dhaka Site</option>
-                  <option value="Chittagong Site">Chittagong Site</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    options={siteOptions.length ? siteOptions : [
+                      { value: "Dhaka Site", label: "Dhaka Site" },
+                      { value: "Chittagong Site", label: "Chittagong Site" },
+                    ]}
+                    value={headerState.site}
+                    onChange={(val) =>
+                      setHeaderState({ ...headerState, site: val })
+                    }
+                    placeholder="Select Site"
+                    className="w-full text-[11px]"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center">
                 <label className="w-24 text-right pr-3 text-[11px] font-medium text-slate-600 dark:text-slate-400">
                   If Task
                 </label>
-                <select
-                  value={headerState.task}
-                  onChange={(e) =>
-                    setHeaderState({ ...headerState, task: e.target.value })
-                  }
-                  className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Task</option>
-                  <option value="Foundation">Foundation</option>
-                  <option value="Finishing">Finishing</option>
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Foundation", label: "Foundation" },
+                      { value: "Finishing", label: "Finishing" },
+                    ]}
+                    value={headerState.task}
+                    onChange={(val) =>
+                      setHeaderState({ ...headerState, task: val })
+                    }
+                    placeholder="Select Task"
+                    className="w-full text-[11px]"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -662,35 +703,33 @@ export default function JournalVoucherCreatePage() {
         {/* Entry creator bar */}
         <div className="bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800 p-2.5 mb-3 shadow-xs">
           <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
-            <select
-              value={entryType}
-              onChange={(e) =>
-                setEntryType(e.target.value as "DEBIT" | "CREDIT")
-              }
-              className="w-full md:w-44 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 font-medium"
-            >
-              <option value="DEBIT">Debit</option>
-              <option value="CREDIT">Credit</option>
-            </select>
+            <div className="w-full md:w-44">
+              <PredictiveSearchSelect
+                options={[
+                  { value: "DEBIT", label: "Debit" },
+                  { value: "CREDIT", label: "Credit" },
+                ]}
+                value={entryType}
+                onChange={(val) =>
+                  setEntryType(val as "DEBIT" | "CREDIT")
+                }
+                placeholder="Entry Type"
+                className="w-full text-[11px]"
+              />
+            </div>
 
             <div className="flex-1 flex items-center gap-1 min-w-[220px]">
-              <select
+              <PredictiveSearchSelect
+                options={accountOptions.map((opt) => ({
+                  value: opt.id,
+                  label: `${opt.name} (${opt.code})`,
+                }))}
                 value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
+                onChange={(val) => setSelectedAccountId(val)}
                 disabled={loadingAccounts}
-                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-              >
-                <option value="">
-                  {loadingAccounts
-                    ? "Loading accounts..."
-                    : "Select Chart Of Account"}
-                </option>
-                {accountOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.name} ({opt.code})
-                  </option>
-                ))}
-              </select>
+                placeholder={loadingAccounts ? "Loading accounts..." : "Select Chart Of Account"}
+                className="w-full text-[11px]"
+              />
 
               <button
                 type="button"
@@ -891,19 +930,20 @@ export default function JournalVoucherCreatePage() {
                 <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Chart of Group
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Assets", label: "Assets" },
+                    { value: "Liabilities", label: "Liabilities" },
+                    { value: "Expenses", label: "Expenses" },
+                    { value: "Income", label: "Income" },
+                  ]}
                   value={modalData.group}
-                  onChange={(e) =>
-                    setModalData({ ...modalData, group: e.target.value })
+                  onChange={(val) =>
+                    setModalData({ ...modalData, group: val })
                   }
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select value</option>
-                  <option value="Assets">Assets</option>
-                  <option value="Liabilities">Liabilities</option>
-                  <option value="Expenses">Expenses</option>
-                  <option value="Income">Income</option>
-                </select>
+                  placeholder="Select value"
+                  className="w-full text-xs"
+                />
               </div>
 
               <div>
@@ -940,17 +980,18 @@ export default function JournalVoucherCreatePage() {
                 <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Set Accounts Default Module
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Active", label: "Active" },
+                    { value: "Inactive", label: "Inactive" },
+                  ]}
                   value={modalData.status}
-                  onChange={(e) =>
-                    setModalData({ ...modalData, status: e.target.value })
+                  onChange={(val) =>
+                    setModalData({ ...modalData, status: val })
                   }
-                  className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Status</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
+                  placeholder="Select Status"
+                  className="w-full text-xs"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">

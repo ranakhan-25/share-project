@@ -6,6 +6,7 @@ import { Search, Plus, Download, ChevronRight, X, Loader2, Edit2, Trash2, Refres
 import { motion, AnimatePresence } from "motion/react";
 import api from "@/lib/api";
 import { showAlert } from "@/lib/swal";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 export interface CrmColumn {
   key: string;
@@ -630,18 +631,15 @@ export function CrmPageTemplate({
                         className="w-full rounded-md border border-border bg-canvas px-3 py-1.5 text-[12.5px] text-ink placeholder:text-ink-faint outline-none focus:border-[#0000F2] focus:ring-1 focus:ring-[#0000F2]"
                       />
                     ) : f.type === "select" ? (
-                      <select
-                        value={formData[f.key] ?? ""}
-                        onChange={(e) => handleInputChange(f.key, e.target.value)}
-                        className="w-full rounded-md border border-border bg-canvas px-3 py-1.5 text-[12.5px] text-ink outline-none focus:border-[#0000F2] focus:ring-1 focus:ring-[#0000F2]"
-                      >
-                        <option value="">Select {f.label}...</option>
-                        {f.options?.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                      <PredictiveSearchSelect
+                        value={String(formData[f.key] ?? "")}
+                        onChange={(val) => handleInputChange(f.key, val)}
+                        options={(f.options || []).map((opt) => ({
+                          value: String(opt.value),
+                          label: opt.label,
+                        }))}
+                        placeholder={`Select ${f.label}...`}
+                      />
                     ) : (
                       <input
                         type={f.type || "text"}

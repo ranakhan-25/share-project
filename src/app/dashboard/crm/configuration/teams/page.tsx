@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { crmFetch } from "../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
@@ -134,7 +135,7 @@ export default function TeamsPage() {
     setFormData({
       name: item.name || "",
       leaderUuid: item.leaderUuid || "",
-      memberUuids: item.members?.map((m) => m.uuid) || [],
+      memberUuids: item.members?.map((m: any) => m.userUuid || m.user?.uuid || m.uuid) || [],
     });
     setIsModalOpen(true);
   };
@@ -250,18 +251,21 @@ export default function TeamsPage() {
       <div className="p-4 md:p-5 rounded-2xl border border-border/80 bg-card shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-muted-foreground w-full sm:w-auto">
           <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 border rounded-xl bg-background border-border text-foreground font-black text-sm outline-none cursor-pointer"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
+          <div className="w-24">
+            <PredictiveSearchSelect
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              value={String(entriesPerPage)}
+              onChange={(val) => {
+                setEntriesPerPage(Number(val));
+                setCurrentPage(1);
+              }}
+              placeholder="10"
+            />
+          </div>
           <span>entries</span>
         </div>
 
@@ -466,7 +470,7 @@ export default function TeamsPage() {
       {/* TEAM ADD / EDIT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 md:p-8 space-y-5 shadow-2xl">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 md:p-8 space-y-5 shadow-2xl">
             <div className="flex justify-between items-center border-b pb-4 border-slate-200 dark:border-slate-800">
               <h3 className="text-xl font-black text-slate-800 dark:text-slate-100">
                 {editingRecord ? "Team Edit" : "Team Add"}
@@ -503,47 +507,38 @@ export default function TeamsPage() {
                 <label className="block text-slate-500 mb-1.5">
                   Team Leader
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "", label: "Select Leader" },
+                    ...users.map((user) => ({
+                      value: user.uuid,
+                      label: user.name,
+                    })),
+                  ]}
                   value={formData.leaderUuid}
-                  onChange={(e) =>
-                    setFormData({ ...formData, leaderUuid: e.target.value })
+                  onChange={(val: string) =>
+                    setFormData({ ...formData, leaderUuid: val })
                   }
-                  className="w-full p-3 border rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-sm font-extrabold outline-none cursor-pointer"
-                >
-                  <option value="">Select Leader</option>
-                  {users.map((user) => (
-                    <option key={user.uuid} value={user.uuid}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Leader"
+                />
               </div>
 
               <div>
                 <label className="block text-slate-500 mb-1.5">
                   Team Members
                 </label>
-                <select
+                <PredictiveSearchSelect
                   multiple
+                  options={users.map((user) => ({
+                    value: user.uuid,
+                    label: user.name,
+                  }))}
                   value={formData.memberUuids}
-                  onChange={(e) => {
-                    const selectedOptions = Array.from(
-                      e.target.selectedOptions,
-                      (option) => option.value,
-                    );
-                    setFormData({ ...formData, memberUuids: selectedOptions });
-                  }}
-                  className="w-full p-3 border rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20 min-h-[100px]"
-                >
-                  {users.map((user) => (
-                    <option key={user.uuid} value={user.uuid}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Hold Ctrl (Windows) or Cmd (Mac) to select multiple members.
-                </p>
+                  onChange={(val: string[]) =>
+                    setFormData({ ...formData, memberUuids: val })
+                  }
+                  placeholder="Select Team Members"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">

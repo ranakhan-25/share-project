@@ -28,11 +28,26 @@ import {
   CreditCard,
   CheckCircle2
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== API CONFIG ====================
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 export default function ContractorSupplierBillPage() {
   const [bills, setBills] = useState<any[]>([]);
@@ -113,6 +128,7 @@ export default function ContractorSupplierBillPage() {
     try {
       const res = await fetch(
         `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) return [];
       const json = await res.json();
@@ -176,6 +192,7 @@ export default function ContractorSupplierBillPage() {
       setError(null);
       const res = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/contractor-bills?page=1&limit=100`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -260,7 +277,10 @@ export default function ContractorSupplierBillPage() {
     if (!confirm(`Are you sure you want to delete bill ${bill.code}?`)) return;
     try {
       setActiveDropdown(null);
-      const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/contractor-bills/${bill.uuid}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/contractor-bills/${bill.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to delete bill");
       await loadBills();
     } catch (err: any) {
@@ -306,7 +326,7 @@ export default function ContractorSupplierBillPage() {
       setError(null);
       const res = await fetch(`${API_BASE}${API_PREFIX}/project-billing/contractor-bills${editingBillUuid ? `/${editingBillUuid}` : ""}`, {
         method: editingBillUuid ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const body = await res.json().catch(() => ({}));
@@ -336,7 +356,7 @@ export default function ContractorSupplierBillPage() {
     try {
       const response = await fetch(`${API_BASE}${API_PREFIX}/project-billing/bill-items`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           projectId: formData.projectId,
           title: newItemData.name.trim(),
@@ -450,19 +470,15 @@ export default function ContractorSupplierBillPage() {
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                   Contractor/Supplier
                 </label>
-                <div className="relative">
-                  <select 
-                    value={filterContractor}
-                    onChange={(e) => setFilterContractor(e.target.value)}
-                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-                  >
-                    <option value="">Select One Option</option>
-                    {[...contractors, ...suppliers].map((row) => (
-                      <option key={row.uuid} value={row.uuid}>{row.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+                <PredictiveSearchSelect
+                  options={[...contractors, ...suppliers].map((row) => ({
+                    value: row.uuid,
+                    label: row.name,
+                  }))}
+                  value={filterContractor}
+                  onChange={(val) => setFilterContractor(val)}
+                  placeholder="Select One Option"
+                />
               </div>
 
               {/* Ledger */}
@@ -470,17 +486,17 @@ export default function ContractorSupplierBillPage() {
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                   Ledger
                 </label>
-                <div className="relative">
-                  <select 
-                    value={filterLedger}
-                    onChange={(e) => setFilterLedger(e.target.value)}
-                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-                  >
-                    <option value="">Select Chart Of Account</option>
-                    <option value="500-001-002-001">500-001-002-001-Contractor Bill Expense</option>
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+                <PredictiveSearchSelect
+                  options={[
+                    {
+                      value: "500-001-002-001",
+                      label: "500-001-002-001-Contractor Bill Expense",
+                    },
+                  ]}
+                  value={filterLedger}
+                  onChange={(val) => setFilterLedger(val)}
+                  placeholder="Select Chart Of Account"
+                />
               </div>
 
               {/* Select Project */}
@@ -488,19 +504,15 @@ export default function ContractorSupplierBillPage() {
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                   Select Project
                 </label>
-                <div className="relative">
-                  <select 
-                    value={filterProject}
-                    onChange={(e) => setFilterProject(e.target.value)}
-                    className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/60 pl-3.5 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map((row) => (
-                      <option key={row.uuid} value={row.uuid}>{row.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+                <PredictiveSearchSelect
+                  options={projects.map((row) => ({
+                    value: row.uuid,
+                    label: row.name,
+                  }))}
+                  value={filterProject}
+                  onChange={(val) => setFilterProject(val)}
+                  placeholder="Select Project"
+                />
               </div>
             </div>
           </div>
@@ -738,30 +750,34 @@ export default function ContractorSupplierBillPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Contractor/Supplier <span className="text-rose-500">*</span>
               </label>
-              <select 
-                value={formData.contractorId} 
-                onChange={(e) => setFormData({...formData, contractorId: e.target.value})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select One Option</option>
-                {[...contractors, ...suppliers].map((c) => (
-                  <option key={c.uuid} value={c.uuid}>{c.name} ({c.accountType})</option>
-                ))}
-              </select>
+              <PredictiveSearchSelect
+                options={[...contractors, ...suppliers].map((c) => ({
+                  value: c.uuid,
+                  label: `${c.name} (${c.accountType})`,
+                }))}
+                value={formData.contractorId}
+                onChange={(val) =>
+                  setFormData({ ...formData, contractorId: val })
+                }
+                placeholder="Select One Option"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Ledger
               </label>
-              <select 
-                value={formData.ledgerId} 
-                onChange={(e) => setFormData({...formData, ledgerId: e.target.value})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select Chart Of Account</option>
-                <option value="500-001-002-001">500-001-002-001-Contractor Bill Expense</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[
+                  {
+                    value: "500-001-002-001",
+                    label: "500-001-002-001-Contractor Bill Expense",
+                  },
+                ]}
+                value={formData.ledgerId}
+                onChange={(val) => setFormData({ ...formData, ledgerId: val })}
+                placeholder="Select Chart Of Account"
+              />
             </div>
 
             <div>
@@ -780,64 +796,83 @@ export default function ContractorSupplierBillPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Project Type
               </label>
-              <select 
-                value={formData.projectTypeId} 
-                onChange={(e) => setFormData({...formData, projectTypeId: e.target.value})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select value</option>
-                {projectTypes.map((t) => (
-                  <option key={t.uuid} value={t.uuid}>{t.name}</option>
-                ))}
-              </select>
+              <PredictiveSearchSelect
+                options={projectTypes.map((t) => ({
+                  value: t.uuid,
+                  label: t.name,
+                }))}
+                value={formData.projectTypeId}
+                onChange={(val) =>
+                  setFormData({ ...formData, projectTypeId: val })
+                }
+                placeholder="Select value"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Project <span className="text-rose-500">*</span>
               </label>
-              <select 
-                value={formData.projectId} 
-                onChange={(e) => setFormData({...formData, projectId: e.target.value, workNameId: "", siteId: ""})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>{p.name}</option>
-                ))}
-              </select>
+              <PredictiveSearchSelect
+                options={projects.map((p) => ({
+                  value: p.uuid,
+                  label: p.name,
+                }))}
+                value={formData.projectId}
+                onChange={(val) =>
+                  setFormData({
+                    ...formData,
+                    projectId: val,
+                    workNameId: "",
+                    siteId: "",
+                  })
+                }
+                placeholder="Select Project"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Title/Name of Work
               </label>
-              <select 
-                value={formData.workNameId} 
-                onChange={(e) => setFormData({...formData, workNameId: e.target.value})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select Title/Name of Work</option>
-                {workNames.filter((row) => !row.raw?.projectId || row.raw.projectId === formData.projectId).map((row) => (
-                  <option key={row.uuid} value={row.uuid}>{row.name}</option>
-                ))}
-              </select>
+              <PredictiveSearchSelect
+                options={workNames
+                  .filter(
+                    (row) =>
+                      !row.raw?.projectId ||
+                      row.raw.projectId === formData.projectId,
+                  )
+                  .map((row) => ({
+                    value: row.uuid,
+                    label: row.name,
+                  }))}
+                value={formData.workNameId}
+                onChange={(val) =>
+                  setFormData({ ...formData, workNameId: val })
+                }
+                placeholder="Select Title/Name of Work"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Site
               </label>
-              <select 
-                value={formData.siteId} 
-                onChange={(e) => setFormData({...formData, siteId: e.target.value})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select Site</option>
-                {sites.filter((row) => !row.raw?.projectId || row.raw.projectId === formData.projectId).map((row) => (
-                  <option key={row.uuid} value={row.uuid}>{row.name}</option>
-                ))}
-              </select>
+              <PredictiveSearchSelect
+                options={sites
+                  .filter(
+                    (row) =>
+                      !row.raw?.projectId ||
+                      row.raw.projectId === formData.projectId,
+                  )
+                  .map((row) => ({
+                    value: row.uuid,
+                    label: row.name,
+                  }))}
+                value={formData.siteId}
+                onChange={(val) => setFormData({ ...formData, siteId: val })}
+                placeholder="Select Site"
+              />
             </div>
 
             <div>
@@ -847,7 +882,9 @@ export default function ContractorSupplierBillPage() {
               <input
                 type="text"
                 value={formData.poNo}
-                onChange={(e) => setFormData({...formData, poNo: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, poNo: e.target.value })
+                }
                 placeholder="Work Order Ref No"
                 className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
               />
@@ -857,28 +894,32 @@ export default function ContractorSupplierBillPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 If Task
               </label>
-              <select 
-                value={formData.taskId} 
-                onChange={(e) => setFormData({...formData, taskId: e.target.value})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select Task</option>
-                {tasks.map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                options={tasks.map((row) => ({
+                  value: row.uuid,
+                  label: row.name,
+                }))}
+                value={formData.taskId}
+                onChange={(val) => setFormData({ ...formData, taskId: val })}
+                placeholder="Select Task"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Category
               </label>
-              <select 
-                value={formData.categoryId} 
-                onChange={(e) => setFormData({...formData, categoryId: e.target.value})} 
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="">Select Category</option>
-                {categories.map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                options={categories.map((row) => ({
+                  value: row.uuid,
+                  label: row.name,
+                }))}
+                value={formData.categoryId}
+                onChange={(val) =>
+                  setFormData({ ...formData, categoryId: val })
+                }
+                placeholder="Select Category"
+              />
             </div>
 
             <div>
@@ -886,16 +927,19 @@ export default function ContractorSupplierBillPage() {
                 Select Item
               </label>
               <div className="flex gap-2">
-                <select 
-                  value={formData.itemId} 
-                  onChange={(e) => setFormData({...formData, itemId: e.target.value})} 
-                  className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
-                >
-                  <option value="">Select Item</option>
-                  {items.map((i) => (
-                    <option key={i.uuid} value={i.uuid}>{i.name}</option>
-                  ))}
-                </select>
+                <div className="flex-1">
+                  <PredictiveSearchSelect
+                    options={items.map((i) => ({
+                      value: i.uuid,
+                      label: i.name,
+                    }))}
+                    value={formData.itemId}
+                    onChange={(val) =>
+                      setFormData({ ...formData, itemId: val })
+                    }
+                    placeholder="Select Item"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={addSelectedItem}
@@ -941,10 +985,26 @@ export default function ContractorSupplierBillPage() {
                         className="h-8 w-full rounded-lg border border-slate-200 px-2.5 text-xs text-slate-800 outline-none focus:border-indigo-600"
                       />
                     </td>
-                    <td className="py-2.5 px-4 text-slate-600">
-                      <select className="h-8 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-800 outline-none">
-                        <option>{row.unit || "Nos"}</option>
-                      </select>
+                    <td className="py-2.5 px-4 text-slate-600 w-32">
+                      <PredictiveSearchSelect
+                        options={[
+                          { value: "Nos", label: "Nos" },
+                          { value: "Pcs", label: "Pcs" },
+                          { value: "Kg", label: "Kg" },
+                          { value: "Cft", label: "Cft" },
+                          { value: "Bags", label: "Bags" },
+                          { value: "Sft", label: "Sft" },
+                        ]}
+                        value={row.unit || "Nos"}
+                        onChange={(val) =>
+                          setBillItems((rows) =>
+                            rows.map((item, i) =>
+                              i === rowIndex ? { ...item, unit: val } : item,
+                            ),
+                          )
+                        }
+                        placeholder="Unit"
+                      />
                     </td>
                     <td className="py-2.5 px-4">
                       <input
@@ -1099,14 +1159,17 @@ export default function ContractorSupplierBillPage() {
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Category</label>
-                <select 
-                  value={newItemData.categoryId} 
-                  onChange={(e) => setNewItemData({...newItemData, categoryId: e.target.value})} 
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-indigo-600"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((row) => <option key={row.uuid} value={row.uuid}>{row.name}</option>)}
-                </select>
+                <PredictiveSearchSelect
+                  options={categories.map((row) => ({
+                    value: row.uuid,
+                    label: row.name,
+                  }))}
+                  value={newItemData.categoryId}
+                  onChange={(val) =>
+                    setNewItemData({ ...newItemData, categoryId: val })
+                  }
+                  placeholder="Select Category"
+                />
               </div>
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Brand</label>
@@ -1248,9 +1311,18 @@ export default function ContractorSupplierBillPage() {
               </div>
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Under</label>
-                <select className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-indigo-600">
-                  <option>Select One Option</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Contractors", label: "Contractors" },
+                    { value: "Labour", label: "Labour" },
+                    { value: "Suppliers", label: "Suppliers" },
+                  ]}
+                  value={newWorker.underGroup}
+                  onChange={(val) =>
+                    setNewWorker({ ...newWorker, underGroup: val })
+                  }
+                  placeholder="Select One Option"
+                />
               </div>
             </div>
             <div className="bg-slate-50 px-5 py-3.5 border-t border-slate-100 flex justify-end gap-2">

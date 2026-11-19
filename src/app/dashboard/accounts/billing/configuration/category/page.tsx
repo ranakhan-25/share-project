@@ -12,6 +12,7 @@ import {
   Loader2,
   Save,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== TYPES ====================
 export interface CategoryItem {
@@ -41,6 +42,16 @@ const CATEGORY_TYPE_API = `${API_BASE_URL}${API_PREFIX}/category-type`;
 // ✅ Backend enum — shudhu ei 2 ta value allowed
 const ALLOWED_CATEGORY_TYPES = ["Service", "Product"];
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // ==================== HELPERS ====================
 const generateCategoryCode = () => {
   const rand = Math.floor(100000 + Math.random() * 900000);
@@ -56,7 +67,7 @@ async function fetchRelatedOptions(
     const query = new URLSearchParams({ page: "1", limit: "100" });
     const res = await fetch(`${endpoint}?${query}`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
     if (!res.ok) {
@@ -94,7 +105,7 @@ async function fetchCategories(): Promise<CategoryItem[]> {
   const query = new URLSearchParams({ page: "1", limit: "100" });
   const res = await fetch(`${CATEGORY_API}?${query}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -107,23 +118,25 @@ async function fetchCategories(): Promise<CategoryItem[]> {
   const rows = json?.data?.data ?? json?.data ?? [];
 
   return Array.isArray(rows)
-    ? rows.map((item: any) => ({
-        id: item.id ?? item.uuid,
-        uuid: item.uuid,
-        type: item.type || item.categoryType || "",
-        code: item.code || "",
-        name: item.name || item.categoryName || "",
-        createdBy: item.createdBy || "",
-        updatedBy: item.updatedBy || "",
-        status: item.status || "active",
-      }))
+    ? rows
+        .filter((item: any) => !item.deletedAt && !item.deleted_at)
+        .map((item: any) => ({
+          id: item.id ?? item.uuid,
+          uuid: item.uuid,
+          type: item.type || item.categoryType || "",
+          code: item.code || "",
+          name: item.name || item.categoryName || "",
+          createdBy: item.createdBy || "",
+          updatedBy: item.updatedBy || "",
+          status: item.status || "active",
+        }))
     : [];
 }
 
 async function createCategory(payload: Record<string, any>) {
   const res = await fetch(CATEGORY_API, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -136,7 +149,7 @@ async function createCategory(payload: Record<string, any>) {
 async function updateCategory(uuid: string, payload: Record<string, any>) {
   const res = await fetch(`${CATEGORY_API}/${uuid}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -149,7 +162,7 @@ async function updateCategory(uuid: string, payload: Record<string, any>) {
 async function deleteCategory(uuid: string) {
   const res = await fetch(`${CATEGORY_API}/${uuid}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -388,28 +401,23 @@ export default function CategoryListPage() {
             <label className="block font-semibold text-slate-700 mb-1 text-xs">
               Type <span className="text-rose-500">*</span>
             </label>
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "", label: "All Types" },
+                ...(categoryTypes.length === 0
+                  ? [
+                      { value: "Service", label: "Service" },
+                      { value: "Product", label: "Product" },
+                    ]
+                  : categoryTypes.map((t) => ({ value: t.name, label: t.name }))),
+              ]}
               value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value);
+              onChange={(val) => {
+                setTypeFilter(val);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select One Option</option>
-              {categoryTypes.length === 0 ? (
-                <>
-                  <option value="Service">Service</option>
-                  <option value="Product">Product</option>
-                </>
-              ) : (
-                categoryTypes.map((t) => (
-                  <option key={t.uuid} value={t.name}>
-                    {t.name}
-                  </option>
-                ))
-              )}
-            </select>
+              placeholder="Select Type Filter"
+            />
           </div>
         </div>
 
@@ -429,18 +437,20 @@ export default function CategoryListPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between p-3 gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <span>Show</span>
-              <select
-                value={entriesPerPage}
-                onChange={(e) => {
-                  setEntriesPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <div className="w-24">
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "10", label: "10" },
+                    { value: "25", label: "25" },
+                    { value: "50", label: "50" },
+                  ]}
+                  value={String(entriesPerPage)}
+                  onChange={(val) => {
+                    setEntriesPerPage(Number(val) || 10);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
               <span>entries</span>
             </div>
             <div className="flex items-center gap-2">
@@ -610,28 +620,19 @@ export default function CategoryListPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Type <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    required
-                    value={formData.type}
-                    onChange={(e) =>
-                      setFormData({ ...formData, type: e.target.value })
+                  <PredictiveSearchSelect
+                    options={
+                      categoryTypes.length === 0
+                        ? [
+                            { value: "Service", label: "Service" },
+                            { value: "Product", label: "Product" },
+                          ]
+                        : categoryTypes.map((t) => ({ value: t.name, label: t.name }))
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select One Option</option>
-                    {categoryTypes.length === 0 ? (
-                      <>
-                        <option value="Service">Service</option>
-                        <option value="Product">Product</option>
-                      </>
-                    ) : (
-                      categoryTypes.map((t) => (
-                        <option key={t.uuid} value={t.name}>
-                          {t.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    value={formData.type}
+                    onChange={(val) => setFormData({ ...formData, type: val })}
+                    placeholder="Select Type"
+                  />
                 </div>
 
                 {/* CODE — auto-generated */}
@@ -721,28 +722,19 @@ export default function CategoryListPage() {
                   <label className="block font-semibold text-slate-700 mb-1">
                     Type <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    required
-                    value={formData.type}
-                    onChange={(e) =>
-                      setFormData({ ...formData, type: e.target.value })
+                  <PredictiveSearchSelect
+                    options={
+                      categoryTypes.length === 0
+                        ? [
+                            { value: "Service", label: "Service" },
+                            { value: "Product", label: "Product" },
+                          ]
+                        : categoryTypes.map((t) => ({ value: t.name, label: t.name }))
                     }
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select One Option</option>
-                    {categoryTypes.length === 0 ? (
-                      <>
-                        <option value="Service">Service</option>
-                        <option value="Product">Product</option>
-                      </>
-                    ) : (
-                      categoryTypes.map((t) => (
-                        <option key={t.uuid} value={t.name}>
-                          {t.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    value={formData.type}
+                    onChange={(val) => setFormData({ ...formData, type: val })}
+                    placeholder="Select Type"
+                  />
                 </div>
 
                 <div>

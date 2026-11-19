@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, Search, ChevronLeft, ChevronRight, Navigation } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -43,11 +44,19 @@ export default function PropertyRoadPage() {
     details: "",
   });
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== "undefined" ? (localStorage.getItem("token") || localStorage.getItem("accessToken") || "") : "";
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
   // ====================== FETCH LISTS ======================
   const fetchRoads = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/land-infrastructure/roads`);
+      const res = await fetch(`${API_PATH}/land-infrastructure/roads`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success) {
         setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
@@ -62,7 +71,7 @@ export default function PropertyRoadPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, { headers: getAuthHeaders() });
       const jsonProj = await resProj.json();
       if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
     } catch (err) {
@@ -97,7 +106,7 @@ export default function PropertyRoadPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -123,6 +132,7 @@ export default function PropertyRoadPage() {
     try {
       const res = await fetch(`${API_PATH}/land-infrastructure/roads/${item.uuid}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         toast.success("Deleted successfully!");
@@ -200,22 +210,24 @@ export default function PropertyRoadPage() {
 
         {/* Filter / Search Card */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
             <span>Show</span>
-            <select 
-              value={entriesLimit} 
-              onChange={(e) => {
-                setEntriesLimit(Number(e.target.value));
+            <PredictiveSearchSelect 
+              value={String(entriesLimit)} 
+              onChange={(val) => {
+                setEntriesLimit(Number(val));
                 setCurrentPage(1);
               }} 
-              className="h-9 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
-          </label>
+          </div>
 
           <div className="relative w-full sm:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -352,15 +364,12 @@ export default function PropertyRoadPage() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Project Name <span className="text-rose-500">*</span>
                 </label>
-                <select 
-                  required 
+                <PredictiveSearchSelect 
                   value={formData.projectId} 
-                  onChange={(e) => setFormData({ ...formData, projectId: e.target.value })} 
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                >
-                  <option value="">Select Project</option>
-                  {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                </select>
+                  onChange={(val) => setFormData({ ...formData, projectId: val })} 
+                  options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                  placeholder="Select Project"
+                />
               </div>
 
               <div>

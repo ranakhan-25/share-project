@@ -432,24 +432,22 @@ export default function ProjectApiPage({
 
         {/* Filter / Search Card with Predictive Search */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
-            <span>Show</span>
-            <select
-              value={pageSize}
-              onChange={(event) => {
-                setPageSize(Number(event.target.value));
+          <div className="w-40">
+            <PredictiveSearchSelect
+              options={[
+                { value: "10", label: "10 entries" },
+                { value: "25", label: "25 entries" },
+                { value: "50", label: "50 entries" },
+                { value: "100", label: "100 entries" },
+              ]}
+              value={String(pageSize)}
+              onChange={(val) => {
+                setPageSize(Number(val));
                 setPage(1);
               }}
-              className="h-9 rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 text-xs font-medium text-slate-700 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100"
-            >
-              {[10, 25, 50, 100].map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-            <span>entries</span>
-          </label>
+              placeholder="Show entries"
+            />
+          </div>
 
           <div className="w-full sm:w-80">
             <PredictiveSearchInput

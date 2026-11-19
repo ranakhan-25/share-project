@@ -1,4 +1,5 @@
 'use client';
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -84,14 +85,12 @@ export default function StatementOfFinancialPosition() {
               {/* Company */}
               <div>
                 <label className="block text-slate-600 font-medium mb-1.5">Company</label>
-                <select 
-                  value={company} 
-                  onChange={(e) => setCompany(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-                >
-                  <option value="Select value">Select value</option>
-                  <option value="Somikoron IT Ltd">Somikoron IT Ltd</option>
-                </select>
+                <PredictiveSearchSelect
+                options={[{"value":"Select value","label":"Select value"},{"value":"Somikoron IT Ltd","label":"Somikoron IT Ltd"}]}
+                value={company}
+                onChange={(val: any) => (val)}
+                placeholder="Select value"
+              />
               </div>
 
             </div>

@@ -47,6 +47,17 @@ function mapEmployee(item: any): EmployeeHierarchyItem {
   };
 }
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 // Fetch ALL pages from a given base URL (auto-paginate)
 async function fetchAllPages(
   baseUrl: string,
@@ -66,7 +77,7 @@ async function fetchAllPages(
     try {
       res = await fetch(url, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         cache: "no-store",
       });
     } catch (err) {

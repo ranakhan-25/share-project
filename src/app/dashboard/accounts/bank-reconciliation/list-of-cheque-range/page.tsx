@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import toast, { Toaster } from "react-hot-toast";
 import { ChevronDown, Plus, Trash2, X, ArrowUpDown, FileText, Copy, Pencil, RotateCcw } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 export interface ChequeRangeItem {
   id: number;
@@ -34,6 +35,35 @@ export default function ChequeRangePage() {
   const [modalName, setModalName] = useState("");
   const [modalFromNumber, setModalFromNumber] = useState("");
   const [modalToNumber, setModalToNumber] = useState("");
+  const [accountOptions, setAccountOptions] = useState<{ value: string; label: string }[]>([
+    { value: "Cash", label: "Cash Account" },
+    { value: "Bank", label: "Bank Account" },
+  ]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/backend/chart-of-accounts", {
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => ({}));
+        const list = json?.data?.data || json?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          setAccountOptions([
+            { value: "Cash", label: "Cash Account" },
+            { value: "Bank", label: "Bank Account" },
+            ...list.map((c: any) => ({
+              value: c.name || c.uuid || String(c.id),
+              label: `${c.name || 'Account'} (${c.code || 'COA'})`,
+            }))
+          ]);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, []);
 
   const unwrapRecords = (result: Record<string, unknown>): Record<string, unknown>[] => {
     const nested = result.data as Record<string, unknown> | unknown[] | undefined;
@@ -236,15 +266,12 @@ const getAuthHeaders = () => {
           <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
             Cash/Bank
           </label>
-          <select
+          <PredictiveSearchSelect
             value={cashBankFilter}
-            onChange={(e) => setCashBankFilter(e.target.value)}
-            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-          >
-            <option value="">Select value</option>
-            <option value="Cash">Cash Account</option>
-            <option value="Bank">Bank Account</option>
-          </select>
+            onChange={(val) => setCashBankFilter(val)}
+            options={accountOptions}
+            placeholder="Select value"
+          />
         </div>
 
         {/* Export & Table Controls */}
@@ -268,15 +295,17 @@ const getAuthHeaders = () => {
 
             <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 ml-2">
               <span>Show</span>
-              <select
-                value={entriesPerPage}
-                onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-                className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-0.5 outline-none"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <PredictiveSearchSelect
+                value={String(entriesPerPage)}
+                onChange={(val) => setEntriesPerPage(Number(val))}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "25", label: "25" },
+                  { value: "50", label: "50" },
+                ]}
+                placeholder="10"
+                className="w-20"
+              />
               <span>entries</span>
             </div>
           </div>
@@ -442,15 +471,12 @@ const getAuthHeaders = () => {
                   <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                     Chart of Account
                   </label>
-                  <select
+                  <PredictiveSearchSelect
                     value={modalChartOfAccount}
-                    onChange={(e) => setModalChartOfAccount(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-                  >
-                    <option value="">Select value</option>
-                    <option value="Cash">Cash Account</option>
-                    <option value="Bank">Bank Account</option>
-                  </select>
+                    onChange={(val) => setModalChartOfAccount(val)}
+                    options={accountOptions}
+                    placeholder="Select value"
+                  />
                 </div>
 
                 <div>

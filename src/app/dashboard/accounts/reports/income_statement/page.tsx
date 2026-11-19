@@ -1,4 +1,5 @@
 'use client';
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 import React, { useState } from 'react';
 import { 
@@ -136,28 +137,23 @@ export default function IncomeStatement() {
             {/* Project */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Project</label>
-              <select 
-                value={project} 
-                onChange={(e) => setProject(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Project">Select Project</option>
-                <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
-                <option value="Lake Garden">Lake Garden</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Project","label":"Select Project"},{"value":"Sheba Eyecon Tower","label":"Sheba Eyecon Tower"},{"value":"Lake Garden","label":"Lake Garden"}]}
+                value={project}
+                onChange={(val: any) => (val)}
+                placeholder="Select Project"
+              />
             </div>
 
             {/* Site */}
             <div>
               <label className="block text-slate-600 font-medium mb-1.5">Site</label>
-              <select 
-                value={site} 
-                onChange={(e) => setSite(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-              >
-                <option value="Select Site">Select Site</option>
-                <option value="Main Site">Main Site</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[{"value":"Select Site","label":"Select Site"},{"value":"Main Site","label":"Main Site"}]}
+                value={site}
+                onChange={(val: any) => (val)}
+                placeholder="Select Site"
+              />
             </div>
 
           </div>

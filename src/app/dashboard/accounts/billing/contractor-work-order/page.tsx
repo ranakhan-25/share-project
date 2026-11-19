@@ -5,9 +5,24 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, ChevronRight, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
+
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") {
+    return { "Content-Type": "application/json" };
+  }
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("share-project:access-token") ||
+    "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 // ====================== TYPES ======================
 interface WorkOrder {
@@ -77,7 +92,9 @@ export default function ContractorWorkOrderPage() {
   const fetchWorkOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/project-billing/contractor-work-orders`);
+      const res = await fetch(`${API_PATH}/project-billing/contractor-work-orders`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
         setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
@@ -92,8 +109,9 @@ export default function ContractorWorkOrderPage() {
   // ====================== FETCH DROPDOWNS ======================
   const fetchDropdowns = async () => {
     try {
+      const headers = getAuthHeaders();
       // ১. সাপ্লায়ার (ফিক্স করা হয়েছে)
-      const resSup = await fetch(`${API_PATH}/inventory/suppliers?page=1&limit=100`);
+      const resSup = await fetch(`${API_PATH}/supplier-accounts?page=1&limit=100`, { headers });
       const jsonSup = await resSup.json();
       
       const supplierData = jsonSup.data?.data || jsonSup.data || jsonSup;
@@ -104,32 +122,32 @@ export default function ContractorWorkOrderPage() {
       }
 
       // ২. প্রজেক্ট টাইপ
-      const resType = await fetch(`${API_PATH}/project-type`);
+      const resType = await fetch(`${API_PATH}/project-type`, { headers });
       const jsonType = await resType.json();
       if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
 
       // ৩. প্রজেক্ট
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, { headers });
       const jsonProj = await resProj.json();
       if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
 
       // ৪. সাইট
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites`, { headers });
       const jsonSite = await resSite.json();
       if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
 
       // ৫. ক্যাটাগরি
-      const resCat = await fetch(`${API_PATH}/category?page=1&limit=100`);
+      const resCat = await fetch(`${API_PATH}/category?page=1&limit=100`, { headers });
       const jsonCat = await resCat.json();
       if (jsonCat.success) setCategories(jsonCat.data.data || jsonCat.data || []);
 
       // ৬. ব্র্যান্ড
-      const resBrand = await fetch(`${API_PATH}/procurement/brand?page=1&limit=100`);
+      const resBrand = await fetch(`${API_PATH}/procurement/brand?page=1&limit=100`, { headers });
       const jsonBrand = await resBrand.json();
       if (jsonBrand.success) setBrands(jsonBrand.data.data || jsonBrand.data || []);
 
       // ৭. আন্ডার (Under)
-      const resUnder = await fetch(`${API_PATH}/under?page=1&limit=100`);
+      const resUnder = await fetch(`${API_PATH}/under?page=1&limit=100`, { headers });
       const jsonUnder = await resUnder.json();
       if (jsonUnder.success) setUnders(jsonUnder.data.data || jsonUnder.data || []);
 
@@ -178,7 +196,7 @@ export default function ContractorWorkOrderPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -204,6 +222,7 @@ export default function ContractorWorkOrderPage() {
     try {
       const res = await fetch(`${API_PATH}/project-billing/contractor-work-orders/${item.uuid}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
       });
       if (res.ok) {
         toast.success("Deleted successfully!");
@@ -439,16 +458,22 @@ export default function ContractorWorkOrderPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Supplier</label>
-                  <select value={formData.supplierId} onChange={(e) => {
-                    const sup = suppliers.find(s => s.uuid === e.target.value);
-                    // ✅ supplierName বা name যেটাই থাকুক সেটা ধরবে
-                    setFormData({ ...formData, supplierId: e.target.value, supplierName: sup?.supplierName || sup?.name || "" });
-                  }} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select One Option</option>
-                    {suppliers.map(s => (
-                      <option key={s.uuid} value={s.uuid}>{s.supplierName || s.name || "Unknown"}</option>
-                    ))}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={suppliers.map((s) => ({
+                      value: s.uuid,
+                      label: s.supplierName || s.name || "Unknown",
+                    }))}
+                    value={formData.supplierId}
+                    onChange={(val) => {
+                      const sup = suppliers.find((s) => s.uuid === val);
+                      setFormData({
+                        ...formData,
+                        supplierId: val,
+                        supplierName: sup?.supplierName || sup?.name || "",
+                      });
+                    }}
+                    placeholder="Select One Option"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Code</label>
@@ -456,24 +481,43 @@ export default function ContractorWorkOrderPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-                  <select value={formData.projectType} onChange={(e) => setFormData({ ...formData, projectType: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select value</option>
-                    {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={projectTypes.map((p) => ({
+                      value: p.name,
+                      label: p.name,
+                    }))}
+                    value={formData.projectType}
+                    onChange={(val) =>
+                      setFormData({ ...formData, projectType: val })
+                    }
+                    placeholder="Select value"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Project</label>
-                  <select value={formData.projectId} onChange={(e) => setFormData({ ...formData, projectId: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Project</option>
-                    {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={projects.map((p) => ({
+                      value: p.uuid,
+                      label: p.name,
+                    }))}
+                    value={formData.projectId}
+                    onChange={(val) =>
+                      setFormData({ ...formData, projectId: val })
+                    }
+                    placeholder="Select Project"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Site</label>
-                  <select value={formData.site} onChange={(e) => setFormData({ ...formData, site: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Site</option>
-                    {sites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={sites.map((s) => ({
+                      value: s.name,
+                      label: s.name,
+                    }))}
+                    value={formData.site}
+                    onChange={(val) => setFormData({ ...formData, site: val })}
+                    placeholder="Select Site"
+                  />
                 </div>
               </div>
 
@@ -481,17 +525,31 @@ export default function ContractorWorkOrderPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Category</label>
-                  <select value={formData.categoryId} onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Category</option>
-                    {categories.map(c => <option key={c.uuid} value={c.uuid}>{c.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={categories.map((c) => ({
+                      value: c.uuid,
+                      label: c.name,
+                    }))}
+                    value={formData.categoryId}
+                    onChange={(val) =>
+                      setFormData({ ...formData, categoryId: val })
+                    }
+                    placeholder="Select Category"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Brand</label>
-                  <select value={formData.brand} onChange={(e) => setFormData({ ...formData, brand: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Brand</option>
-                    {brands.map(b => <option key={b.uuid} value={b.name}>{b.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={brands.map((b) => ({
+                      value: b.name,
+                      label: b.name,
+                    }))}
+                    value={formData.brand}
+                    onChange={(val) =>
+                      setFormData({ ...formData, brand: val })
+                    }
+                    placeholder="Select Brand"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Select Item</label>
@@ -499,10 +557,17 @@ export default function ContractorWorkOrderPage() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Under</label>
-                  <select value={formData.under} onChange={(e) => setFormData({ ...formData, under: e.target.value })} className="w-full border rounded px-3 py-1.5 text-sm">
-                    <option value="">Select Under</option>
-                    {unders.map(u => <option key={u.uuid} value={u.name}>{u.name}</option>)}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={unders.map((u) => ({
+                      value: u.name,
+                      label: u.name,
+                    }))}
+                    value={formData.under}
+                    onChange={(val) =>
+                      setFormData({ ...formData, under: val })
+                    }
+                    placeholder="Select Under"
+                  />
                 </div>
               </div>
 

@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Loader2, Edit3, Trash2, ArrowLeft, Search, FileSpreadsheet, FileText, Calendar } from "lucide-react";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -49,6 +50,9 @@ export default function FlatLandShareBookingPage() {
   const [dataList, setDataList] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterSalesBy, setFilterSalesBy] = useState("");
+  const [filterTeam, setFilterTeam] = useState("");
+  const [filterProject, setFilterProject] = useState("");
   
   // View States (1 = List, 2 = Step 1 Form, 3 = Step 2 Form)
   const [viewMode, setViewMode] = useState<1 | 2 | 3>(1);
@@ -108,11 +112,19 @@ export default function FlatLandShareBookingPage() {
     installments: [] as Installment[],
   });
 
+  const getAuthHeaders = () => {
+    const token = typeof window !== "undefined" ? (localStorage.getItem("token") || localStorage.getItem("accessToken") || "") : "";
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
   // ====================== FETCH INITIAL DATA ======================
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_PATH}/flat-land-offers`);
+      const res = await fetch(`${API_PATH}/flat-land-offers`, { headers: getAuthHeaders() });
       const json = await res.json();
       if (json.success) {
         setDataList((json.data.data || []).filter((item: any) => !item.deletedAt));
@@ -126,19 +138,19 @@ export default function FlatLandShareBookingPage() {
 
   const fetchDropdowns = async () => {
     try {
-      const resCus = await fetch(`${API_PATH}/customer-account?status=active`);
+      const resCus = await fetch(`${API_PATH}/customer-account?status=active`, { headers: getAuthHeaders() });
       const jsonCus = await resCus.json();
       if (jsonCus.success) setCustomers(jsonCus.data.data || jsonCus.data || []);
 
-      const resProj = await fetch(`${API_PATH}/project`);
+      const resProj = await fetch(`${API_PATH}/project`, { headers: getAuthHeaders() });
       const jsonProj = await resProj.json();
       if (jsonProj.success) setProjects(jsonProj.data.data || jsonProj.data || []);
 
-      const resSite = await fetch(`${API_PATH}/project-sites`);
+      const resSite = await fetch(`${API_PATH}/project-sites`, { headers: getAuthHeaders() });
       const jsonSite = await resSite.json();
       if (jsonSite.success) setSites(jsonSite.data.data || jsonSite.data || []);
 
-      const resType = await fetch(`${API_PATH}/project-type`);
+      const resType = await fetch(`${API_PATH}/project-type`, { headers: getAuthHeaders() });
       const jsonType = await resType.json();
       if (jsonType.success) setProjectTypes(jsonType.data.data || jsonType.data || []);
 
@@ -216,7 +228,7 @@ export default function FlatLandShareBookingPage() {
     try {
       const res = await fetch(`${API_PATH}/flat-land-offers`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -290,7 +302,7 @@ export default function FlatLandShareBookingPage() {
       };
       const res = await fetch(`${API_PATH}/customer-account`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -355,23 +367,30 @@ export default function FlatLandShareBookingPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Sales By</label>
-              <select className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100">
-                <option value="">Select value</option>
-                {salesPersons.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                options={salesPersons.map(s => ({ value: s.name, label: s.name }))}
+                value={filterSalesBy}
+                onChange={setFilterSalesBy}
+                placeholder="Select value"
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Team</label>
-              <select className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100">
-                <option value="">Select value</option>
-              </select>
+              <PredictiveSearchSelect
+                options={[]}
+                value={filterTeam}
+                onChange={setFilterTeam}
+                placeholder="Select value"
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Project</label>
-              <select className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100">
-                <option value="">Select Project</option>
-                {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-              </select>
+              <PredictiveSearchSelect
+                options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                value={filterProject}
+                onChange={setFilterProject}
+                placeholder="Select Project"
+              />
             </div>
           </div>
 
@@ -529,37 +548,33 @@ export default function FlatLandShareBookingPage() {
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Project <span className="text-rose-500">*</span>
                     </label>
-                    <select 
-                      required 
-                      value={formData.projectId} 
-                      onChange={e => setFormData({ ...formData, projectId: e.target.value })} 
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="">Select Project</option>
-                      {projects.map(p => <option key={p.uuid} value={p.uuid}>{p.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={projects.map(p => ({ value: p.uuid, label: p.name }))}
+                      value={formData.projectId}
+                      onChange={val => setFormData({ ...formData, projectId: val })}
+                      placeholder="Select Project"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Customer <span className="text-rose-500">*</span>
                     </label>
-                    <div className="flex gap-1.5">
-                      <select 
-                        required 
-                        value={formData.customerId} 
-                        onChange={e => {
-                          const cus = customers.find(c => c.uuid === e.target.value);
-                          setFormData({ ...formData, customerId: e.target.value, customerName: cus?.customerName || "" });
-                        }} 
-                        className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                      >
-                        <option value="">Select One Option</option>
-                        {customers.map(c => <option key={c.uuid} value={c.uuid}>{c.customerName}</option>)}
-                      </select>
+                    <div className="flex gap-1.5 items-center">
+                      <div className="flex-1">
+                        <PredictiveSearchSelect
+                          options={customers.map(c => ({ value: c.uuid, label: c.customerName }))}
+                          value={formData.customerId}
+                          onChange={val => {
+                            const cus = customers.find(c => c.uuid === val);
+                            setFormData({ ...formData, customerId: val, customerName: cus?.customerName || "" });
+                          }}
+                          placeholder="Select One Option"
+                        />
+                      </div>
                       <button 
                         type="button" 
                         onClick={() => setIsCustomerModalOpen(true)} 
-                        className="h-10 w-10 flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-bold"
+                        className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-bold"
                         title="Add Customer"
                       >
                         +
@@ -578,47 +593,39 @@ export default function FlatLandShareBookingPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Project Type</label>
-                    <select 
-                      value={formData.projectType} 
-                      onChange={e => setFormData({ ...formData, projectType: e.target.value })} 
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="">Select Project Type</option>
-                      {projectTypes.map(p => <option key={p.uuid} value={p.name}>{p.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={projectTypes.map(p => ({ value: p.name, label: p.name }))}
+                      value={formData.projectType}
+                      onChange={val => setFormData({ ...formData, projectType: val })}
+                      placeholder="Select Project Type"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Site</label>
-                    <select 
-                      value={formData.siteName} 
-                      onChange={e => setFormData({ ...formData, siteName: e.target.value })} 
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="">Select Site</option>
-                      {sites.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={sites.map(s => ({ value: s.name, label: s.name }))}
+                      value={formData.siteName}
+                      onChange={val => setFormData({ ...formData, siteName: val })}
+                      placeholder="Select Site"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Sales By</label>
-                    <select 
-                      value={formData.salesBy} 
-                      onChange={e => setFormData({ ...formData, salesBy: e.target.value })} 
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="">Select Sales Person</option>
-                      {salesPersons.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={salesPersons.map(s => ({ value: s.name, label: s.name }))}
+                      value={formData.salesBy}
+                      onChange={val => setFormData({ ...formData, salesBy: val })}
+                      placeholder="Select Sales Person"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Collection Officer</label>
-                    <select 
-                      value={formData.collectionOfficer} 
-                      onChange={e => setFormData({ ...formData, collectionOfficer: e.target.value })} 
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="">Select Collection Officer</option>
-                      {collectionOfficers.map(s => <option key={s.uuid} value={s.name}>{s.name}</option>)}
-                    </select>
+                    <PredictiveSearchSelect
+                      options={collectionOfficers.map(s => ({ value: s.name, label: s.name }))}
+                      value={formData.collectionOfficer}
+                      onChange={val => setFormData({ ...formData, collectionOfficer: val })}
+                      placeholder="Select Collection Officer"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Attachment</label>
@@ -747,14 +754,15 @@ export default function FlatLandShareBookingPage() {
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <select 
-                            value={ins.type} 
-                            onChange={e => updateInstallment(ins.id, "type", e.target.value)} 
-                            className="h-8 w-full rounded-lg border border-slate-200 px-2 text-xs"
-                          >
-                            <option>DownPayment</option>
-                            <option>Installment</option>
-                          </select>
+                          <PredictiveSearchSelect
+                            options={[
+                              { value: "DownPayment", label: "DownPayment" },
+                              { value: "Installment", label: "Installment" }
+                            ]}
+                            value={ins.type}
+                            onChange={val => updateInstallment(ins.id, "type", val)}
+                            placeholder="Select Type"
+                          />
                         </td>
                         <td className="px-3 py-2">
                           <input 

@@ -24,11 +24,25 @@ import {
   Tag,
   Receipt
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== API CONFIG ====================
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PREFIX = "/realbizpro/api/v1";
+
+const getAuthHeaders = () => {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("token") ||
+        localStorage.getItem("accessToken") ||
+        localStorage.getItem("share-project:access-token")
+      : "";
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 // ==================== TYPES ====================
 interface InvoiceItemRow {
@@ -122,6 +136,10 @@ export default function InvoiceBillListPage() {
     try {
       const res = await fetch(
         `${API_BASE}${API_PREFIX}${endpoint}?page=1&limit=100`,
+        {
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        },
       );
       if (!res.ok) {
         console.error(`❌ ${label} fetch failed:`, res.status);
@@ -135,20 +153,22 @@ export default function InvoiceBillListPage() {
           : Array.isArray(json)
             ? json
             : [];
-      return rows.map((r: any) => ({
-        uuid: r.uuid || r.id,
-        id: r.id || r.uuid,
-        name:
-          r.customerName ||
-          r.name ||
-          r.projectName ||
-          r.title ||
-          r.itemName ||
-          r.item_code ||
-          r.code ||
-          "Unnamed",
-        raw: r,
-      }));
+      return rows
+        .filter((r: any) => !r.deletedAt && !r.deleted_at)
+        .map((r: any) => ({
+          uuid: r.uuid || r.id,
+          id: r.id || r.uuid,
+          name:
+            r.customerName ||
+            r.name ||
+            r.projectName ||
+            r.title ||
+            r.itemName ||
+            r.item_code ||
+            r.code ||
+            "Unnamed",
+          raw: r,
+        }));
     } catch (err) {
       console.error(`❌ ${label} error:`, err);
       return [];
@@ -156,16 +176,24 @@ export default function InvoiceBillListPage() {
   };
 
   const loadDropdowns = useCallback(async () => {
-    const [cust, itms, cats, subCats, projs, types] = await Promise.all([
+    const [cust, itms, billItms, cats, subCats, projs, types] = await Promise.all([
       fetchRelatedOptions("/customer-account", "customers"),
       fetchRelatedOptions("/inventory/items", "items"),
+      fetchRelatedOptions("/project-billing/bill-items", "billItems"),
       fetchRelatedOptions("/category", "categories"),
       fetchRelatedOptions("/billing-sub-category", "subCategories"),
       fetchRelatedOptions("/project", "projects"),
       fetchRelatedOptions("/project-type", "projectTypes"),
     ]);
     setCustomers(cust);
-    setItems(itms);
+    // Combine inventory items and bill items
+    const combinedMap = new Map();
+    [...itms, ...billItms].forEach((item) => {
+      if (item.uuid && !combinedMap.has(item.uuid)) {
+        combinedMap.set(item.uuid, item);
+      }
+    });
+    setItems(Array.from(combinedMap.values()));
     setCategories(cats);
     setSubCategories(subCats);
     setProjects(projs);
@@ -185,7 +213,10 @@ export default function InvoiceBillListPage() {
       setError(null);
 
       const url = `${API_BASE}${API_PREFIX}/project-billing/bill-invoices?page=1&limit=100`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+        cache: "no-store",
+      });
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -195,21 +226,23 @@ export default function InvoiceBillListPage() {
       const json = await res.json();
       const rows = json?.data?.data || json?.data || [];
       setInvoices(
-        rows.map((record: any) => {
-          const details = record.details || {};
-          return {
-            ...record,
-            date: record.recordDate,
-            customerId: details.customerId || "",
-            projectTypeId: details.projectTypeId || "",
-            paymentMethod: details.paymentMethod || "Cash",
-            paidAmount: Number(details.paidAmount || 0),
-            grandTotal: Number(record.amount || 0),
-            dueAmount: Number(details.dueAmount ?? record.amount ?? 0),
-            contentBody: details.contentBody || record.description || "",
-            items: Array.isArray(details.items) ? details.items : [],
-          };
-        }),
+        rows
+          .filter((record: any) => !record.deletedAt && !record.deleted_at)
+          .map((record: any) => {
+            const details = record.details || {};
+            return {
+              ...record,
+              date: record.recordDate,
+              customerId: details.customerId || "",
+              projectTypeId: details.projectTypeId || "",
+              paymentMethod: details.paymentMethod || "Cash",
+              paidAmount: Number(details.paidAmount || 0),
+              grandTotal: Number(record.amount || 0),
+              dueAmount: Number(details.dueAmount ?? record.amount ?? 0),
+              contentBody: details.contentBody || record.description || "",
+              items: Array.isArray(details.items) ? details.items : [],
+            };
+          }),
       );
     } catch (err: any) {
       console.error("❌ loadInvoices catch block:", err);
@@ -266,7 +299,7 @@ export default function InvoiceBillListPage() {
     try {
       const res = await fetch(`${API_BASE}${API_PREFIX}/customer-account`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           customerCode: newCustomer.code,
           customerName: newCustomer.name,
@@ -327,7 +360,7 @@ export default function InvoiceBillListPage() {
         `${API_BASE}${API_PREFIX}/project-billing/bill-invoices${editingInvoiceUuid ? `/${editingInvoiceUuid}` : ""}`,
         {
           method: editingInvoiceUuid ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         },
       );
@@ -354,6 +387,10 @@ export default function InvoiceBillListPage() {
       setLoading(true);
       const response = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/bill-invoices/${invoice.uuid}`,
+        {
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        },
       );
       const json = await response.json();
       if (!response.ok) {
@@ -399,7 +436,10 @@ export default function InvoiceBillListPage() {
       setLoading(true);
       const response = await fetch(
         `${API_BASE}${API_PREFIX}/project-billing/bill-invoices/${invoice.uuid}`,
-        { method: "DELETE" },
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+        },
       );
       const json = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -661,20 +701,17 @@ export default function InvoiceBillListPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Customer <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={customers.map((c) => ({
+                  value: c.uuid,
+                  label: c.name,
+                }))}
                 value={formData.customerId}
-                onChange={(e) =>
-                  setFormData({ ...formData, customerId: e.target.value })
+                onChange={(val) =>
+                  setFormData({ ...formData, customerId: val })
                 }
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-              >
-                <option value="">Select Customer</option>
-                {customers.map((c) => (
-                  <option key={c.uuid} value={c.uuid}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Customer"
+              />
             </div>
 
             <div>
@@ -693,40 +730,34 @@ export default function InvoiceBillListPage() {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Project Type
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={projectTypes.map((pt) => ({
+                  value: pt.uuid,
+                  label: pt.name,
+                }))}
                 value={formData.projectTypeId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectTypeId: e.target.value })
+                onChange={(val) =>
+                  setFormData({ ...formData, projectTypeId: val })
                 }
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-              >
-                <option value="">Select Project Type</option>
-                {projectTypes.map((pt) => (
-                  <option key={pt.uuid} value={pt.uuid}>
-                    {pt.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Project Type"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Project <span className="text-rose-500">*</span>
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={projects.map((p) => ({
+                  value: p.uuid,
+                  label: p.name,
+                }))}
                 value={formData.projectId}
-                onChange={(e) =>
-                  setFormData({ ...formData, projectId: e.target.value })
+                onChange={(val) =>
+                  setFormData({ ...formData, projectId: val })
                 }
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
-              >
-                <option value="">Select Project</option>
-                {projects.map((p) => (
-                  <option key={p.uuid} value={p.uuid}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Project"
+              />
             </div>
           </div>
 
@@ -741,82 +772,75 @@ export default function InvoiceBillListPage() {
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Category
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  options={categories.map((category) => ({
+                    value: category.uuid,
+                    label: category.name,
+                  }))}
                   value={selectedCategoryId}
-                  onChange={(event) => {
-                    setSelectedCategoryId(event.target.value);
+                  onChange={(val) => {
+                    setSelectedCategoryId(val);
                     setSelectedSubCategoryId("");
                   }}
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-emerald-600"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((category) => (
-                    <option key={category.uuid} value={category.uuid}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Category"
+                />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Sub Category
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  options={visibleSubCategories.map((subCategory) => ({
+                    value: subCategory.uuid,
+                    label: subCategory.name,
+                  }))}
                   value={selectedSubCategoryId}
-                  onChange={(event) =>
-                    setSelectedSubCategoryId(event.target.value)
-                  }
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-emerald-600"
-                >
-                  <option value="">Select Sub Category</option>
-                  {visibleSubCategories.map((subCategory) => (
-                    <option key={subCategory.uuid} value={subCategory.uuid}>
-                      {subCategory.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedSubCategoryId(val)}
+                  placeholder="Select Sub Category"
+                />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Select Item (Product / Material) <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 outline-none focus:border-emerald-600"
-                  defaultValue=""
-                  onChange={(event) => {
-                    const selected = items.find(
-                      (item) => item.uuid === event.target.value,
-                    );
+                <PredictiveSearchSelect
+                  options={items.map((i) => ({
+                    value: i.uuid,
+                    label: `${i.name}${i.raw?.code ? ` (${i.raw.code})` : ""}`,
+                  }))}
+                  value=""
+                  onChange={(val) => {
+                    const selected = items.find((item) => item.uuid === val);
                     if (!selected) return;
                     const rawItem = selected.raw || {};
-                    const rate = Number(rawItem.sale_price || 0);
+                    const rate = Number(
+                      rawItem.details?.salePrice ||
+                        rawItem.salePrice ||
+                        rawItem.sale_price ||
+                        rawItem.amount ||
+                        0,
+                    );
                     setInvoiceItems((current) => [
                       ...current,
                       {
                         itemId: rawItem.id || selected.uuid,
-                        itemName: rawItem.name || selected.name,
-                        description: rawItem.item_code || "",
+                        itemName: rawItem.title || rawItem.name || selected.name,
+                        description: rawItem.code || rawItem.item_code || "",
                         unit:
+                          rawItem.details?.unit ||
                           rawItem.unit?.name ||
-                          rawItem.unit?.unitName ||
+                          rawItem.unit ||
                           "Nos",
                         quantity: 1,
                         rate,
                         amount: rate,
                       },
                     ]);
-                    event.currentTarget.value = "";
                   }}
-                >
-                  <option value="">+ Choose Item to append...</option>
-                  {items.map((i) => (
-                    <option key={i.uuid} value={i.uuid}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Item to Append"
+                />
               </div>
             </div>
           </div>
@@ -900,17 +924,18 @@ export default function InvoiceBillListPage() {
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
                   Payment Method
                 </label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Cash", label: "Cash" },
+                    { value: "Cheque", label: "Cheque" },
+                    { value: "Bank Transfer", label: "Bank Transfer" },
+                  ]}
                   value={formData.paymentMethod}
-                  onChange={(e) =>
-                    setFormData({ ...formData, paymentMethod: e.target.value })
+                  onChange={(val) =>
+                    setFormData({ ...formData, paymentMethod: val })
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm text-slate-800 outline-none focus:border-emerald-600"
-                >
-                  <option value="Cash">Cash</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                </select>
+                  placeholder="Select Payment Method"
+                />
               </div>
 
               <div>
@@ -996,50 +1021,44 @@ export default function InvoiceBillListPage() {
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Category</label>
-                <select
+                <PredictiveSearchSelect
+                  options={categories.map((c) => ({
+                    value: c.uuid,
+                    label: c.name,
+                  }))}
                   value={newItem.categoryId}
-                  onChange={(event) =>
+                  onChange={(val) =>
                     setNewItem({
                       ...newItem,
-                      categoryId: event.target.value,
+                      categoryId: val,
                       subCategoryId: "",
                     })
                   }
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-emerald-600"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((category) => (
-                    <option key={category.uuid} value={category.uuid}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Category"
+                />
               </div>
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Sub Category</label>
-                <select
-                  value={newItem.subCategoryId}
-                  onChange={(event) =>
-                    setNewItem({
-                      ...newItem,
-                      subCategoryId: event.target.value,
-                    })
-                  }
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-emerald-600"
-                >
-                  <option value="">Select Sub Category</option>
-                  {subCategories
+                <PredictiveSearchSelect
+                  options={subCategories
                     .filter(
                       (subCategory) =>
                         !newItem.categoryId ||
                         subCategory.raw?.categoryId === newItem.categoryId,
                     )
-                    .map((subCategory) => (
-                      <option key={subCategory.uuid} value={subCategory.uuid}>
-                        {subCategory.name}
-                      </option>
-                    ))}
-                </select>
+                    .map((s) => ({
+                      value: s.uuid,
+                      label: s.name,
+                    }))}
+                  value={newItem.subCategoryId}
+                  onChange={(val) =>
+                    setNewItem({
+                      ...newItem,
+                      subCategoryId: val,
+                    })
+                  }
+                  placeholder="Select Sub Category"
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block font-semibold text-slate-600 mb-1">Item Name *</label>
@@ -1055,24 +1074,33 @@ export default function InvoiceBillListPage() {
               </div>
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Brand</label>
-                <select className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-emerald-600">
-                  <option>Select Brand</option>
-                </select>
+                <input
+                  type="text"
+                  value={newItem.brand}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, brand: e.target.value })
+                  }
+                  placeholder="Brand Name"
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-emerald-600"
+                />
               </div>
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Unit</label>
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Nos", label: "Nos" },
+                    { value: "Pcs", label: "Pcs" },
+                    { value: "Kg", label: "Kg" },
+                    { value: "Cft", label: "Cft" },
+                    { value: "Bags", label: "Bags" },
+                    { value: "Sft", label: "Sft" },
+                  ]}
                   value={newItem.unit}
-                  onChange={(e) =>
-                    setNewItem({ ...newItem, unit: e.target.value })
+                  onChange={(val) =>
+                    setNewItem({ ...newItem, unit: val })
                   }
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-emerald-600"
-                >
-                  <option value="Nos">Nos</option>
-                  <option value="Kg">Kg</option>
-                  <option value="Cft">Cft</option>
-                  <option value="Bags">Bags</option>
-                </select>
+                  placeholder="Select Unit"
+                />
               </div>
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">
@@ -1244,9 +1272,17 @@ export default function InvoiceBillListPage() {
               </div>
               <div>
                 <label className="block font-semibold text-slate-600 mb-1">Chart Of Groups</label>
-                <select className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 outline-none focus:border-emerald-600">
-                  <option>Select Group Option</option>
-                </select>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Customers", label: "Customers" },
+                    { value: "Sundry Debtors", label: "Sundry Debtors" },
+                  ]}
+                  value={newCustomer.chartOfGroups}
+                  onChange={(val) =>
+                    setNewCustomer({ ...newCustomer, chartOfGroups: val })
+                  }
+                  placeholder="Select Group Option"
+                />
               </div>
             </div>
             <div className="bg-slate-50 px-5 py-3.5 border-t border-slate-100 flex justify-end gap-2">

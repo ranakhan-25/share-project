@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const getAuthHeaders = () => {
   const token = typeof window !== 'undefined'
@@ -102,6 +103,59 @@ export default function ExpenseListPage() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [openActionId, setOpenActionId] = useState<number | null>(null);
+
+  const [debitAccount, setDebitAccount] = useState("");
+  const [creditAccount, setCreditAccount] = useState("");
+  const [filterProject, setFilterProject] = useState("");
+  const [titleOfWork, setTitleOfWork] = useState("");
+  const [filterSite, setFilterSite] = useState("");
+  const [filterTask, setFilterTask] = useState("");
+
+  const [coaOptions, setCoaOptions] = useState<{ value: string; label: string }[]>([]);
+  const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    const loadDropdowns = async () => {
+      try {
+        const [coaRes, projRes, siteRes] = await Promise.all([
+          fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project?limit=100", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project-sites?limit=100", { headers: getAuthHeaders() }),
+        ]);
+        const coaJson = await coaRes.json().catch(() => ({}));
+        const projJson = await projRes.json().catch(() => ({}));
+        const siteJson = await siteRes.json().catch(() => ({}));
+
+        const coaList = coaJson?.data?.data || coaJson?.data || [];
+        if (Array.isArray(coaList)) {
+          setCoaOptions(coaList.map((a: { uuid?: string; id?: string; name?: string }) => ({
+            value: a.uuid || a.id || "",
+            label: a.name || "Account",
+          })));
+        }
+
+        const projList = projJson?.data?.data || projJson?.data || [];
+        if (Array.isArray(projList)) {
+          setProjectOptions(projList.map((p: { uuid?: string; id?: string; name?: string }) => ({
+            value: p.uuid || p.id || "",
+            label: p.name || "Project",
+          })));
+        }
+
+        const sList = siteJson?.data?.data || siteJson?.data || [];
+        if (Array.isArray(sList)) {
+          setSiteOptions(sList.map((s: { uuid?: string; id?: string; name?: string }) => ({
+            value: s.uuid || s.id || "",
+            label: s.name || "Site",
+          })));
+        }
+      } catch (err) {
+        console.error("Error loading dropdowns in expense page", err);
+      }
+    };
+    loadDropdowns();
+  }, []);
 
   const fetchExpenses = async () => {
     setIsLoading(true);
@@ -234,25 +288,37 @@ export default function ExpenseListPage() {
             <label className="block text-xs text-slate-500 dark:text-slate-400 mb-0.5 font-medium">
               Debit Accounts
             </label>
-            <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2.5 py-1.5 text-xs md:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option>Select Chart Of Account</option>
-            </select>
+            <PredictiveSearchSelect
+              options={coaOptions}
+              value={debitAccount}
+              onChange={(val) => setDebitAccount(val)}
+              placeholder="Select Chart Of Account"
+              className="w-full"
+            />
           </div>
           <div>
             <label className="block text-xs text-slate-500 dark:text-slate-400 mb-0.5 font-medium">
               Credit Accounts
             </label>
-            <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2.5 py-1.5 text-xs md:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option>Select Chart Of Account</option>
-            </select>
+            <PredictiveSearchSelect
+              options={coaOptions}
+              value={creditAccount}
+              onChange={(val) => setCreditAccount(val)}
+              placeholder="Select Chart Of Account"
+              className="w-full"
+            />
           </div>
           <div>
             <label className="block text-xs text-slate-500 dark:text-slate-400 mb-0.5 font-medium">
               Select Project
             </label>
-            <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2.5 py-1.5 text-xs md:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option>Select Project</option>
-            </select>
+            <PredictiveSearchSelect
+              options={projectOptions}
+              value={filterProject}
+              onChange={(val) => setFilterProject(val)}
+              placeholder="Select Project"
+              className="w-full"
+            />
           </div>
         </div>
 
@@ -261,25 +327,44 @@ export default function ExpenseListPage() {
             <label className="block text-xs text-slate-500 dark:text-slate-400 mb-0.5 font-medium">
               Title/Name of Work
             </label>
-            <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2.5 py-1.5 text-xs md:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option>Select Title/Name of Work</option>
-            </select>
+            <PredictiveSearchSelect
+              options={[
+                { value: "Foundation Work", label: "Foundation Work" },
+                { value: "Electrical Wiring", label: "Electrical Wiring" },
+                { value: "Plumbing", label: "Plumbing" },
+              ]}
+              value={titleOfWork}
+              onChange={(val) => setTitleOfWork(val)}
+              placeholder="Select Title/Name of Work"
+              className="w-full"
+            />
           </div>
           <div>
             <label className="block text-xs text-slate-500 dark:text-slate-400 mb-0.5 font-medium">
               Site
             </label>
-            <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2.5 py-1.5 text-xs md:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option>Select Site</option>
-            </select>
+            <PredictiveSearchSelect
+              options={siteOptions}
+              value={filterSite}
+              onChange={(val) => setFilterSite(val)}
+              placeholder="Select Site"
+              className="w-full"
+            />
           </div>
           <div>
             <label className="block text-xs text-slate-500 dark:text-slate-400 mb-0.5 font-medium">
               Task
             </label>
-            <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md px-2.5 py-1.5 text-xs md:text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-              <option>Select Task</option>
-            </select>
+            <PredictiveSearchSelect
+              options={[
+                { value: "Task 1", label: "Task 1" },
+                { value: "Task 2", label: "Task 2" },
+              ]}
+              value={filterTask}
+              onChange={(val) => setFilterTask(val)}
+              placeholder="Select Task"
+              className="w-full"
+            />
           </div>
           <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs md:text-sm font-medium rounded-md bg-rose-500 hover:bg-rose-600 text-white transition-colors">
             <FileText className="w-3.5 h-3.5" />

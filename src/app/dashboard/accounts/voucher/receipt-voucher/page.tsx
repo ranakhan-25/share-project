@@ -28,6 +28,7 @@ import {
   Printer,
   CheckCircle2,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface VoucherRow {
   id: number;
@@ -91,6 +92,8 @@ export default function ReceiptVoucherPage() {
   // Table Data & Filter States
   const [vouchers, setVouchers] = useState<VoucherRow[]>([]);
   const [accounts, setAccounts] = useState<Array<{ id?: string | number; uuid?: string; name?: string }>>([]);
+  const [projectOptions, setProjectOptions] = useState<{ value: string; label: string }[]>([]);
+  const [siteOptions, setSiteOptions] = useState<{ value: string; label: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -169,9 +172,32 @@ export default function ReceiptVoucherPage() {
     fetchVouchers();
     const fetchAccounts = async () => {
       try {
-        const response = await fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders() });
-        const result = await response.json();
-        setAccounts(normalizeArray(result.data) as Array<{ id?: string | number; uuid?: string; name?: string }>);
+        const [accRes, projRes, siteRes] = await Promise.all([
+          fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project?limit=100", { headers: getAuthHeaders() }),
+          fetch("/api/backend/project-sites?limit=100", { headers: getAuthHeaders() }),
+        ]);
+        const [accJson, projJson, siteJson] = await Promise.all([
+          accRes.json().catch(() => ({})),
+          projRes.json().catch(() => ({})),
+          siteRes.json().catch(() => ({})),
+        ]);
+        setAccounts(normalizeArray(accJson.data) as Array<{ id?: string | number; uuid?: string; name?: string }>);
+
+        const pList = projJson?.data?.data || projJson?.data || [];
+        if (Array.isArray(pList)) {
+          setProjectOptions(pList.map((p: any) => ({
+            value: p.name || p.title || p.uuid || String(p.id),
+            label: p.name || p.title || "Project",
+          })));
+        }
+        const sList = siteJson?.data?.data || siteJson?.data || [];
+        if (Array.isArray(sList)) {
+          setSiteOptions(sList.map((s: any) => ({
+            value: s.name || s.siteName || s.uuid || String(s.id),
+            label: s.name || s.siteName || "Site",
+          })));
+        }
       } catch (error) {
         console.error("Failed to load accounts", error);
       }
@@ -412,39 +438,43 @@ export default function ReceiptVoucherPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Project Type</label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Residential", label: "Residential" },
+                      { value: "Commercial", label: "Commercial" },
+                    ]}
                     value={projectType}
-                    onChange={(e) => setProjectType(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs"
-                  >
-                    <option value="">Select Project Type</option>
-                    <option value="Residential">Residential</option>
-                    <option value="Commercial">Commercial</option>
-                  </select>
+                    onChange={(val) => setProjectType(val)}
+                    placeholder="Select Project Type"
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Project</label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={projectOptions.length ? projectOptions : [
+                      { value: "Sheba Eyecon Tower", label: "Sheba Eyecon Tower" },
+                      { value: "Lake Garden", label: "Lake Garden" },
+                    ]}
                     value={project}
-                    onChange={(e) => setProject(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs"
-                  >
-                    <option value="">Select Project</option>
-                    <option value="Sheba Eyecon Tower">Sheba Eyecon Tower</option>
-                    <option value="Lake Garden">Lake Garden</option>
-                  </select>
+                    onChange={(val) => setProject(val)}
+                    placeholder="Select Project"
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Title/Name of Work</label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Booking Money", label: "Booking Money" },
+                      { value: "Installment", label: "Installment" },
+                      { value: "General Collection", label: "General Collection" },
+                    ]}
                     value={titleOfWork}
-                    onChange={(e) => setTitleOfWork(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs"
-                  >
-                    <option value="">Select Title/Name of Work</option>
-                    <option value="Booking Money">Booking Money</option>
-                    <option value="Installment">Installment</option>
-                  </select>
+                    onChange={(val) => setTitleOfWork(val)}
+                    placeholder="Select Title/Name of Work"
+                    className="w-full"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
@@ -480,18 +510,16 @@ export default function ReceiptVoucherPage() {
                     Select Accounts<span className="text-red-500">*</span>
                   </label>
                   <div className="flex items-center gap-1">
-                    <select
+                    <PredictiveSearchSelect
+                      options={accounts.map((account, index) => ({
+                        value: String(account.uuid ?? account.id ?? index),
+                        label: account.name ?? `Account ${index + 1}`,
+                      }))}
                       value={selectedAccount}
-                      onChange={(e) => setSelectedAccount(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs"
-                    >
-                      <option value="">Select Chart Of Account</option>
-                      {accounts.map((account, index) => (
-                        <option key={String(account.uuid ?? account.id ?? index)} value={String(account.uuid ?? account.id ?? "")}>
-                          {account.name ?? `Account ${index + 1}`}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => setSelectedAccount(val)}
+                      placeholder="Select Chart Of Account"
+                      className="w-full"
+                    />
                     <button
                       type="button"
                       onClick={() => setIsModalOpen(true)}
@@ -507,15 +535,16 @@ export default function ReceiptVoucherPage() {
                   <label className="block text-[11px] font-medium text-slate-500 mb-0.5">
                     Payment Method<span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "Cash", label: "Cash" },
+                      { value: "Bank Check", label: "Bank Check" },
+                    ]}
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 py-1 text-xs"
-                  >
-                    <option value="">Select Payment Method</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Bank Check">Bank Check</option>
-                  </select>
+                    onChange={(val) => setPaymentMethod(val)}
+                    placeholder="Select Payment Method"
+                    className="w-full"
+                  />
                 </div>
 
                 <div>
@@ -607,64 +636,71 @@ export default function ReceiptVoucherPage() {
             </div>
             <div>
               <label className="block text-[9px] text-slate-400">Credit Accounts</label>
-              <select
+              <PredictiveSearchSelect
+                options={accounts.map((a, i) => ({ value: String(a.uuid ?? a.id ?? i), label: a.name ?? "Account" }))}
                 value={filters.creditAccount}
-                onChange={(e) => setFilters({ ...filters, creditAccount: e.target.value })}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1 py-0.5 text-[10px]"
-              >
-                <option value="">Chart Of Account</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, creditAccount: val })}
+                placeholder="Chart Of Account"
+                className="w-full text-[10px]"
+              />
             </div>
             <div>
               <label className="block text-[9px] text-slate-400">Debit Accounts</label>
-              <select
+              <PredictiveSearchSelect
+                options={accounts.map((a, i) => ({ value: String(a.uuid ?? a.id ?? i), label: a.name ?? "Account" }))}
                 value={filters.debitAccount}
-                onChange={(e) => setFilters({ ...filters, debitAccount: e.target.value })}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1 py-0.5 text-[10px]"
-              >
-                <option value="">Chart Of Account</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, debitAccount: val })}
+                placeholder="Chart Of Account"
+                className="w-full text-[10px]"
+              />
             </div>
             <div>
               <label className="block text-[9px] text-slate-400">Select Project</label>
-              <select
+              <PredictiveSearchSelect
+                options={projectOptions}
                 value={filters.project}
-                onChange={(e) => setFilters({ ...filters, project: e.target.value })}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1 py-0.5 text-[10px]"
-              >
-                <option value="">Select Project</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, project: val })}
+                placeholder="Select Project"
+                className="w-full text-[10px]"
+              />
             </div>
             <div>
               <label className="block text-[9px] text-slate-400">Title/Name of Work</label>
-              <select
+              <PredictiveSearchSelect
+                options={[
+                  { value: "Booking Money", label: "Booking Money" },
+                  { value: "Installment", label: "Installment" },
+                  { value: "General Collection", label: "General Collection" },
+                ]}
                 value={filters.titleOfWork}
-                onChange={(e) => setFilters({ ...filters, titleOfWork: e.target.value })}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1 py-0.5 text-[10px]"
-              >
-                <option value="">Select Work</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, titleOfWork: val })}
+                placeholder="Select Work"
+                className="w-full text-[10px]"
+              />
             </div>
             <div>
               <label className="block text-[9px] text-slate-400">Site</label>
-              <select
+              <PredictiveSearchSelect
+                options={siteOptions}
                 value={filters.site}
-                onChange={(e) => setFilters({ ...filters, site: e.target.value })}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1 py-0.5 text-[10px]"
-              >
-                <option value="">Select Site</option>
-              </select>
+                onChange={(val) => setFilters({ ...filters, site: val })}
+                placeholder="Select Site"
+                className="w-full text-[10px]"
+              />
             </div>
             <div>
               <label className="block text-[9px] text-slate-400">Task</label>
               <div className="flex items-center gap-1">
-                <select
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Task 1", label: "Task 1" },
+                    { value: "Task 2", label: "Task 2" },
+                  ]}
                   value={filters.task}
-                  onChange={(e) => setFilters({ ...filters, task: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1 py-0.5 text-[10px]"
-                >
-                  <option value="">Task</option>
-                </select>
+                  onChange={(val) => setFilters({ ...filters, task: val })}
+                  placeholder="Task"
+                  className="w-full text-[10px]"
+                />
                 <button
                   type="button"
                   onClick={() => toast("PDF export is not connected yet.")}
@@ -900,25 +936,32 @@ export default function ReceiptVoucherPage() {
                 Date
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950" />
               </label>
-              <label className="text-[11px] font-medium">
-                Payment Method
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950">
-                  <option value="">Select Payment Method</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Bank Check">Bank Check</option>
-                </select>
-              </label>
-              <label className="text-[11px] font-medium sm:col-span-2">
-                Chart of Account
-                <select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950">
-                  <option value="">Select Chart Of Account</option>
-                  {accounts.map((account, index) => (
-                    <option key={String(account.uuid ?? account.id ?? index)} value={String(account.uuid ?? account.id ?? "")}>
-                      {account.name ?? `Account ${index + 1}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="text-[11px] font-medium">
+                <span className="block mb-1">Payment Method</span>
+                <PredictiveSearchSelect
+                  options={[
+                    { value: "Cash", label: "Cash" },
+                    { value: "Bank Check", label: "Bank Check" },
+                  ]}
+                  value={paymentMethod}
+                  onChange={(val) => setPaymentMethod(val)}
+                  placeholder="Select Payment Method"
+                  className="w-full"
+                />
+              </div>
+              <div className="text-[11px] font-medium sm:col-span-2">
+                <span className="block mb-1">Chart of Account</span>
+                <PredictiveSearchSelect
+                  options={accounts.map((account, index) => ({
+                    value: String(account.uuid ?? account.id ?? index),
+                    label: account.name ?? `Account ${index + 1}`,
+                  }))}
+                  value={selectedAccount}
+                  onChange={(val) => setSelectedAccount(val)}
+                  placeholder="Select Chart Of Account"
+                  className="w-full"
+                />
+              </div>
               <label className="text-[11px] font-medium">
                 Cheque/Receipt No
                 <input value={chequeNo} onChange={(e) => setChequeNo(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950" />
@@ -966,15 +1009,16 @@ export default function ReceiptVoucherPage() {
                     <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                       Chart of Group
                     </label>
-                    <select
+                    <PredictiveSearchSelect
+                      options={[
+                        { value: "Assets", label: "Assets" },
+                        { value: "Expenses", label: "Expenses" },
+                      ]}
                       value={modalGroup}
-                      onChange={(e) => setModalGroup(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-[11px]"
-                    >
-                      <option value="">Select value</option>
-                      <option value="Assets">Assets</option>
-                      <option value="Expenses">Expenses</option>
-                    </select>
+                      onChange={(val) => setModalGroup(val)}
+                      placeholder="Select value"
+                      className="w-full text-[11px]"
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
@@ -1007,14 +1051,16 @@ export default function ReceiptVoucherPage() {
                     <label className="block text-[10px] font-medium text-slate-600 dark:text-slate-400 mb-0.5">
                       Set Accounts Default Module
                     </label>
-                    <select
+                    <PredictiveSearchSelect
+                      options={[
+                        { value: "Active", label: "Active" },
+                        { value: "Inactive", label: "Inactive" },
+                      ]}
                       value={modalDefaultModule}
-                      onChange={(e) => setModalDefaultModule(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 text-[11px]"
-                    >
-                      <option value="">Select Status</option>
-                      <option value="Active">Active</option>
-                    </select>
+                      onChange={(val) => setModalDefaultModule(val)}
+                      placeholder="Select Status"
+                      className="w-full text-[11px]"
+                    />
                   </div>
                 </div>
               </div>

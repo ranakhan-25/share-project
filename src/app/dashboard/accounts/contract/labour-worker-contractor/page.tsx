@@ -16,6 +16,7 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==================== TYPES ====================
 interface LedgerEntry {
@@ -50,6 +51,16 @@ interface LabourWorkBank {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 // shared error reader
 async function handleRes(res: Response, action: string) {
   const json = await res.json().catch(() => ({}));
@@ -67,18 +78,16 @@ async function fetchLabourWorkBanks(): Promise<{
 }> {
   const url = `${API_BASE}/realbizpro/api/v1/labour-work-bank?page=1&limit=100&status=active&sortOrder=DESC&withDeleted=false`;
 
-  console.log("GET →", url);
-
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
   const json = await handleRes(res, "fetch labour work banks");
-  console.log("GET response →", json);
 
   const mapped: LabourWorkBank[] = (json?.data?.data || [])
+    .filter((item: any) => !item.deletedAt && !item.deleted_at)
     .map((item: any) => ({
       id: item.id ?? item.uuid,
       uuid: item.uuid,
@@ -103,14 +112,12 @@ async function fetchLabourWorkBanks(): Promise<{
 }
 
 async function createLabourWorkBank(payload: Record<string, any>) {
-  console.log("POST payload →", payload);
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/labour-work-bank`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleRes(res, "create labour work bank");
-  console.log("POST response →", json);
   return json;
 }
 
@@ -118,31 +125,27 @@ async function updateLabourWorkBank(
   uuid: string,
   payload: Record<string, any>,
 ) {
-  console.log("PATCH", uuid, "payload →", payload);
   const res = await fetch(
     `${API_BASE}/realbizpro/api/v1/labour-work-bank/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
   );
   const json = await handleRes(res, "update labour work bank");
-  console.log("PATCH response →", json);
   return json;
 }
 
 async function softDeleteLabourWorkBank(uuid: string) {
-  console.log("DELETE →", uuid);
   const res = await fetch(
     `${API_BASE}/realbizpro/api/v1/labour-work-bank/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   const json = await handleRes(res, "delete labour work bank");
-  console.log("DELETE response →", json);
   return json;
 }
 
@@ -359,17 +362,16 @@ function LabourFormModal({
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 Under
               </label>
-              <select
+              <PredictiveSearchSelect
+                options={[
+                  { value: "Labour", label: "Labour" },
+                  { value: "Worker", label: "Worker" },
+                  { value: "Contractor", label: "Contractor" },
+                ]}
                 value={formData.under}
-                onChange={(e) =>
-                  setFormData({ ...formData, under: e.target.value })
-                }
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="Labour">Labour</option>
-                <option value="Worker">Worker</option>
-                <option value="Contractor">Contractor</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, under: val })}
+                placeholder="Select Under"
+              />
             </div>
           </div>
 
@@ -522,19 +524,20 @@ export default function LabourWorkBankListPage() {
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="w-full md:w-72">
-            <select
+            <PredictiveSearchSelect
+              options={[
+                { value: "", label: "All Groups" },
+                { value: "Labour", label: "Labour" },
+                { value: "Worker", label: "Worker" },
+                { value: "Contractor", label: "Contractor" },
+              ]}
               value={groupFilter}
-              onChange={(e) => {
-                setGroupFilter(e.target.value);
+              onChange={(val) => {
+                setGroupFilter(val);
                 setCurrentPage(1);
               }}
-              className="w-full border border-slate-200 rounded-md px-3 py-2 text-xs bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Select value</option>
-              <option value="Labour">Labour</option>
-              <option value="Worker">Worker</option>
-              <option value="Contractor">Contractor</option>
-            </select>
+              placeholder="Select group filter"
+            />
           </div>
 
           <div className="flex items-center space-x-2">
@@ -552,19 +555,21 @@ export default function LabourWorkBankListPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-2 gap-4">
         <div className="flex items-center space-x-2 text-xs text-slate-600">
           <span>Show</span>
-          <select
-            value={entriesPerPage}
-            onChange={(e) => {
-              setEntriesPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-          >
-            <option value={10}>10</option>
-            <option value={13}>13</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </select>
+          <div className="w-24">
+            <PredictiveSearchSelect
+              options={[
+                { value: "10", label: "10" },
+                { value: "13", label: "13" },
+                { value: "20", label: "20" },
+                { value: "50", label: "50" },
+              ]}
+              value={String(entriesPerPage)}
+              onChange={(val) => {
+                setEntriesPerPage(Number(val) || 10);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
           <span>entries</span>
         </div>
 

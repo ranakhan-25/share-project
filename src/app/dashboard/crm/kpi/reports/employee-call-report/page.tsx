@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { API_BASE, crmFetch } from "../../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==========================================
 // 1. TYPES & INTERFACES
@@ -177,21 +178,13 @@ export default function EmployeeKpiCallReportPage() {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Select Staff/Employee
           </label>
-          <select
+          <PredictiveSearchSelect
             value={selectedUser}
-            onChange={(e) => setSelectedUser(e.target.value)}
-            className="w-full border rounded-md p-2 text-sm outline-none focus:border-indigo-500 text-gray-600"
+            onChange={setSelectedUser}
+            placeholder={isDropdownLoading ? "Loading..." : "Select Staff/Employee"}
             disabled={isDropdownLoading}
-          >
-            <option value="">
-              {isDropdownLoading ? "Loading..." : "Select Staff/Employee"}
-            </option>
-            {users.map((user) => (
-              <option key={user.uuid} value={user.uuid}>
-                {user.name}
-              </option>
-            ))}
-          </select>
+            options={users.map((user) => ({ value: user.uuid, label: user.name }))}
+          />
         </div>
         <div>
           <button

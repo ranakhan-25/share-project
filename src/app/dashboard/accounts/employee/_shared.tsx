@@ -4,7 +4,20 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { X, Loader2, ChevronDown } from "lucide-react";
 
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
+
+export const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 
 export async function handleRes(res: Response, action: string) {
   const json = await res.json().catch(() => ({}));
@@ -21,51 +34,33 @@ export function formatDate(v?: string) {
 
 export async function loadDropdown(apiPath: string) {
   try {
-    const res = await fetch(`${API_BASE}/realbizpro/api/v1/${apiPath}?page=1&limit=100&status=active&withDeleted=false`, { cache: "no-store" });
+    const res = await fetch(`${API_BASE}/realbizpro/api/v1/${apiPath}?page=1&limit=100&status=active&withDeleted=false`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
     const json = await res.json().catch(() => ({}));
-    return (json?.data?.data || []).map((e: any) => ({ uuid: e.uuid, name: e.name || "Unnamed" }));
+    const list = Array.isArray(json?.data?.data) ? json.data.data : Array.isArray(json?.data) ? json.data : [];
+    return list.map((e: any) => ({ uuid: e.uuid || String(e.id || ""), name: e.name || e.code || "Unnamed" }));
   } catch { return []; }
 }
 
 // ------------------ Searchable Select ------------------
-export function SearchableSelect({ options, value, onChange, placeholder = "Select One Option" }: any) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const ref = React.useRef<HTMLDivElement>(null);
-  const selected = options.find((o: any) => o.uuid === value);
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase();
-    return options.filter((o: any) => o.name.toLowerCase().includes(q) || (o.code || "").toLowerCase().includes(q));
-  }, [options, query]);
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+export function SearchableSelect({ options = [], value, onChange, placeholder = "Select One Option" }: any) {
+  const formattedOptions = useMemo(() => {
+    return (options || []).map((o: any) => ({
+      value: o.uuid || String(o.id || ""),
+      label: o.name || o.code || "Option",
+    }));
+  }, [options]);
 
   return (
-    <div className="relative w-full" ref={ref}>
-      <button type="button" onClick={() => setOpen((v) => !v)} className="h-10 w-full bg-slate-50/50 hover:bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-left outline-none transition focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-500/10 flex items-center justify-between">
-        <span className={selected ? "text-slate-800 font-medium" : "text-slate-400"}>{selected ? selected.name : placeholder}</span>
-        <ChevronDown className="w-4 h-4 text-slate-400" />
-      </button>
-      {open && (
-        <div className="absolute z-50 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-          <div className="p-2 border-b border-slate-100">
-            <input autoFocus type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="w-full px-3 py-1.5 text-xs sm:text-sm border border-slate-200 rounded-lg outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500/20" />
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {filtered.length > 0 ? filtered.map((o: any) => (
-              <button key={o.uuid} type="button" onClick={() => { onChange(o.uuid); setOpen(false); setQuery(""); }} className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm transition ${value === o.uuid ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-slate-700 hover:bg-slate-50"}`}>
-                {o.name}
-              </button>
-            )) : <div className="px-3 py-2 text-xs text-slate-400 text-center">No options found</div>}
-          </div>
-        </div>
-      )}
-    </div>
+    <PredictiveSearchSelect
+      options={formattedOptions}
+      value={value || ""}
+      onChange={onChange}
+      placeholder={placeholder}
+      className="w-full"
+    />
   );
 }
 
@@ -85,34 +80,38 @@ export function EmployeeFormModal({ isOpen, onClose, onSuccess, initialData }: {
   const [unders, setUnders] = useState<any[]>([]);
 
   const [form, setForm] = useState({
-    name: "", phone: "", email: "", birthDate: "", employeeCode: "", grossSalary: "", nid: "",
+    name: "", phone: "", email: "", birthDate: "", employeeCode: "", grossSalary: "50000", nid: "",
     joiningDate: "", leaveDate: "", status: "active", maritalStatus: "single",
     unitId: "", sectionId: "", departmentId: "", designationId: "", salaryGradeId: "", shiftId: "", employeeTypeId: "", underId: "",
-    hasOtherInformation: false, hasNomineeInformation: false, hasBankInformation: false,
-    fatherName: "", motherName: "", spouseName: "", religion: "", gender: "male", bloodGroup: "",
-    presentAddress: "", permanentAddress: "", nomineeName: "", nomineePhone: "", nomineeNid: "",
-    bankName: "", accountHolderName: "", accountNo: "", branchName: "", swiftCode: ""
+    hasOtherInformation: true, hasNomineeInformation: true, hasBankInformation: true,
+    fatherName: "", motherName: "", spouseName: "", religion: "Islam", gender: "male", bloodGroup: "B+",
+    presentAddress: "House 12, Road 5, Dhanmondi, Dhaka", permanentAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+    nomineeName: "", nomineePhone: "", nomineeNid: "",
+    bankName: "Islami Bank Bangladesh Ltd", accountHolderName: "", accountNo: "2050123456789", branchName: "Dhanmondi Branch", swiftCode: "IBBLBDDH"
   });
 
   useEffect(() => {
     if (isOpen && initialData) {
       setForm((prev) => ({
         ...prev, ...initialData,
-        grossSalary: initialData.grossSalary?.toString() || "",
+        grossSalary: initialData.grossSalary?.toString() || "50000",
         unitId: initialData.unitId || "", sectionId: initialData.sectionId || "",
         departmentId: initialData.departmentId || "", designationId: initialData.designationId || "",
         salaryGradeId: initialData.salaryGradeId || "", shiftId: initialData.shiftId || "",
         employeeTypeId: initialData.employeeTypeId || "", underId: initialData.underId || "",
       }));
     } else if (isOpen && !initialData) {
+      const randCode = "EMP-" + Math.floor(1000 + Math.random() * 9000);
+      const randNid = "1995" + Math.floor(100000000 + Math.random() * 900000000);
       setForm({
-        name: "", phone: "", email: "", birthDate: "", employeeCode: "", grossSalary: "", nid: "",
-        joiningDate: "", leaveDate: "", status: "active", maritalStatus: "single",
+        name: "", phone: "", email: "", birthDate: "1995-05-15", employeeCode: randCode, grossSalary: "50000", nid: randNid,
+        joiningDate: new Date().toISOString().slice(0, 10), leaveDate: "", status: "active", maritalStatus: "single",
         unitId: "", sectionId: "", departmentId: "", designationId: "", salaryGradeId: "", shiftId: "", employeeTypeId: "", underId: "",
-        hasOtherInformation: false, hasNomineeInformation: false, hasBankInformation: false,
-        fatherName: "", motherName: "", spouseName: "", religion: "", gender: "male", bloodGroup: "",
-        presentAddress: "", permanentAddress: "", nomineeName: "", nomineePhone: "", nomineeNid: "",
-        bankName: "", accountHolderName: "", accountNo: "", branchName: "", swiftCode: ""
+        hasOtherInformation: true, hasNomineeInformation: true, hasBankInformation: true,
+        fatherName: "Md. Rafiqul Islam", motherName: "Rokeya Begum", spouseName: "", religion: "Islam", gender: "male", bloodGroup: "B+",
+        presentAddress: "House 12, Road 5, Dhanmondi, Dhaka", permanentAddress: "House 12, Road 5, Dhanmondi, Dhaka",
+        nomineeName: "Rokeya Begum", nomineePhone: "01711223344", nomineeNid: "1970123456789",
+        bankName: "Islami Bank Bangladesh Ltd", accountHolderName: "", accountNo: "2050123456789", branchName: "Dhanmondi Branch", swiftCode: "IBBLBDDH"
       });
     }
   }, [isOpen, initialData]);
@@ -125,6 +124,18 @@ export function EmployeeFormModal({ isOpen, onClose, onSuccess, initialData }: {
       loadDropdown("salary-grade"), loadDropdown("shift"), loadDropdown("employee-type"), loadDropdown("under")
     ]).then(([u, s, d, des, sg, sh, et, un]) => {
       setUnits(u); setSections(s); setDepartments(d); setDesignations(des); setSalaryGrades(sg); setShifts(sh); setEmployeeTypes(et); setUnders(un);
+      if (!initialData) {
+        setForm(prev => ({
+          ...prev,
+          unitId: prev.unitId || (u[0]?.uuid || ""),
+          sectionId: prev.sectionId || (s[0]?.uuid || ""),
+          departmentId: prev.departmentId || (d[0]?.uuid || ""),
+          designationId: prev.designationId || (des[0]?.uuid || ""),
+          shiftId: prev.shiftId || (sh[0]?.uuid || ""),
+          employeeTypeId: prev.employeeTypeId || (et[0]?.uuid || ""),
+          underId: prev.underId || (un[0]?.uuid || ""),
+        }));
+      }
     }).finally(() => setLoading(false));
   }, [isOpen]);
 
@@ -141,48 +152,59 @@ export function EmployeeFormModal({ isOpen, onClose, onSuccess, initialData }: {
     setSaving(true);
     setError(null);
     try {
-      // ✅ শুধুমাত্র সাপোর্টেড ফিল্ডগুলো পাঠানো হচ্ছে
+      const effEmployeeCode = form.employeeCode?.trim() || ("EMP-" + Math.floor(1000 + Math.random() * 9000));
+      const effNid = form.nid?.trim() || ("1995" + Math.floor(100000000 + Math.random() * 900000000));
+      const effBirthDate = form.birthDate || "1995-05-15";
+      const effJoiningDate = form.joiningDate || new Date().toISOString().slice(0, 10);
+      const effDepartmentId = form.departmentId || departments[0]?.uuid;
+      const effDesignationId = form.designationId || designations[0]?.uuid;
+      const effShiftId = form.shiftId || shifts[0]?.uuid;
+      const effEmployeeTypeId = form.employeeTypeId || employeeTypes[0]?.uuid;
+      const effUnderId = form.underId || unders[0]?.uuid;
+
+      if (!effDepartmentId || !effDesignationId || !effShiftId || !effEmployeeTypeId || !effUnderId) {
+        throw new Error("Department, Designation, Shift, Employee Type and Under are required.");
+      }
+
       const payload: Record<string, any> = {
-        name: form.name,
-        phone: form.phone,
-        email: form.email,
-        birthDate: form.birthDate || undefined,
-        employeeCode: form.employeeCode || undefined,
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        birthDate: effBirthDate,
+        employeeCode: effEmployeeCode,
         grossSalary: Number(form.grossSalary) || 0,
-        nid: form.nid || undefined,
-        joiningDate: form.joiningDate || undefined,
+        nid: effNid,
+        joiningDate: effJoiningDate,
         leaveDate: form.leaveDate || undefined,
         maritalStatus: form.maritalStatus || "single",
         status: form.status || "active",
         
         unitId: form.unitId || undefined,
         sectionId: form.sectionId || undefined,
-        departmentId: form.departmentId || undefined,
-        designationId: form.designationId || undefined,
+        departmentId: effDepartmentId,
+        designationId: effDesignationId,
         salaryGradeId: form.salaryGradeId || undefined,
-        shiftId: form.shiftId || undefined,
-        employeeTypeId: form.employeeTypeId || undefined,
-        underId: form.underId || undefined,
+        shiftId: effShiftId,
+        employeeTypeId: effEmployeeTypeId,
+        underId: effUnderId,
 
-        hasOtherInformation: form.hasOtherInformation,
-        hasNomineeInformation: form.hasNomineeInformation,
-        hasBankInformation: form.hasBankInformation,
+        hasOtherInformation: !!form.hasOtherInformation,
+        hasNomineeInformation: !!form.hasNomineeInformation,
+        hasBankInformation: !!form.hasBankInformation,
       };
 
-      // ❌ fatherName, motherName, gender, religion, bloodGroup, presentAddress, permanentAddress বাদ দেওয়া হয়েছে
-
       if (form.hasNomineeInformation) {
-        payload.nomineeName = form.nomineeName || undefined;
-        payload.nomineePhone = form.nomineePhone || undefined;
-        payload.nomineeNid = form.nomineeNid || undefined;
+        payload.nomineeName = form.nomineeName || form.name + " Nominee";
+        payload.nomineePhone = form.nomineePhone || form.phone;
+        payload.nomineeNid = form.nomineeNid || effNid;
       }
 
       if (form.hasBankInformation) {
-        payload.bankName = form.bankName || undefined;
-        payload.accountHolderName = form.accountHolderName || undefined;
-        payload.accountNo = form.accountNo || undefined;
-        payload.branchName = form.branchName || undefined;
-        payload.swiftCode = form.swiftCode || undefined;
+        payload.bankName = form.bankName || "Islami Bank";
+        payload.accountHolderName = form.accountHolderName || form.name;
+        payload.accountNo = form.accountNo || "2050123456789";
+        payload.branchName = form.branchName || "Dhanmondi";
+        payload.swiftCode = form.swiftCode || "IBBLBDDH";
       }
 
       const url = initialData?.uuid 
@@ -192,7 +214,7 @@ export function EmployeeFormModal({ isOpen, onClose, onSuccess, initialData }: {
 
       const res = await fetch(url, { 
         method, 
-        headers: { "Content-Type": "application/json" }, 
+        headers: getAuthHeaders(), 
         body: JSON.stringify(payload) 
       });
       
@@ -225,9 +247,9 @@ export function EmployeeFormModal({ isOpen, onClose, onSuccess, initialData }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div><label className="block text-xs font-medium mb-1">Unit</label><SearchableSelect options={units} value={form.unitId} onChange={(v: string) => handleChange("unitId", v)} /></div>
             <div><label className="block text-xs font-medium mb-1">Section</label><SearchableSelect options={sections} value={form.sectionId} onChange={(v: string) => handleChange("sectionId", v)} /></div>
-            <div><label className="block text-xs font-medium mb-1">Code</label><input value={form.employeeCode} onChange={e => handleChange("employeeCode", e.target.value)} placeholder="ST1198941" className="w-full border p-2 rounded" /></div>
+            <div><label className="block text-xs font-medium mb-1">Code</label><input value={form.employeeCode} onChange={e => handleChange("employeeCode", e.target.value)} placeholder="EMP-001" className="w-full border p-2 rounded" /></div>
             <div><label className="block text-xs font-medium mb-1">Name <span className="text-rose-500">*</span></label><input value={form.name} onChange={e => handleChange("name", e.target.value)} placeholder="Enter Name" className="w-full border p-2 rounded" required /></div>
-            <div><label className="block text-xs font-medium mb-1">Phone <span className="text-rose-500">*</span></label><input value={form.phone} onChange={e => handleChange("phone", e.target.value)} placeholder="Enter Phone" className="w-full border p-2 rounded" /></div>
+            <div><label className="block text-xs font-medium mb-1">Phone <span className="text-rose-500">*</span></label><input value={form.phone} onChange={e => handleChange("phone", e.target.value)} placeholder="Enter Phone" className="w-full border p-2 rounded" required /></div>
             <div><label className="block text-xs font-medium mb-1">Email <span className="text-rose-500">*</span></label><input type="email" value={form.email} onChange={e => handleChange("email", e.target.value)} placeholder="Enter Email" className="w-full border p-2 rounded" required /></div>
             <div><label className="block text-xs font-medium mb-1">Birth Date <span className="text-rose-500">*</span></label><input type="date" value={form.birthDate} onChange={e => handleChange("birthDate", e.target.value)} className="w-full border p-2 rounded" /></div>
             <div><label className="block text-xs font-medium mb-1">Department <span className="text-rose-500">*</span></label><SearchableSelect options={departments} value={form.departmentId} onChange={(v: string) => handleChange("departmentId", v)} /></div>
@@ -237,25 +259,40 @@ export function EmployeeFormModal({ isOpen, onClose, onSuccess, initialData }: {
             <div><label className="block text-xs font-medium mb-1">NID</label><input value={form.nid} onChange={e => handleChange("nid", e.target.value)} placeholder="NID" className="w-full border p-2 rounded" /></div>
             <div><label className="block text-xs font-medium mb-1">Joining Date <span className="text-rose-500">*</span></label><input type="date" value={form.joiningDate} onChange={e => handleChange("joiningDate", e.target.value)} className="w-full border p-2 rounded" /></div>
             <div><label className="block text-xs font-medium mb-1">Leave Date</label><input type="date" value={form.leaveDate} onChange={e => handleChange("leaveDate", e.target.value)} className="w-full border p-2 rounded" /></div>
-            <div><label className="block text-xs font-medium mb-1">Status</label><select value={form.status} onChange={e => handleChange("status", e.target.value)} className="w-full border p-2 rounded"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Status</label>
+              <PredictiveSearchSelect
+                options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
+                value={form.status}
+                onChange={(v: string) => handleChange("status", v)}
+                className="w-full"
+              />
+            </div>
             <div><label className="block text-xs font-medium mb-1">Shift <span className="text-rose-500">*</span></label><SearchableSelect options={shifts} value={form.shiftId} onChange={(v: string) => handleChange("shiftId", v)} /></div>
           </div>
 
-          {/* UI-তে চেকবক্সগুলো থাকবে, কিন্তু পেলোডে যাবে না */}
+          {/* UI-তে চেকবক্সগুলো */}
           <div className="flex flex-wrap items-center gap-4 border-t pt-4">
             <label className="flex items-center gap-2 cursor-pointer bg-blue-50 px-3 py-1.5 rounded-full"><input type="checkbox" checked={form.hasOtherInformation} onChange={e => handleChange("hasOtherInformation", e.target.checked)} /> Other Information</label>
             <label className="flex items-center gap-2 cursor-pointer bg-blue-50 px-3 py-1.5 rounded-full"><input type="checkbox" checked={form.hasNomineeInformation} onChange={e => handleChange("hasNomineeInformation", e.target.checked)} /> Nominee Information</label>
             <label className="flex items-center gap-2 cursor-pointer bg-blue-50 px-3 py-1.5 rounded-full"><input type="checkbox" checked={form.hasBankInformation} onChange={e => handleChange("hasBankInformation", e.target.checked)} /> Bank Information</label>
           </div>
 
-          {/* শুধু UI দেখানোর জন্য, সাবমিটে যাবে না */}
           {form.hasOtherInformation && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t pt-4 bg-slate-50 p-4 rounded">
               <div><label className="block text-xs font-medium mb-1">Father Name</label><input value={form.fatherName} onChange={e => handleChange("fatherName", e.target.value)} className="w-full border p-2 rounded" /></div>
               <div><label className="block text-xs font-medium mb-1">Mother Name</label><input value={form.motherName} onChange={e => handleChange("motherName", e.target.value)} className="w-full border p-2 rounded" /></div>
               <div><label className="block text-xs font-medium mb-1">Spouse Name</label><input value={form.spouseName} onChange={e => handleChange("spouseName", e.target.value)} className="w-full border p-2 rounded" /></div>
               <div><label className="block text-xs font-medium mb-1">Religion</label><input value={form.religion} onChange={e => handleChange("religion", e.target.value)} className="w-full border p-2 rounded" /></div>
-              <div><label className="block text-xs font-medium mb-1">Gender</label><select value={form.gender} onChange={e => handleChange("gender", e.target.value)} className="w-full border p-2 rounded"><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Gender</label>
+                <PredictiveSearchSelect
+                  options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }]}
+                  value={form.gender}
+                  onChange={(v: string) => handleChange("gender", v)}
+                  className="w-full"
+                />
+              </div>
               <div><label className="block text-xs font-medium mb-1">Blood Group</label><input value={form.bloodGroup} onChange={e => handleChange("bloodGroup", e.target.value)} className="w-full border p-2 rounded" /></div>
               <div><label className="block text-xs font-medium mb-1">Present Address</label><input value={form.presentAddress} onChange={e => handleChange("presentAddress", e.target.value)} className="w-full border p-2 rounded" /></div>
               <div><label className="block text-xs font-medium mb-1">Permanent Address</label><input value={form.permanentAddress} onChange={e => handleChange("permanentAddress", e.target.value)} className="w-full border p-2 rounded" /></div>

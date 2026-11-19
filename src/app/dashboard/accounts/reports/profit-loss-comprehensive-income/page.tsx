@@ -1,4 +1,5 @@
 'use client';
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -69,41 +70,34 @@ export default function ProfitLossComprehensiveIncome() {
               {/* Type */}
               <div>
                 <label className="block text-slate-600 font-medium mb-1.5">Type</label>
-                <select 
-                  value={reportType} 
-                  onChange={(e) => setReportType(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-                >
-                  <option value="Select Type">Select Type</option>
-                  <option value="Detailed">Detailed</option>
-                  <option value="Summary">Summary</option>
-                </select>
+                <PredictiveSearchSelect
+                options={[{"value":"Select Type","label":"Select Type"},{"value":"Detailed","label":"Detailed"},{"value":"Summary","label":"Summary"}]}
+                value={reportType}
+                onChange={(val: any) => (val)}
+                placeholder="Select Type"
+              />
               </div>
 
               {/* Company */}
               <div>
                 <label className="block text-slate-600 font-medium mb-1.5">Company</label>
-                <select 
-                  value={company} 
-                  onChange={(e) => setCompany(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-                >
-                  <option value="Select value">Select value</option>
-                  <option value="Somikoron IT Ltd">Somikoron IT Ltd</option>
-                </select>
+                <PredictiveSearchSelect
+                options={[{"value":"Select value","label":"Select value"},{"value":"Somikoron IT Ltd","label":"Somikoron IT Ltd"}]}
+                value={company}
+                onChange={(val: any) => (val)}
+                placeholder="Select value"
+              />
               </div>
 
               {/* Project */}
               <div>
                 <label className="block text-slate-600 font-medium mb-1.5">Project</label>
-                <select 
-                  value={project} 
-                  onChange={(e) => setProject(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 bg-white text-slate-700 focus:outline-none focus:border-purple-500"
-                >
-                  <option value="Select Project">Select Project</option>
-                  <option value="Rifat Eyecon City">Rifat Eyecon City</option>
-                </select>
+                <PredictiveSearchSelect
+                options={[{"value":"Select Project","label":"Select Project"},{"value":"Rifat Eyecon City","label":"Rifat Eyecon City"}]}
+                value={project}
+                onChange={(val: any) => (val)}
+                placeholder="Select Project"
+              />
               </div>
 
             </div>

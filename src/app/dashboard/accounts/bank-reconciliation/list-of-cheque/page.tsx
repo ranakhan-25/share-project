@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronDown, Copy, FileText, ArrowUpDown } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 export interface ChequeItem {
   id: number;
+  uuid?: string;
   instrumentNumber: string;
   chequeStatus: string;
   instrumentDate: string;
@@ -13,6 +15,17 @@ export interface ChequeItem {
   amount: string;
   chequeRange: string;
 }
+
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
 
 export default function ListOfChequePage() {
   // Main Data State (API Ready)
@@ -114,6 +127,51 @@ export default function ListOfChequePage() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [accountOptions, setAccountOptions] = useState<{ value: string; label: string }[]>([
+    { value: "Cash", label: "Cash Account" },
+    { value: "Bank", label: "Bank Account" },
+  ]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const [chqRes, coaRes] = await Promise.all([
+          fetch("/api/backend/cheques?limit=100", { headers: getAuthHeaders(), cache: "no-store" }),
+          fetch("/api/backend/chart-of-accounts", { headers: getAuthHeaders(), cache: "no-store" }),
+        ]);
+        const chqJson = await chqRes.json().catch(() => ({}));
+        const coaJson = await coaRes.json().catch(() => ({}));
+
+        const chqList = chqJson?.data?.data || chqJson?.data || [];
+        if (Array.isArray(chqList) && chqList.length > 0) {
+          setItems(chqList.map((c: any, index: number) => ({
+            id: index + 1,
+            uuid: c.uuid,
+            instrumentNumber: String(c.instrumentNumber || c.chequeNo || `CHQ-${index + 1}`),
+            chequeStatus: String(c.chequeStatus || "Available"),
+            instrumentDate: String(c.instrumentDate || "-"),
+            favouringName: String(c.favouringName || "-"),
+            amount: c.amount ? Number(c.amount).toLocaleString() : "-",
+            chequeRange: String(c.chequeRange?.name || c.chequeRangeName || "-"),
+          })));
+        }
+
+        const coaList = coaJson?.data?.data || coaJson?.data || [];
+        if (Array.isArray(coaList) && coaList.length > 0) {
+          setAccountOptions([
+            { value: "Cash", label: "Cash Account" },
+            { value: "Bank", label: "Bank Account" },
+            ...coaList.map((c: any) => ({
+              value: c.name || c.uuid || String(c.id),
+              label: `${c.name || 'Account'} (${c.code || 'COA'})`,
+            }))
+          ]);
+        }
+      } catch (err) {
+        console.error("List of cheques fetch error", err);
+      }
+    })();
+  }, []);
 
   // Filter logic
   const filteredItems = items.filter(
@@ -149,15 +207,12 @@ export default function ListOfChequePage() {
           <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
             Cash/Bank
           </label>
-          <select
+          <PredictiveSearchSelect
             value={cashBankFilter}
-            onChange={(e) => setCashBankFilter(e.target.value)}
-            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded px-2.5 py-1.5 text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
-          >
-            <option value="">Select value</option>
-            <option value="Cash">Cash Account</option>
-            <option value="Bank">Bank Account</option>
-          </select>
+            onChange={(val) => setCashBankFilter(val)}
+            options={accountOptions}
+            placeholder="Select value"
+          />
         </div>
 
         {/* Export & Table Controls */}
@@ -179,15 +234,17 @@ export default function ListOfChequePage() {
 
             <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400 ml-2">
               <span>Show</span>
-              <select
-                value={entriesPerPage}
-                onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-                className="bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded px-2 py-0.5 outline-none"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+              <PredictiveSearchSelect
+                value={String(entriesPerPage)}
+                onChange={(val) => setEntriesPerPage(Number(val))}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "25", label: "25" },
+                  { value: "50", label: "50" },
+                ]}
+                placeholder="10"
+                className="w-20"
+              />
               <span>entries</span>
             </div>
           </div>

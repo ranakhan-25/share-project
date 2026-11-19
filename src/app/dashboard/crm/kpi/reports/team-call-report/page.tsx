@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { API_BASE, crmFetch } from "../../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ==========================================
 // 1. TYPES & INTERFACES
@@ -176,21 +177,13 @@ export default function TeamKpiReportPage() {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Select Team
           </label>
-          <select
+          <PredictiveSearchSelect
             value={selectedTeam}
-            onChange={(e) => setSelectedTeam(e.target.value)}
-            className="w-full border rounded-md p-2 text-sm outline-none focus:border-indigo-500 text-gray-600"
+            onChange={setSelectedTeam}
+            placeholder={isDropdownLoading ? "Loading..." : "Select Team"}
             disabled={isDropdownLoading}
-          >
-            <option value="">
-              {isDropdownLoading ? "Loading..." : "Select Team"}
-            </option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
+            options={teams.map((team) => ({ value: team.id, label: team.name }))}
+          />
         </div>
         <div>
           <button

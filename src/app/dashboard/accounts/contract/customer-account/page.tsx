@@ -15,6 +15,7 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ---------- Types ----------
 export interface Customer {
@@ -40,7 +41,17 @@ export interface Customer {
 }
 
 // ---------- API helpers ----------
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
+
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 // form values -> backend field names
 function toPayload(form: Partial<Customer>) {
@@ -72,18 +83,17 @@ async function handleRes(res: Response, action: string) {
 }
 
 async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
-  const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account`, {
+  const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account?page=1&limit=100&withDeleted=false`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      // Authorization: `Bearer ${token}`  // add if needed
-    },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
 
   const json = await handleRes(res, "fetch customers");
 
-  const mapped: Customer[] = (json?.data?.data || []).map((item: any) => ({
+  const mapped: Customer[] = (json?.data?.data || [])
+    .filter((item: any) => !item.deletedAt && !item.deleted_at)
+    .map((item: any) => ({
     id: Number(item.id) || item.uuid,
     uuid: item.uuid,
     code: item.customerCode || "",
@@ -112,7 +122,7 @@ async function fetchCustomers(): Promise<{ data: Customer[]; meta: any }> {
 async function createCustomer(form: Partial<Customer>) {
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/customer-account`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(toPayload(form)),
   });
   return handleRes(res, "create customer");
@@ -124,7 +134,7 @@ async function updateCustomer(uuid: string, form: Partial<Customer>) {
     `${API_BASE}/realbizpro/api/v1/customer-account/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(toPayload(form)),
     },
   );
@@ -137,7 +147,7 @@ async function softDeleteCustomer(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/customer-account/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   return handleRes(res, "delete customer");
@@ -169,6 +179,20 @@ function CustomerFormModal({
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [groups, setGroups] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/realbizpro/api/v1/chart-of-group?page=1&limit=100&withDeleted=false`, {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        const list = Array.isArray(json?.data?.data) ? json.data.data : Array.isArray(json?.data) ? json.data : [];
+        setGroups(list.map((g: any) => ({ value: g.name || g.code, label: `${g.name} (${g.code || ""})` })));
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -287,14 +311,11 @@ function CustomerFormModal({
               <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
                 Under Group
               </label>
-              <input
-                type="text"
+              <PredictiveSearchSelect
+                options={groups}
                 value={formData.under}
-                onChange={(e) =>
-                  setFormData({ ...formData, under: e.target.value })
-                }
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Group code"
+                onChange={(val) => setFormData({ ...formData, under: val })}
+                placeholder="Select or search group"
               />
             </div>
             <div>
@@ -442,15 +463,17 @@ export default function CustomerListPage() {
         <div className="flex items-center justify-between md:justify-end gap-4">
           <div className="flex items-center space-x-2 text-sm text-slate-600">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-              className="border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
+            <div className="w-24">
+              <PredictiveSearchSelect
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "20", label: "20" },
+                  { value: "50", label: "50" },
+                ]}
+                value={String(entriesPerPage)}
+                onChange={(val) => setEntriesPerPage(Number(val) || 10)}
+              />
+            </div>
             <span>entries</span>
           </div>
 

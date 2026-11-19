@@ -12,6 +12,7 @@ import {
   Trash2,
   Eye,
 } from 'lucide-react';
+import PredictiveSearchSelect from '@/components/ui/PredictiveSearchSelect';
 
 export default function AssetItemList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -254,11 +255,17 @@ export default function AssetItemList() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
           <div className="flex items-center space-x-2 text-gray-600">
             <span>Show</span>
-            <select className="border border-gray-300 rounded px-2 py-1 outline-none focus:border-[#6b58e8]">
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-            </select>
+            <PredictiveSearchSelect
+              value="10"
+              onChange={() => {}}
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
           </div>
 
@@ -384,49 +391,41 @@ export default function AssetItemList() {
                   {/* Category Dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-800 mb-1.5">Category</label>
-                    <div className="relative">
-                      <select
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white text-gray-700 outline-none focus:border-[#6b58e8]"
-                        required
-                      >
-                        <option value="">Select Category</option>
-                        <option value="Electronics">Electronics</option>
-                        <option value="Furniture">Furniture</option>
-                        <option value="Stationery">Stationery</option>
-                        <option value="Vehicles">Vehicles</option>
-                        <option value="Machinery">Machinery</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-                    </div>
+                    <PredictiveSearchSelect
+                      value={formData.category}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, category: val }))}
+                      options={[
+                        { value: "Electronics", label: "Electronics" },
+                        { value: "Furniture", label: "Furniture" },
+                        { value: "Stationery", label: "Stationery" },
+                        { value: "Vehicles", label: "Vehicles" },
+                        { value: "Machinery", label: "Machinery" },
+                      ]}
+                      placeholder="Select Category"
+                    />
                   </div>
 
                   {/* Brand Dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-800 mb-1.5">Brand</label>
                     <div className="flex space-x-2">
-                      <div className="relative flex-1">
-                        <select
-                          name="brand"
+                      <div className="flex-1">
+                        <PredictiveSearchSelect
                           value={formData.brand}
-                          onChange={handleInputChange}
-                          className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white text-gray-700 outline-none focus:border-[#6b58e8]"
-                          required
-                        >
-                          <option value="">Select Brand</option>
-                          <option value="Global Link">Global Link</option>
-                          <option value="ABCD">ABCD</option>
-                          <option value="local">local</option>
-                          <option value="bsrm test">bsrm test</option>
-                          <option value="hhh">hhh</option>
-                          <option value="test">test</option>
-                          <option value="Dell">Dell</option>
-                          <option value="HP">HP</option>
-                          <option value="Samsung">Samsung</option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
+                          onChange={(val) => setFormData((prev) => ({ ...prev, brand: val }))}
+                          options={[
+                            { value: "Global Link", label: "Global Link" },
+                            { value: "ABCD", label: "ABCD" },
+                            { value: "local", label: "local" },
+                            { value: "bsrm test", label: "bsrm test" },
+                            { value: "hhh", label: "hhh" },
+                            { value: "test", label: "test" },
+                            { value: "Dell", label: "Dell" },
+                            { value: "HP", label: "HP" },
+                            { value: "Samsung", label: "Samsung" },
+                          ]}
+                          placeholder="Select Brand"
+                        />
                       </div>
                       <button type="button" className="bg-[#6b58e8] hover:bg-[#5844d0] text-white px-3 py-2 rounded shadow transition">
                         <Plus className="w-4 h-4" />
@@ -451,34 +450,29 @@ export default function AssetItemList() {
                   {/* Unit Dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-800 mb-1.5">Unit</label>
-                    <div className="relative">
-                      <select
-                        name="unit"
-                        value={formData.unit}
-                        onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white text-gray-700 outline-none focus:border-[#6b58e8]"
-                        required
-                      >
-                        <option value="">Select Unit</option>
-                        <option value="Kg">Kg</option>
-                        <option value="Bag">Bag</option>
-                        <option value="Cft">Cft</option>
-                        <option value="Litre">Litre</option>
-                        <option value="Pcs">Pcs</option>
-                        <option value="Sft">Sft</option>
-                        <option value="Feet">Feet</option>
-                        <option value="Lt.">Lt.</option>
-                        <option value="Tk.">Tk.</option>
-                        <option value="Goj">Goj</option>
-                        <option value="Drum">Drum</option>
-                        <option value="Gallon">Gallon</option>
-                        <option value="Job">Job</option>
-                        <option value="Nos">Nos</option>
-                        <option value="Rft">Rft</option>
-                        <option value="RMT">RMT</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-                    </div>
+                    <PredictiveSearchSelect
+                      value={formData.unit}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, unit: val }))}
+                      options={[
+                        { value: "Kg", label: "Kg" },
+                        { value: "Bag", label: "Bag" },
+                        { value: "Cft", label: "Cft" },
+                        { value: "Litre", label: "Litre" },
+                        { value: "Pcs", label: "Pcs" },
+                        { value: "Sft", label: "Sft" },
+                        { value: "Feet", label: "Feet" },
+                        { value: "Lt.", label: "Lt." },
+                        { value: "Tk.", label: "Tk." },
+                        { value: "Goj", label: "Goj" },
+                        { value: "Drum", label: "Drum" },
+                        { value: "Gallon", label: "Gallon" },
+                        { value: "Job", label: "Job" },
+                        { value: "Nos", label: "Nos" },
+                        { value: "Rft", label: "Rft" },
+                        { value: "RMT", label: "RMT" },
+                      ]}
+                      placeholder="Select Unit"
+                    />
                   </div>
 
                   {/* Purchase Price */}
@@ -500,23 +494,18 @@ export default function AssetItemList() {
                   {/* Chart Of Groups Dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-800 mb-1.5">Chart Of Groups*</label>
-                    <div className="relative">
-                      <select
-                        name="group"
-                        value={formData.group}
-                        onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded px-3 py-2 appearance-none bg-white text-gray-700 outline-none focus:border-[#6b58e8]"
-                        required
-                      >
-                        <option value="">Select One Option</option>
-                        <option value="Asset">Asset</option>
-                        <option value="Liability">Liability</option>
-                        <option value="Equity">Equity</option>
-                        <option value="Revenue">Revenue</option>
-                        <option value="Expense">Expense</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-                    </div>
+                    <PredictiveSearchSelect
+                      value={formData.group}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, group: val }))}
+                      options={[
+                        { value: "Asset", label: "Asset" },
+                        { value: "Liability", label: "Liability" },
+                        { value: "Equity", label: "Equity" },
+                        { value: "Revenue", label: "Revenue" },
+                        { value: "Expense", label: "Expense" },
+                      ]}
+                      placeholder="Select One Option"
+                    />
                   </div>
 
                 </div>

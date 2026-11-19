@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { Sparkles, Search, ChevronLeft, ChevronRight, Plus, Edit, Trash2, X, AlertTriangle, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { crmFetch } from "../../crm-fetch";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 const API_PATH = `${API_BASE}/realbizpro/api/v1`;
@@ -321,43 +322,63 @@ export default function ProjectPage() {
       <div className="bg-white p-4 rounded-xl border grid grid-cols-1 md:grid-cols-4 gap-4 shadow-sm">
         <div>
           <label className="block text-xs text-gray-600 mb-1">Project Type</label>
-          <select value={filterProjectType} onChange={(e) => setFilterProjectType(e.target.value)} className="w-full border rounded-lg px-3 py-1.5 text-sm">
-            <option value="">All Types</option>
-            {projectTypes.map((p, index) => {
-              const pName = typeof p === "string" ? p : p.name || p.label;
-              return <option key={`ptype-${index}`} value={pName}>{pName}</option>;
-            })}
-          </select>
+          <PredictiveSearchSelect
+            options={[
+              { value: "", label: "All Types" },
+              ...projectTypes.map((p) => {
+                const pName = typeof p === "string" ? p : p.name || p.label;
+                return { value: pName, label: pName };
+              }),
+            ]}
+            value={filterProjectType}
+            onChange={(val) => setFilterProjectType(val)}
+            placeholder="All Types"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Status</label>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full border rounded-lg px-3 py-1.5 text-sm">
-            <option value="">All Status</option>
-            {statuses.map((s, index) => {
-              const sName = typeof s === "string" ? s : s.name || s.label;
-              return <option key={`status-${index}`} value={sName}>{sName}</option>;
-            })}
-          </select>
+          <PredictiveSearchSelect
+            options={[
+              { value: "", label: "All Status" },
+              ...statuses.map((s) => {
+                const sName = typeof s === "string" ? s : s.name || s.label;
+                return { value: sName, label: sName };
+              }),
+            ]}
+            value={filterStatus}
+            onChange={(val) => setFilterStatus(val)}
+            placeholder="All Status"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Area</label>
-          <select value={filterArea} onChange={(e) => setFilterArea(e.target.value)} className="w-full border rounded-lg px-3 py-1.5 text-sm">
-            <option value="">Select Area</option>
-            {areas.map((a, index) => {
-              const aName = typeof a === "string" ? a : a.name || a.label;
-              return <option key={`area-${index}`} value={aName}>{aName}</option>;
-            })}
-          </select>
+          <PredictiveSearchSelect
+            options={[
+              { value: "", label: "Select Area" },
+              ...areas.map((a) => {
+                const aName = typeof a === "string" ? a : a.name || a.label;
+                return { value: aName, label: aName };
+              }),
+            ]}
+            value={filterArea}
+            onChange={(val) => setFilterArea(val)}
+            placeholder="Select Area"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Number Of Storeys</label>
-          <select value={filterStoreys} onChange={(e) => setFilterStoreys(e.target.value)} className="w-full border rounded-lg px-3 py-1.5 text-sm">
-            <option value="">All Storeys</option>
-            {storeys.map((s, index) => {
-              const sVal = typeof s === "string" ? s : String(s);
-              return <option key={`storey-${index}`} value={sVal}>{sVal}</option>;
-            })}
-          </select>
+          <PredictiveSearchSelect
+            options={[
+              { value: "", label: "All Storeys" },
+              ...storeys.map((s) => {
+                const sVal = typeof s === "string" ? s : String(s);
+                return { value: sVal, label: sVal };
+              }),
+            ]}
+            value={filterStoreys}
+            onChange={(val) => setFilterStoreys(val)}
+            placeholder="All Storeys"
+          />
         </div>
       </div>
 
@@ -516,25 +537,35 @@ export default function ProjectPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-slate-500 mb-1.5">Project Type</label>
-                  <select required value={formData.projectType} onChange={(e) => setFormData({ ...formData, projectType: e.target.value })} className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none">
-                    <option value="">Select Project Type</option>
-                    {projectTypes.map((p, index) => {
-                      const pName = typeof p === "string" ? p : p.name || p.label;
-                      const pVal = typeof p === "object" && p.uuid ? p.uuid : pName;
-                      return <option key={`ptype-modal-${index}`} value={pVal}>{pName}</option>;
-                    })}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "", label: "Select Project Type" },
+                      ...projectTypes.map((p) => {
+                        const pName = typeof p === "string" ? p : p.name || p.label;
+                        const pVal = typeof p === "object" && p.uuid ? p.uuid : pName;
+                        return { value: pVal, label: pName };
+                      }),
+                    ]}
+                    value={formData.projectType}
+                    onChange={(val) => setFormData({ ...formData, projectType: val })}
+                    placeholder="Select Project Type"
+                  />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Project Manager</label>
-                  <select value={formData.projectManager} onChange={(e) => setFormData({ ...formData, projectManager: e.target.value })} className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none">
-                    <option value="">Select Project Manager</option>
-                    {managers.map((m, index) => {
-                      const mName = typeof m === "string" ? m : m.name || m.label;
-                      const mVal = typeof m === "object" && m.uuid ? m.uuid : mName;
-                      return <option key={`manager-${index}`} value={mVal}>{mName}</option>;
-                    })}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "", label: "Select Project Manager" },
+                      ...managers.map((m) => {
+                        const mName = typeof m === "string" ? m : m.name || m.label;
+                        const mVal = typeof m === "object" && m.uuid ? m.uuid : mName;
+                        return { value: mVal, label: mName };
+                      }),
+                    ]}
+                    value={formData.projectManager}
+                    onChange={(val) => setFormData({ ...formData, projectManager: val })}
+                    placeholder="Select Project Manager"
+                  />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Code</label>
@@ -564,24 +595,34 @@ export default function ProjectPage() {
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Status</label>
-                  <select required value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none">
-                    <option value="">Select Status</option>
-                    {statuses.map((s, index) => {
-                      const sName = typeof s === "string" ? s : s.name || s.label;
-                      return <option key={`status-modal-${index}`} value={sName}>{sName}</option>;
-                    })}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "", label: "Select Status" },
+                      ...statuses.map((s) => {
+                        const sName = typeof s === "string" ? s : s.name || s.label;
+                        return { value: sName, label: sName };
+                      }),
+                    ]}
+                    value={formData.status}
+                    onChange={(val) => setFormData({ ...formData, status: val })}
+                    placeholder="Select Status"
+                  />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Area</label>
-                  <select value={formData.areaCategory} onChange={(e) => setFormData({ ...formData, areaCategory: e.target.value })} className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none">
-                    <option value="">Select Area</option>
-                    {areas.map((a, index) => {
-                      const aName = typeof a === "string" ? a : a.name || a.label;
-                      const aVal = typeof a === "object" && a.uuid ? a.uuid : aName;
-                      return <option key={`area-modal-${index}`} value={aVal}>{aName}</option>;
-                    })}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "", label: "Select Area" },
+                      ...areas.map((a) => {
+                        const aName = typeof a === "string" ? a : a.name || a.label;
+                        const aVal = typeof a === "object" && a.uuid ? a.uuid : aName;
+                        return { value: aVal, label: aName };
+                      }),
+                    ]}
+                    value={formData.areaCategory}
+                    onChange={(val) => setFormData({ ...formData, areaCategory: val })}
+                    placeholder="Select Area"
+                  />
                 </div>
               </div>
 
@@ -592,13 +633,18 @@ export default function ProjectPage() {
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Assign User</label>
-                  <select className="w-full p-3 border rounded-xl bg-white border-slate-200 text-sm font-semibold outline-none">
-                    <option value="">Select User</option>
-                    {managers.map((u, index) => {
-                      const uName = typeof u === "string" ? u : u.name || u.label;
-                      return <option key={`user-${index}`} value={uName}>{uName}</option>;
-                    })}
-                  </select>
+                  <PredictiveSearchSelect
+                    options={[
+                      { value: "", label: "Select User" },
+                      ...managers.map((u) => {
+                        const uName = typeof u === "string" ? u : u.name || u.label;
+                        return { value: uName, label: uName };
+                      }),
+                    ]}
+                    value=""
+                    onChange={() => {}}
+                    placeholder="Select User"
+                  />
                 </div>
                 <div>
                   <label className="block text-slate-500 mb-1.5">Start Date</label>

@@ -13,6 +13,7 @@ import {
   Briefcase,
   ChevronDown,
 } from "lucide-react";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 // ---------- Types ----------
 export interface Designation {
@@ -34,6 +35,17 @@ interface OptionItem {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5002";
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('share-project:access-token')
+    : '';
+  return {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+};
+
 async function handleRes(res: Response, action: string) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -52,7 +64,7 @@ async function fetchDesignations(): Promise<{
   console.log("GET designations →", url);
   const res = await fetch(url, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     cache: "no-store",
   });
   const json = await handleRes(res, "fetch designations");
@@ -83,7 +95,7 @@ async function fetchDepartments(): Promise<OptionItem[]> {
 
     const res = await fetch(url, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -111,7 +123,7 @@ async function createDesignation(payload: Record<string, any>) {
   console.log("POST payload →", payload);
   const res = await fetch(`${API_BASE}/realbizpro/api/v1/designation`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleRes(res, "create designation");
@@ -125,7 +137,7 @@ async function updateDesignation(uuid: string, payload: Record<string, any>) {
     `${API_BASE}/realbizpro/api/v1/designation/${uuid}`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     },
   );
@@ -140,7 +152,7 @@ async function softDeleteDesignation(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/designation/${uuid}`,
     {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   const json = await handleRes(res, "delete designation");
@@ -154,7 +166,7 @@ async function restoreDesignation(uuid: string) {
     `${API_BASE}/realbizpro/api/v1/designation/${uuid}/restore`,
     {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
     },
   );
   const json = await handleRes(res, "restore designation");
@@ -173,7 +185,7 @@ const toApiPayload = (data: {
 
 // ---------- Searchable Select (for Department dropdown) ----------
 function SearchableSelect({
-  options,
+  options = [],
   value,
   onChange,
   placeholder = "Select value",
@@ -183,87 +195,14 @@ function SearchableSelect({
   onChange: (val: string) => void;
   placeholder?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  const selected = options.find((o) => o.uuid === value);
-
-  const filtered = useMemo(
-    () =>
-      options.filter((o) =>
-        o.name.toLowerCase().includes(query.toLowerCase()),
-      ),
-    [options, query],
-  );
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
   return (
-    <div className="relative" ref={containerRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-left text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none flex items-center justify-between"
-      >
-        <span className={selected ? "text-slate-800" : "text-slate-400"}>
-          {selected ? selected.name : placeholder}
-        </span>
-        <ChevronDown className="w-4 h-4 text-slate-400" />
-      </button>
-
-      {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
-          <div className="p-2 border-b border-slate-100">
-            <input
-              autoFocus
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search..."
-              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div className="max-h-56 overflow-y-auto">
-            {filtered.length > 0 ? (
-              filtered.map((opt) => (
-                <button
-                  key={opt.uuid}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.uuid);
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                    value === opt.uuid
-                      ? "bg-indigo-50 text-indigo-700 font-medium"
-                      : "text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {opt.name}
-                </button>
-              ))
-            ) : (
-              <div className="px-3 py-3 text-xs text-slate-400 text-center">
-                No options found
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    <PredictiveSearchSelect
+      value={value}
+      onChange={onChange}
+      options={options.map((o) => ({ value: o.uuid, label: o.name }))}
+      placeholder={placeholder}
+      className="w-full"
+    />
   );
 }
 
@@ -535,18 +474,20 @@ export default function DesignationListPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/70 p-3 rounded-xl border border-slate-200/60">
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <span>Show</span>
-            <select
-              value={entriesPerPage}
-              onChange={(e) => {
-                setEntriesPerPage(Number(e.target.value));
+            <PredictiveSearchSelect
+              value={String(entriesPerPage)}
+              onChange={(value) => {
+                setEntriesPerPage(Number(value) || 10);
                 setCurrentPage(1);
               }}
-              className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" },
+              ]}
+              placeholder="10"
+              className="w-20"
+            />
             <span>entries</span>
           </div>
 

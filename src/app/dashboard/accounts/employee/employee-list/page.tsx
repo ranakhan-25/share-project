@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { Search, Plus, Download, Eye, AlignLeft, Heart, Edit3, Trash2, Loader2, X, Save, ChevronRight } from "lucide-react";
-import { API_BASE, formatDate, SearchableSelect, loadDropdown, EmployeeFormModal } from "../_shared";
+import { API_BASE, formatDate, SearchableSelect, loadDropdown, EmployeeFormModal, getAuthHeaders } from "../_shared";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 import { useRouter } from "next/navigation";
 
 // ---------- Types ----------
@@ -64,7 +65,10 @@ function AttendanceModal({ employee, onClose }: { employee: Employee; onClose: (
   };
 
   useEffect(() => {
-    fetch(`${API_BASE}/realbizpro/api/v1/month-year?page=1&limit=100&sortOrder=DESC&withDeleted=false`, { cache: "no-store" })
+    fetch(`${API_BASE}/realbizpro/api/v1/month-year?page=1&limit=100&sortOrder=DESC&withDeleted=false`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    })
       .then(res => res.json())
       .then((json: { data?: { data?: MonthYearItem[] } }) => {
         const list = json?.data?.data || [];
@@ -79,7 +83,9 @@ function AttendanceModal({ employee, onClose }: { employee: Employee; onClose: (
     (async () => {
       let existing: AttendanceApiRecord[] = [];
       if (employee.uuid && monthYearId) {
-        const res = await fetch(`${API_BASE}/realbizpro/api/v1/attendance?employeeId=${employee.uuid}&monthYearId=${monthYearId}&page=1&limit=500&withDeleted=false`);
+        const res = await fetch(`${API_BASE}/realbizpro/api/v1/attendance?employeeId=${employee.uuid}&monthYearId=${monthYearId}&page=1&limit=500&withDeleted=false`, {
+          headers: getAuthHeaders(),
+        });
         const json = await res.json().catch(() => ({})) as { data?: { data?: AttendanceApiRecord[] } };
         existing = json?.data?.data || [];
       }
@@ -110,7 +116,7 @@ function AttendanceModal({ employee, onClose }: { employee: Employee; onClose: (
       if (!currentMonthYearId) {
         const checkRes = await fetch(
           `${API_BASE}/realbizpro/api/v1/month-year?page=1&limit=100&withDeleted=false`,
-          { cache: "no-store" }
+          { headers: getAuthHeaders(), cache: "no-store" }
         );
         const checkJson = await checkRes.json().catch(() => ({}));
         const existingList = checkJson?.data?.data || [];
@@ -126,7 +132,7 @@ function AttendanceModal({ employee, onClose }: { employee: Employee; onClose: (
         } else {
           const createRes = await fetch(`${API_BASE}/realbizpro/api/v1/month-year`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ month, year: Number(year) }),
           });
           const createJson = await createRes.json().catch(() => ({}));
@@ -164,7 +170,7 @@ function AttendanceModal({ employee, onClose }: { employee: Employee; onClose: (
         
         const res = await fetch(url, {
           method,
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
 
@@ -196,11 +202,16 @@ function AttendanceModal({ employee, onClose }: { employee: Employee; onClose: (
         </div>
         
         <div className="p-4 overflow-y-auto flex-1">
-          <div className="flex gap-4 mb-4">
-            <select value={month} onChange={(e) => setMonth(e.target.value)} className="border p-2 rounded text-sm w-40">
-              {MONTHS.map(m => <option key={m}>{m}</option>)}
-            </select>
-            <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="border p-2 rounded text-sm w-24" />
+          <div className="flex gap-4 mb-4 items-center">
+            <div className="w-48">
+              <PredictiveSearchSelect
+                options={MONTHS.map(m => ({ value: m, label: m }))}
+                value={month}
+                onChange={setMonth}
+                placeholder="Select Month"
+              />
+            </div>
+            <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="border p-2 rounded text-sm w-24 h-10" />
           </div>
 
           {loading ? <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-slate-400" /></div> : (
@@ -265,7 +276,10 @@ export default function EmployeeListPage() {
     setLoading(true);
     try {
       const [empRes, sec, dep, des, sh, et] = await Promise.all([
-        fetch(`${API_BASE}/realbizpro/api/v1/employee-list?page=1&limit=100&status=active&sortBy=createdAt&sortOrder=DESC&withDeleted=false`, { cache: "no-store" }),
+        fetch(`${API_BASE}/realbizpro/api/v1/employee-list?page=1&limit=100&status=active&sortBy=createdAt&sortOrder=DESC&withDeleted=false`, {
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        }),
         loadDropdown("section"), loadDropdown("department"), loadDropdown("designation"), loadDropdown("shift"), loadDropdown("employee-type"),
       ]);
       const empJ = await empRes.json().catch(() => ({}));
@@ -292,7 +306,10 @@ export default function EmployeeListPage() {
   const handleDelete = async (emp: Employee) => {
     if (!confirm(`Delete ${emp.name}?`)) return;
     try {
-      await fetch(`${API_BASE}/realbizpro/api/v1/employee-list/${emp.uuid}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/realbizpro/api/v1/employee-list/${emp.uuid}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       setEmployees((prev) => prev.filter((x) => x.uuid !== emp.uuid));
     } catch (error: unknown) { alert("Delete failed"); }
   };
@@ -367,11 +384,17 @@ export default function EmployeeListPage() {
           <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center text-xs sm:text-sm text-slate-600 space-x-2">
               <span>Show</span>
-              <select className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 cursor-pointer">
-                <option>10</option>
-                <option>25</option>
-                <option>50</option>
-              </select>
+              <PredictiveSearchSelect
+                value="10"
+                onChange={() => {}}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "25", label: "25" },
+                  { value: "50", label: "50" },
+                ]}
+                placeholder="10"
+                className="w-20"
+              />
               <span>entries</span>
             </div>
 

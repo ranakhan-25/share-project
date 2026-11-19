@@ -17,6 +17,7 @@ import {
   Users
 } from "lucide-react";
 import { crmDirectoryApi } from "@/services/crmLeadApi";
+import PredictiveSearchSelect from "@/components/ui/PredictiveSearchSelect";
 
 interface Party {
   uuid: string;
@@ -320,20 +321,16 @@ export default function PartiesPage() {
       <div className="p-4 md:p-5 rounded-2xl border border-border/80 bg-card shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="w-full sm:w-72">
           <label className="block font-bold text-muted-foreground mb-1.5 text-xs">Filter by Type</label>
-          <select
+          <PredictiveSearchSelect
+            id="party-type-filter"
             value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
+            onChange={(value) => {
+              setTypeFilter(value);
               setCurrentPage(1);
             }}
-            className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border text-sm font-extrabold outline-none focus:ring-2 focus:ring-indigo-500/20 capitalize cursor-pointer"
-          >
-            <option value="all">All Party Types</option>
-            <option value="customer">Customer</option>
-            <option value="investor">Investor</option>
-            <option value="vendor">Vendor</option>
-            <option value="other">Other</option>
-          </select>
+            options={[{ value: "all", label: "All Party Types" }, { value: "customer", label: "Customer" }, { value: "investor", label: "Investor" }, { value: "vendor", label: "Vendor" }, { value: "other", label: "Other" }]}
+            placeholder="Search party type..."
+          />
         </div>
 
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-4">
@@ -577,16 +574,13 @@ export default function PartiesPage() {
 
               <div>
                 <label className="block text-muted-foreground mb-1.5 font-bold">Party Type *</label>
-                <select
+                <PredictiveSearchSelect
+                  id="party-type"
                   value={partyFormData.type}
-                  onChange={(e) => setPartyFormData({ ...partyFormData, type: e.target.value as Party["type"] })}
-                  className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border outline-none font-extrabold capitalize text-foreground focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                >
-                  <option value="customer">Customer</option>
-                  <option value="investor">Investor</option>
-                  <option value="vendor">Vendor</option>
-                  <option value="other">Other</option>
-                </select>
+                  onChange={(value) => setPartyFormData({ ...partyFormData, type: value as Party["type"] })}
+                  options={[{ value: "customer", label: "Customer" }, { value: "investor", label: "Investor" }, { value: "vendor", label: "Vendor" }, { value: "other", label: "Other" }]}
+                  placeholder="Search party type..."
+                />
               </div>
 
               <div>
@@ -636,13 +630,13 @@ export default function PartiesPage() {
             <form onSubmit={handleAssignSubmit} className="space-y-4 text-sm font-semibold">
               <div>
                 <label className="block text-muted-foreground mb-1.5 font-bold">Assignee *</label>
-                <select
+                <PredictiveSearchSelect
+                  id="party-assignee"
                   value={assigneeData.assignee}
-                  onChange={(e) => setAssigneeData({ ...assigneeData, assignee: e.target.value })}
-                  className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border outline-none font-bold text-foreground focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                >
-                  {partyUsers.map((user: any) => <option key={user.uuid} value={user.uuid}>{user.name}</option>)}
-                </select>
+                  onChange={(value) => setAssigneeData({ ...assigneeData, assignee: value })}
+                  options={partyUsers.map((user: any) => ({ value: String(user.uuid ?? user.id ?? ""), label: String(user.name ?? "") }))}
+                  placeholder="Search assignee..."
+                />
               </div>
 
               <div>
@@ -682,29 +676,24 @@ export default function PartiesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-muted-foreground mb-1.5 font-bold">Channel *</label>
-                  <select
+                  <PredictiveSearchSelect
+                    id="party-channel"
                     value={commFormData.channel}
-                    onChange={(e) => setCommFormData({ ...commFormData, channel: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border outline-none font-bold capitalize text-foreground focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                  >
-                    <option value="call">Call</option>
-                    <option value="sms">SMS</option>
-                    <option value="email">Email</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="meeting">Meeting</option>
-                  </select>
+                    onChange={(value) => setCommFormData({ ...commFormData, channel: value })}
+                    options={[{ value: "call", label: "Call" }, { value: "sms", label: "SMS" }, { value: "email", label: "Email" }, { value: "whatsapp", label: "WhatsApp" }, { value: "meeting", label: "Meeting" }]}
+                    placeholder="Search channel..."
+                  />
                 </div>
 
                 <div>
                   <label className="block text-muted-foreground mb-1.5 font-bold">Direction *</label>
-                  <select
+                  <PredictiveSearchSelect
+                    id="party-direction"
                     value={commFormData.direction}
-                    onChange={(e) => setCommFormData({ ...commFormData, direction: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-background border-border outline-none font-bold text-foreground focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                  >
-                    <option value="in">Inbound (Received)</option>
-                    <option value="out">Outbound (Sent)</option>
-                  </select>
+                    onChange={(value) => setCommFormData({ ...commFormData, direction: value })}
+                    options={[{ value: "in", label: "Inbound (Received)" }, { value: "out", label: "Outbound (Sent)" }]}
+                    placeholder="Search direction..."
+                  />
                 </div>
               </div>
 
